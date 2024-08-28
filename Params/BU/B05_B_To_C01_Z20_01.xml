@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<granar>
+<aerenchyma n_files="10" proportion="0"/>
+<cortex cell_diameter="0.0250015238095238" n_layers="3" order="4"/>
+<endodermis barrier="1" cell_diameter="0.0166885714285714" n_layers="1" order="3"/>
+<epidermis cell_diameter="0.0163771666666667" n_layers="1" order="6"/>
+<exodermis barrier="0" cell_diameter="0.0311984" n_layers="1" order="5"/>
+<pericycle cell_diameter="0.0149964285714286" n_layers="1" order="2"/>
+<phloem max_size="0.014253" n_files="1" proportion="0"/>
+<planttype param="2"/>
+<randomness param="2"/>
+<secondarygrowth param="1"/>
+<stele cell_diameter="0.00906928159770313" layer_diameter="0.1452" mean_size="65.9966666666667" n_layers="5" order="1" SD="19.8652550617068" totarea="16516.878"/>
+<xylem max_size="452.173" mean_size="262.357166666667" n_files="6" order="1.5"/>
+</granar>
