@@ -5,7 +5,8 @@ vroot_plot <- function(Data = data,
          aes(x = x,
              y = y
              )) +
-    geom_point() +
+    # geom_jitter() +
+    geom_point(alpha = 0.5, size = 1) +
     # geom_line() +
 
     # stat_summary(fun.y = median, geom = "line",
@@ -13,27 +14,26 @@ vroot_plot <- function(Data = data,
     #              position = position_dodge(width = 0.9)) +
 
     #facet_wrap(~segment, ncol = 4) +
-    theme_bw() +
     # scale_fill_manual(values = c("G" = "coral1", "A" =  "turquoise3")) +
-    #geom_jitter(color="black", size=0.4, alpha=0.9) + # Add points
-
-    theme(axis.line = element_line(color='black'),
-          # Remove grid
-          plot.background = element_blank(),
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          # Change font
-          # text = element_text(family = "A"),
-          # Remove x ticks
-          #axis.text.x=element_blank(),
-          #axis.ticks.x=element_blank(),
-          # Remove legend title
-          #legend.title=element_blank()
-          # Remove legend
-          legend.position="none"
-          # Remove panel borders
-          #panel.border = element_blank()
-    ) +
+    
+    theme_bw() +
+    # theme(axis.line = element_line(color='black'),
+    #       # Remove grid
+    #       plot.background = element_blank(),
+    #       panel.grid.major = element_blank(),
+    #       panel.grid.minor = element_blank(),
+    #       # Change font
+    #       # text = element_text(family = "A"),
+    #       # Remove x ticks
+    #       #axis.text.x=element_blank(),
+    #       #axis.ticks.x=element_blank(),
+    #       # Remove legend title
+    #       #legend.title=element_blank()
+    #       # Remove legend
+    #       legend.position="none"
+    #       # Remove panel borders
+    #       #panel.border = element_blank()
+    # ) +
     ggtitle(Title)
 }
 

@@ -393,7 +393,7 @@ For that, we first compute stats to find regression equations with the function 
 
 Next, we generate virtual roots with the function *Make_Virtual_Roots()*. The file *Virtual_Roots* contains all generated virtual roots. *Make_Virtual_Roots()* take the regression functions for each param, compute the param value corresponding to each node, and ad a random residual corresponding to the standart error of the regression. E.G : for cortex_n_layers, the reg equation is : $-0.05407*X + 3.63181 + sd$ where X is the node, and $sd$ the random residual. $sd$ is drawn in a normal distribution of mean 0 and sigma the standart deviation of the regression of the param : $sd \sim R(0, \sigma_{param})$.
 
-NB : we can also add some randomness using the method $alpha$alpha, which simply compute the value of the param per node and add a residual that is a percentage of the mean value of the param at that node.
+NB : we can also add some randomness using the method $alpha$, which simply compute the value of the param per node and add a residual that is a percentage of the mean value of the param at that node.
 
 Finally, we can plot and save the results using the *Virtual_Roots_Visu()* function.
 
@@ -427,12 +427,22 @@ alpha <- 0.15
 # source("Regressions_Auto.R")
 ```
 
+### Create Regressions
+
+```{r}
+source("Regressions_Auto.R")
+
+reg_plots <- wrap_plots(plot_list, ncol = 3)
+print(reg_plots)
+ggsave(filename = "plots/regressions/Regression_plots.svg", 
+       plot = reg_plots, device = "svg", width = 10, height = 15, units = "in")
+```
+
 ### Generation of Virtual_Roots
 
 The principle here is that we build simple regression functions for each GRANAR parameter. For ex, the function *phloem_proportion()* returns a regressed value of phloem proportion for a given x.
 
 ```{r, eval = F}
-source("Regressions_Auto.R")
 Virtual_Roots3 <- Make_Virtual_Roots3(Parameters,
                                     n_nodes,
                                     n_roots,
@@ -448,12 +458,15 @@ Virtual_Roots3 <- Make_Virtual_Roots3(Parameters,
 NB : You can add colors to points by changing code of *Virtual_Root_Visu.R* so that each virtual root has a color
 
 ```{r}
-Virtual_Roots3 <- read.csv("Data/Virtual Roots/Virtual_Root_2023-07-31_30x50.csv")[,-1]
+Virtual_Roots3 <- read.csv("Data/Virtual Roots/Virtual_Root_2023-07-31_30x50.csv")
+
+source("FUNCTIONS/T-Root/Virtual_Roots_Visu.R")
 p3_3 <- Virtual_Roots_Visu2(Virtual_Roots3)
 
-# svg(filename=paste0("Plots/Virtual_roots3_",Sys.Date(),"_n",n_nodes,"_r",n_roots,".svg"), width = 20, height = 20)
-plot(p3_3)
-# dev.off()
+p3_3
+ggsave(filename=paste0("Plots/Virtual_roots3_",Sys.Date(),"_n",n_nodes,"_r",n_roots,".png"), 
+       plot = p3_3,
+       width = 8, height = 12, device = "png", units = "in", dpi = 300)
 ```
 
 # 4) GRANAR-MECHA LOCAL
