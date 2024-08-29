@@ -1,7 +1,7 @@
 ---
 title: "MAIN-MARSHAL"
 format: html
-editor: visual
+editor: source
 ---
 
 ```{r, include=FALSE}
@@ -257,9 +257,8 @@ barplot_30 <- ggplot(data = t %>% filter(Scenario %in% c("S1", "S2", "S3"))) +
   theme(legend.position = "none")
 
 # svg("plots/CRB-MARSHAL/Barplot_30.svg", width = 2, height = 3)
-barplot_30
+# barplot_30
 # dev.off()
-  
 ```
 
 ### 60 days old
@@ -287,6 +286,52 @@ barplot_60 <- ggplot(data = t %>% filter(Scenario %in% c("S1", "S2", "S3"))) +
 barplot_60
 # dev.off()
 ```
+
+### Final Boxplot 
+
+```{r}
+# 30 DAYS
+boxplot_30 <- ggplot(data = Krs_table_30 %>% filter(Scenario %in% c("S1", "S2", "S3"))) + 
+  geom_boxplot(aes(x = Scenario, y = Krs, fill = Scenario), outlier.alpha = 0) +
+  geom_jitter(aes(x = Scenario, y = Krs), width = 0.1, alpha = 0.2) +
+  # ylim(1e-10, 7.5e-9) +
+  ylab(expression(K[rs] ~ "[" ~ 10^{-9} ~ m^{3} ~ s^{-1} ~ MPa^{-1} ~ "]")) +
+  ggtitle("30 days old") +
+  theme_test() +
+  theme(legend.position = "none")
+
+svg("plots/CRB-MARSHAL/Boxplot_30.svg", width = 2, height = 3)
+boxplot_30
+dev.off()
+
+# 60 DAYS
+boxplot_60 <- ggplot(data = Krs_table_60 %>% filter(Scenario %in% c("S1", "S2", "S3"))) + 
+  geom_boxplot(aes(x = Scenario, y = Krs, fill = Scenario), outlier.alpha = 0) +
+  geom_jitter(aes(x = Scenario, y = Krs), width = 0.1, alpha = 0.2) +
+  # ylim(1e-10, 7.5e-9) +
+  # ylab(expression(K[rs] ~ "[" ~ 10^{-9} ~ m^{3} ~ s^{-1} ~ MPa^{-1} ~ "]")) +
+  ylab("") +
+  ggtitle("60 days old") +
+  theme_test() +
+  theme(legend.position = "none")
+
+svg("plots/CRB-MARSHAL/Boxplot_60.svg", width = 2, height = 3)
+boxplot_60
+dev.off()
+
+# COMBINE BOTH
+library(cowplot)
+Krs_both <- plot_grid(boxplot_30 + theme(axis.title.x = element_blank()) , 
+                      boxplot_60+ theme(axis.title.x = element_blank()) ,
+          align = 'h',
+          ncol = 2)
+Krs_both
+
+svg(filename = "plots/CRB-MARSHAL/Krs_both.svg", width = 5, height = 3)
+Krs_both
+dev.off()
+```
+
 
 ## Plot Hydraulic Properties
 

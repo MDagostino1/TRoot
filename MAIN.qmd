@@ -168,12 +168,13 @@ for(i in seq(1, length(test$x))){
 radius_plot <- ggplot() +
   geom_point(data = Anatomy_Full, aes(x = age, y = radius), size = 2) + 
   geom_line(data = test, aes(x = x, y = radius), linetype = 2, color = "red", linewidth = 1.2) +
-  
+  xlab("Age [d]") +
+  ylab("Radius [mm]") +
   theme_bw()
 
-# svg("Plots/Radius_Plot.svg", width = 5, height = 4)
+svg("Plots/Radius_Plot.svg", width = 4, height = 3)
 radius_plot
-# dev.off()
+dev.off()
 ```
 
 ## Correlations
@@ -196,7 +197,9 @@ prm <- c("cortex_n_layers",
          "radius",
          "age")
 
-corrplot(cor(Anatomy_Full[prm]), method = "number")
+png(filename = "plots/Correlations.png", width = 10, height = 10, units = "in", res = 100)
+pcor <- corrplot(cor(Anatomy_Full[prm]), method = "number", diag = F, type = "upper")
+dev.off()
 ```
 
 ## Parameter regressions

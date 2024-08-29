@@ -1,7 +1,7 @@
 ---
 title: "RESULTS ANALYSIS"
 format: html
-editor: visual
+editor: source
 editor_options: 
   chunk_output_type: inline
 ---
@@ -182,7 +182,7 @@ kAQP_plot1 <- ggplot(data = Conductivities_dico,
                          color = Barrier))+
   geom_point(aes(x = as.factor(kAQP*10000)),
              position = "jitter",
-             alpha = 0.1) +
+             alpha = 0.05) +
   # geom_boxplot(aes(x = as.factor(kAQP*10000), y = kr, color = Barrier))+
   # facet_wrap(~Barrier) +
   # scale_color_viridis() +
@@ -194,6 +194,7 @@ kAQP_plot1 <- ggplot(data = Conductivities_dico,
   theme_test() 
   # theme(legend.position = "none")
 kAQP_plot1
+ggsave(filename = "plots/AQP_influence.svg", plot = kAQP_plot1, device = "svg", width = 4, height = 3, units = "in")
 #============================================================================
 # kr
 kr_plot1 <- ggplot(data = Conductivities_dico,
@@ -517,12 +518,12 @@ MS_all <- ggplot(data = Conductivities %>% filter(kAQP == 5e-04),
   xlab("Maturation Stage") +
   ylab(expression(k[r] ~ "[" ~ 10^{-08} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
   scale_fill_manual(values=c("white","white","white", "grey", "grey", "grey")) +
-  theme_test() +
+  theme_bw() +
   # ggtitle(expression(k[r] ~ "[" ~ 10^{-08} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
   theme(legend.position = "none") 
 
 
-# svg("Plots/Maturation_Stages_All.svg", height = 6, width = 5)
+# svg("Plots/Maturation_Stages_All.svg", height = 4, width = 4)
 MS_all
 # dev.off()
 ```
