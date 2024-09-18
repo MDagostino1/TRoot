@@ -1,0 +1,39 @@
+---
+title: "GRANAR_VALIDATION"
+format: html
+editor: source
+---
+
+```{r}
+options(rstudio.help.showDataPreview = FALSE)
+rm(list = ls())
+
+pkg_list <- c("fmsb", "packcircles", "pander", "readxl", "visreg", "EnvStats", "factoextra", "data.table",
+              "reticulate", "xml2", "tidyverse", "plyr", "deldir", "viridis", "Hmisc", "devtools", "ggplot2",
+              "gridExtra", "dplyr", "cowplot", "stats", "emmeans", "corrplot", "sf", "SciViews")
+
+for(pkg in pkg_list){
+  library(pkg, character.only = T)
+}
+```
+
+```{r}
+CellSet_full <- read.csv("CellSet/CellSet_full.csv")
+anatomy2 <- read.csv("Data/Anatomy/anatomy2.csv")
+
+test_CS <- CellSet_full %>% filter(CS_id == "B04_B_To_C01_Z20_01")
+
+CellSet_plot <- ggplot(CellSet_full) +
+  geom_polygon(aes(x = x, y = y, group = id_cell, fill = type), color = "white") +
+  coord_fixed() +
+  facet_wrap(~CS_id)
+
+CS_vec <- 
+```
+
+To do : generate GRANAR anatomies corresponding to the CS_ID and compare stats. 
+
+```{r}
+
+```
+

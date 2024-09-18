@@ -31,13 +31,13 @@ pkg_list <- c("fmsb", "packcircles", "pander", "readxl", "visreg", "EnvStats", "
 
 load_packages(pkg_list)
 
-  # Change your path here to Github files
-  GRANAR_path <- "C:/Users/mdagostino/Desktop/GITHUB/granar/R/"
-  
-  for (i in list.files(GRANAR_path, pattern = ".R")) {
-    print(i)
-    source(paste0(GRANAR_path, i))
-  }
+# Change your path here to Github files
+GRANAR_path <- "C:/Users/mdagostino/Desktop/GITHUB/granar/R/"
+
+for (i in list.files(GRANAR_path, pattern = ".R")) {
+  print(i)
+  source(paste0(GRANAR_path, i))
+}
 
 # source("Data_preparation.R")
 
