@@ -8,6 +8,7 @@ editor_options:
 
 ```{r Load Packages, include=F}
 options(rstudio.help.showDataPreview = FALSE)
+rm(list = ls())
 
 TRoot_path <- "FUNCTIONS/T-Root/"
 for (i in list.files(TRoot_path)) {
@@ -156,7 +157,7 @@ Load Data
 
 ```{r Load Data}
 Conductivities_dico <- read.csv(paste0(simu_path, "Conductivities_dico_2024-02-12.csv"))
-Conductivities_mono <- read.csv(paste0(simu_path, "COnductivities_mono_2024-02-12.csv"))
+Conductivities_mono <- read.csv(paste0(simu_path, "Conductivities_mono_2024-02-12.csv"))
 
 Conductivities <- rbind(Conductivities_dico, Conductivities_mono)
 
@@ -608,15 +609,23 @@ coefficients_Kx <- tibble(a = -25.97,
 
 # PREDICTION CURVES
 
-## Scenario 1 : Tomato
+## Scenario 1A : 
+
+* Secondary Growth
+
+* LC + Sub in exo
+
+* Fixed kAQP
 
 ```{r}
+# Create Reg2
 Reg2 <- tibble(x = seq(1:30))
 Reg2$radius <- radius_reg(Reg2$x)
 Reg2$radius[Reg2$x > 30] <- Reg2$radius[Reg2$x == 30]
 Reg2$MS <- 0
 
-timing <- c(7, 25)
+# Set maturation stages timing
+timing <- c(7, 31)
 Reg2$MS[Reg2$x <= timing[1]] <- "T1"
 Reg2$MS[Reg2$x > timing[1] & Reg2$x < timing[2]] <- "T2"
 Reg2$MS[Reg2$x >= timing[2]] <- "T3"
@@ -625,7 +634,7 @@ Reg2$kr <- 0
 Reg2$Kx <- 0
 Reg2$Kr <- 0
 
-
+# Loop for each day
 for(i in Reg2$x){
   Reg2$kr[Reg2$x == i] <- radial_reg(x = i,
                                      timing = timing,
@@ -642,16 +651,77 @@ Reg2$Kx[Reg2$x > 30] <- Reg2$Kx[Reg2$x == 30]
 
 Reg_plot <- ggplot(data = Reg2) +
   geom_line(aes(x = x, y = kr*1e8), color = "red", linewidth = 2) +
-  geom_line(aes(x = x, y = Kx*1e09), color = "blue", linewidth = 2) +
-  geom_line(aes(x = x, y = Kr*1e11), color = "green", linewidth = 2) +
+  geom_line(aes(x = x, y = Kx*1e10), color = "blue", linewidth = 2) +
+  geom_line(aes(x = x, y = Kr*1e10), color = "green", linewidth = 2) +
   geom_line(aes(x = x, y = radius*1e1), color = "grey", linewidth = 2, linetype = 2) +
   xlim(0, 30) +
   theme_test()
 Reg_plot
 
-# svg("plots/Reg_Plot.svg", width = 5, height = 4)
+# svg("plots/Reg_S1A.svg", width = 5, height = 4)
 # Reg_plot
 # dev.off()
+```
+
+## Scenario 1B : Decreasing kAQP
+
+```{r}
+# Create kAQP function
+kAQP_fun <- function(x){
+  if(x < 20){
+    return(1e-3)
+  }else{
+    return(1e-3 - (1e-3/10)*(x-20))
+  }
+}
+
+# Create Reg2
+Reg2 <- tibble(x = seq(1:30))
+Reg2$radius <- radius_reg(Reg2$x)
+Reg2$radius[Reg2$x > 30] <- Reg2$radius[Reg2$x == 30]
+Reg2$MS <- 0
+
+# Set maturation stages timing
+timing <- c(7, 31)
+Reg2$MS[Reg2$x <= timing[1]] <- "T1"
+Reg2$MS[Reg2$x > timing[1] & Reg2$x < timing[2]] <- "T2"
+Reg2$MS[Reg2$x >= timing[2]] <- "T3"
+
+Reg2$kr <- 0
+Reg2$Kx <- 0
+Reg2$Kr <- 0
+Reg2$kAQP <- sapply(Reg2$x, kAQP_fun)
+
+# Loop for each day
+for(i in Reg2$x){
+  kAQP_i <- Reg2$kAQP[Reg2$x == i]
+  Reg2$kAQP[Reg2$x == i] <- kAQP_i
+  Reg2$kr[Reg2$x == i] <- radial_reg(x = i,
+                                     timing = timing,
+                                     kAQP = kAQP_i,
+                                     coefficients = coefficients_kr)
+  Reg2$Kx[Reg2$x == i] <- axial_reg(x = i, 
+                                    timing = timing, 
+                                    coefficients = coefficients_Kx)
+}
+
+Reg2$Kr <- Reg2$kr * 2 *3.1415 * Reg2$radius/1000
+
+Reg2$Kx[Reg2$x > 30] <- Reg2$Kx[Reg2$x == 30]
+
+Reg_plot <- ggplot(data = Reg2) +
+  geom_line(aes(x = x, y = kr*1e8), color = "red", linewidth = 2) +
+  geom_line(aes(x = x, y = Kx*1e10), color = "blue", linewidth = 2) +
+  geom_line(aes(x = x, y = Kr*5e10), color = "green", linewidth = 2) +
+  geom_line(aes(x = x, y = kAQP*1e4), color = "orange", linewidth = 2) +
+  geom_line(aes(x = x, y = radius*1e1), color = "grey", linewidth = 2, linetype = 2) +
+  xlim(0, 30) +
+  theme_test()
+Reg_plot
+
+svg("plots/Reg_RegS1B.svg", width = 5, height = 4)
+Reg_plot
+dev.off()
 ```
 
 ## Scenario 2 : No exodermis suberization
@@ -683,6 +753,7 @@ Reg_mono1 <- tibble(x = seq(1, 30),
                radius = 0,
                kr = 0,
                Kx = 0)
+
 for(i in seq(1, length(Reg_mono1$x))){
   Reg_mono1$radius[i] <- radius_reg(Reg_mono1$x[i])
   Reg_mono1$kr[i] <- radial_reg(Reg_mono1$x[i], 

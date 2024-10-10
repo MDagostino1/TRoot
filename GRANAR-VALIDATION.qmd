@@ -28,7 +28,7 @@ CellSet_plot <- ggplot(CellSet_full) +
   coord_fixed() +
   facet_wrap(~CS_id)
 
-CS_vec <- 
+ggsave(filename = "plots/CellSet.png", plot = CellSet_plot,device = "png", width = 20, height = 15, dpi = 300, units = "in")
 ```
 
 To do : generate GRANAR anatomies corresponding to the CS_ID and compare stats. 

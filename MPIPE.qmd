@@ -1,0 +1,176 @@
+---
+title: "MPIPE"
+format: html
+editor: source
+---
+
+# Load dependancies
+
+```{r, include=F}
+# knitr::opts_chunk$set(echo = FALSE)
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path)) # Set working directory to the current file
+rm(list = ls())
+
+options(rstudio.help.showDataPreview = FALSE)
+MPath <- "./CRB-MARSHAL/"
+
+libs <- c("fmsb", "SciViews", "pander", "visreg", "readxl", "EnvStats", "FactoMineR", "factoextra", "knitr", "data.table", "reticulate", "xml2", "tidyverse", "dplyr", "viridis", "Hmisc", "ggplot2", "gridExtra", "outliers", "Matrix", "emmeans")
+
+for(pk in libs) {
+  library(pk, character.only = T)
+}
+
+# source(paste0(MPath,"io_function.R")) # CROOTBOX
+source(paste0(MPath, "Get_SUF.R")) # MARSHAL
+source(paste0(MPath, "SUF.R"))
+source(paste0(MPath, "CRBM_functions.R"))
+
+TRoot_path <- "FUNCTIONS/T-Root/"
+for (i in list.files(TRoot_path, pattern = ".R")) {
+  print(i)
+  source(paste0(TRoot_path, i))
+}
+```
+
+# Pipeline to run MARSHAL
+
+## Create database tables
+
+```{r}
+# # SCENARIOS
+# Scenarios.IDs <- tibble(Scenario_id = c("test"), SG = c(F), EndoSub = F, ExoSub = F, EndoCS = F)
+# write.csv(Scenarios.IDs, "CRB-MARSHAL/inputs/Scenarios_ID.csv", row.names = F)
+# 
+# # RSA
+# RSA_list <- list.files("CRB-MARSHAL/inputs/RSA/", pattern = ".csv")
+# RSA.IDs <- tibble(planttype = "Tomato", age = 30, rep = 1:10) %>% mutate(RSA_id = paste0(planttype, "_", age, "_", rep))
+# write.csv(RSA.IDs, "CRB-MARSHAL/inputs/RSA_ID.csv", row.names = F)
+# 
+# # RSHA
+# RSHA.IDs <- tibble(RSHA_id = c(), age = c(), Scenario_id = c(), RSA_id = c())
+# write.csv(RSHA.IDs, "CRB-MARSHAL/inputs/RSHA_ID.csv", row.names = F)
+```
+
+
+## Load DB tables and RSA
+
+```{r}
+Scenarios.IDs <- read.csv("CRB-MARSHAL/inputs/Scenarios_ID.csv")
+RSA.IDs <- read.csv("CRB-MARSHAL/inputs/RSA_ID.csv")
+# RSHA.IDs <- read.csv("CRB-MARSHAL/inputs/RSHA_ID.csv")
+
+RSA_list <- RSA.IDs$RSA_id # Implement a way to select RSA_ids
+
+# LOAD RSA FILES AND CREATE A META FILE
+RSA.all      <- tibble()
+for(RSA_id in RSA_list){
+  RSAi <- read.csv(paste0("CRB-MARSHAL/inputs/RSA/", RSA_id, ".csv"))
+  RSAi$RSA_id <- RSA_id
+  RSA.all <- rbind(RSA.all, RSAi)
+}
+```
+
+## Define scenario
+
+kr_reg and kx_reg function (TO DEVELOP)
+
+```{r}
+kr_reg <- function(x, timing){
+  if(x <= timing[1]){
+    kr <- 1.8e-4
+  }else if(x > timing[1] & x <= timing[2]){
+    kr <- 1.8e-5
+  }else if(x > timing[2]){
+    kr <- 1.8e-6
+  }
+  return(kr)
+}
+
+kx_reg <- function(x, timing){
+  if(x <= timing[1]){
+    kx <- 3.0e-2
+  }else if(x > timing[1] & x <= timing[2]){
+    kx <- 0.1
+  }else if(x > timing[2]){
+    kx <- 4
+  }
+  return(kx)
+}
+```
+
+
+```{r}
+Scenario_id  <- "no_sub"
+
+# Generate conds file
+conds <- create.conds(xmax = 40, timing1 = 7, timing2 = 20, SG = T)
+conds$y[conds$type == "kr" & conds$x >= 7] <- 1.8e-5
+```
+
+## Loop MARSHAL
+
+```{r, include = F}
+path.out <- paste0("CRB-MARSHAL/outputs/", Scenario_id, "/")
+
+# Create folder for the Scenario
+if(dir.exists(path.out)){
+  unlink(paste0(path.out, "*"), recursive = F)
+}else{
+  dir.create(path.out)
+}
+
+# MARSHAL PARAMETERS
+# conds        <- read.csv("CRB-MARSHAL/inputs/conductivities3.csv")
+soil         <- read.csv("CRB-MARSHAL/inputs/soil.csv")
+
+# ============================================================================ #
+results <- run.MARSHAL.loop(RSA_list, RSA.all, 
+                            Scenario_id = Scenario_id, 
+                            conds, soil, 
+                            tmin = 1, tmax = 30, step = 1,       # Decomposition of RSA timing 
+                            timing1 = 7, timing2 = 20)           # SG timing
+# ============================================================================ #
+
+RSHA.all <- results$RSHA.all
+Macro.all <- results$Macro.all
+
+write.csv(RSHA.all, paste0(path.out, "RSHA_all.csv"), row.names = F)
+write.csv(Macro.all, paste0(path.out, "Macro_all.csv"), row.names = F)
+```
+
+Make plots
+
+```{r}
+Scenario_id <- "no_sub"
+path.out <- paste0("CRB-MARSHAL/outputs/", Scenario_id, "/")
+
+RSHA.all <- read.csv(paste0(path.out, "RSHA_all.csv"))
+Macro.all <- read.csv(paste0(path.out, "Macro_all.csv"))
+
+plot.path <- paste0(path.out, "plots/")
+
+# Create folder for the Scenario
+if(dir.exists(plot.path)){
+  unlink(paste0(plot.path, "*"), recursive = F)
+}else{
+  dir.create(plot.path)
+}
+
+unlink(paste0(plot.path, "*"), recursive = F)
+
+for(ti in unique(RSHA.all$age)){
+  plot.CRBM(RSHA.all, Macro.all, ti, path.plot = plot.path, Krs.max = 0.1)
+}
+```
+
+```{r}
+library(magick)
+img <- list.files(plot.path, pattern = ".png")
+img_list <- lapply(paste0(plot.path, img), image_read)
+img_join <- image_join(img_list)
+img_animated <- image_animate(img_join, fps = 2)
+
+image_write(image = img_animated,
+            path = paste0(path.out, "animated.gif"))
+```
+

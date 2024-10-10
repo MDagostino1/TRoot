@@ -676,7 +676,11 @@ remove_outliers <- function(data, threshold = 2) {
 #===============================================================================
 
 # Set Conductivities for Dicot MS
-set_conductivities_dico <- function(Conductivities, threshold = 3){
+set_conductivities <- function(Conductivities, threshold = 3, Barriers = NULL){
+  
+  if(is.null(Barriers)){
+    stop("Please set Barriers.")
+  }
   
   colnames(Conductivities)[c(1,2)] <- c("root", "x")
   # Virtual_Roots <- merge(x = Virtual_Roots, y = Parameters[,c(1,2,3)])
@@ -695,6 +699,7 @@ set_conductivities_dico <- function(Conductivities, threshold = 3){
   
   # Convert kAQP from cm hPa-1 d-1 to m MPa-1 s-1
   Conductivities$kAQP <- (0.01 / (1e-4 * 24 * 60 * 60)) * Conductivities$kAQP
+  Conductivities$kAQP <- round(x = Conductivities$kAQP, digits = 8)
   
   #==========================================================================
   
@@ -708,7 +713,7 @@ set_conductivities_dico <- function(Conductivities, threshold = 3){
   # Conductivities2$x <- as.factor(Conductivities2$x)
   
   # ONLY TOMATO BARRIERS
-  Conductivities_dico <- Conductivities %>% filter(Barrier == "b9" | Barrier == "b6" | Barrier == "b8")
+  Conductivities_dico <- Conductivities %>% filter(Barrier %in% Barriers)
   # Conductivities_dico2 <- Conductivities_dico
   # Conductivities_dico2$x <- as.factor(Conductivities_dico2$x)
   
@@ -719,45 +724,45 @@ set_conductivities_dico <- function(Conductivities, threshold = 3){
 #===============================================================================
 #===============================================================================
 
-# Set Conductivities for Monocot MS
-set_conductivities_mono <- function(Conductivities, threshold = 3){
-  
-  colnames(Conductivities)[c(1,2)] <- c("root", "x")
-  # Virtual_Roots <- merge(x = Virtual_Roots, y = Parameters[,c(1,2,3)])
-  
-  #==========================================================================
-  # Convert Kr from cm hPa-1 d to m s-1 Mpa-1
-  # cm HPa-1 d-1 = 0.01m * (100 * 10-6 MPa)-1 * (24*60*60 s)-1
-  conv <- 0.01 * (100 * 1e-06)^-1 * (24*60*60)^-1
-  Conductivities$kr <- Conductivities$Kr * conv
- 
-  Conductivities$radius <- 10*Conductivities$perimeter/(2*pi) # cm -> mm
-  Conductivities$Kr <- Conductivities$kr * Conductivities$perimeter * 1e-3 # because radius is in mm and kr in m...
-  
-  # Convert Kx from cm4 hPa-1 d-1 to m4 MPa-1 s-1
-  Conductivities$Kx <- 1e-8 * 1e4 * (1/86400) * Conductivities$Kx  
-  
-  # Convert kAQP from cm hPa-1 d-1 to m MPa-1 s-1
-  Conductivities$kAQP <- (0.01 / (1e-4 * 24 * 60 * 60)) * Conductivities$kAQP
-  #==========================================================================
-  
-  # Apply remove outliers : change threshold
-  Conductivities <- remove_outliers(Conductivities,
-                                    threshold =  threshold)
-  
-  # ALL CONDUCTIVITIES
-  # Conductivities <- Conductivities %>% filter(Barrier == "b1" | Barrier == "b2" | Barrier == "b3" | Barrier == "b4" | Barrier == "b5" | Barrier == "b6" | Barrier == "b7")
-  # Conductivities2 <- Conductivities
-  # Conductivities2$x <- as.factor(Conductivities2$x)
-  
-  # ONLY TOMATO BARRIERS
-  Conductivities_mono <- Conductivities %>% filter(Barrier == "b1" | Barrier == "b3" | Barrier == "b4")
-  # Conductivities_dico2 <- Conductivities_dico
-  # Conductivities_dico2$x <- as.factor(Conductivities_dico2$x)
-  
-  return(Conductivities_mono)
-  
-}
+# # Set Conductivities for Monocot MS
+# set_conductivities_mono <- function(Conductivities, threshold = 3){
+#   
+#   colnames(Conductivities)[c(1,2)] <- c("root", "x")
+#   # Virtual_Roots <- merge(x = Virtual_Roots, y = Parameters[,c(1,2,3)])
+#   
+#   #==========================================================================
+#   # Convert Kr from cm hPa-1 d to m s-1 Mpa-1
+#   # cm HPa-1 d-1 = 0.01m * (100 * 10-6 MPa)-1 * (24*60*60 s)-1
+#   conv <- 0.01 * (100 * 1e-06)^-1 * (24*60*60)^-1
+#   Conductivities$kr <- Conductivities$Kr * conv
+#  
+#   Conductivities$radius <- 10*Conductivities$perimeter/(2*pi) # cm -> mm
+#   Conductivities$Kr <- Conductivities$kr * Conductivities$perimeter * 1e-3 # because radius is in mm and kr in m...
+#   
+#   # Convert Kx from cm4 hPa-1 d-1 to m4 MPa-1 s-1
+#   Conductivities$Kx <- 1e-8 * 1e4 * (1/86400) * Conductivities$Kx  
+#   
+#   # Convert kAQP from cm hPa-1 d-1 to m MPa-1 s-1
+#   Conductivities$kAQP <- (0.01 / (1e-4 * 24 * 60 * 60)) * Conductivities$kAQP
+#   #==========================================================================
+#   
+#   # Apply remove outliers : change threshold
+#   Conductivities <- remove_outliers(Conductivities,
+#                                     threshold =  threshold)
+#   
+#   # ALL CONDUCTIVITIES
+#   # Conductivities <- Conductivities %>% filter(Barrier == "b1" | Barrier == "b2" | Barrier == "b3" | Barrier == "b4" | Barrier == "b5" | Barrier == "b6" | Barrier == "b7")
+#   # Conductivities2 <- Conductivities
+#   # Conductivities2$x <- as.factor(Conductivities2$x)
+#   
+#   # ONLY TOMATO BARRIERS
+#   Conductivities_mono <- Conductivities %>% filter(Barrier == "b1" | Barrier == "b3" | Barrier == "b4")
+#   # Conductivities_dico2 <- Conductivities_dico
+#   # Conductivities_dico2$x <- as.factor(Conductivities_dico2$x)
+#   
+#   return(Conductivities_mono)
+#   
+# }
 
 #===============================================================================
 #===============================================================================

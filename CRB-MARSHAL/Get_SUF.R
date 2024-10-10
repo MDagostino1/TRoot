@@ -1,16 +1,10 @@
 
-
 getSUF <- function(table_data, table_cond, table_soil, hetero = TRUE, Psi_collar = -15000){
   ####################################################
   #	Calculates Couvreur Macroscopic parameters   #
   ####################################################
-  # F?licien Meunier, 06/2017
+  # Felicien Meunier, 06/2017
   # 
-  # table_data <- current_rootsystem
-  # table_cond <- conds2
-  # table_soil <- soil
-  # Psi_collar = -15000
-
   
   ###################################################################
   #  Connection between basal and Shoot born root with the main axes  #
