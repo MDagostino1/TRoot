@@ -148,7 +148,7 @@ plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max){
     xlim(-15, 15) +
     ylim(-30, 0) +
     scale_size_continuous(range = c(1, 3), limits = c(min(RSHA.all$radius), max(RSHA.all$radius))) +
-    scale_color_viridis_c(option = "D", limits = c(0, 0.01)) +
+    scale_color_viridis_c(option = "D", limits = c(0, max())) +
     coord_fixed() +
     # facet_wrap(~RSA_id, nrow = 2) +
     # ggtitle(paste0("SUF | time : ", ti)) +
@@ -179,7 +179,7 @@ plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max){
   p_full <- plot_grid(p_kr, p_kx, p_suf, p_krs, nrow = 2)
   p_full <- plot_grid(title, p_full, nrow = 2, rel_heights = (c(0.1, 0.7)))
   pfinal <- ggdraw(p_full) + theme(plot.background = element_rect(fill = "white"))
-  ggsave(filename = paste0(path.plot, "Full", "_", sprintf("%03d", ti), ".png"),
+  ggsave(filename = paste0(path.plot, "Full", "_", sprintf("%04d", round(ti*100)), ".png"),
          plot = pfinal, device = "png", width = 10, height = 10, units = "in", dpi = 200)
 }
 
