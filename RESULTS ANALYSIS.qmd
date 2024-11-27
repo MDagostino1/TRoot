@@ -7,6 +7,8 @@ editor_options:
 ---
 
 ```{r Load Packages, include=F}
+DIR_path <- getwd()
+
 options(rstudio.help.showDataPreview = FALSE)
 rm(list = ls())
 
@@ -25,135 +27,148 @@ load_packages(pkg_list)
 simu_path <- "Results/12-01-2023/"
 ```
 
-# Load Data
+# EXTRACT AND PRE-PROCESS RESULTS 
+
+## Extract Data from jobs 
 
 ```{r, eval = F}
-# path <- "Results/12-01-2023/Conductivities/"
-# l <- list.files(path, pattern = ".csv")
-# Conductivities <- data.frame()
-# 
-# for(i in l){
-#   # print(i)
-#   temp_df <- read.csv(paste0(path, i))
-#   Conductivities <- rbind(Conductivities, temp_df)
-# }
-# # Correct a bug that make Kx weird for b9 (the bug is fixed in scripts, but remains in results files)
-# Conductivities$Kx[Conductivities$Barrier == "b9"] <- Conductivities$Kx[Conductivities$Barrier == "b5"]
-# 
-# write.csv(Conductivities, file = "Results/12-01-2023/Conductivities_full.csv", row.names = F)
+path <- "Results/12-01-2023/Conductivities/"
+l <- list.files(path, pattern = ".csv")
+Conductivities <- data.frame()
+
+for(i in l){
+  # print(i)
+  temp_df <- read.csv(paste0(path, i))
+  Conductivities <- rbind(Conductivities, temp_df)
+}
+# Correct a bug that make Kx weird for b9 (the bug is fixed in scripts, but remains in results files)
+Conductivities$Kx[Conductivities$Barrier == "b9"] <- Conductivities$Kx[Conductivities$Barrier == "b5"]
+
+write.csv(Conductivities, file = "Results/12-01-2023/Conductivities_full.csv", row.names = F)
 ```
 
-Load Conductivity file and create Conductivity_Dico and Conductivity_Mono
+Plot and count the number of successfull simulations.
+We have basically 20 roots x 31 days = 620 combinations, 
+and for MECHA 10 kAQP x 10 barriers = 100.
+But we filter to have only 30 days and 6 barriers : 
+
+```{r}
+Conductivities <- read.csv("Results/12-01-2023/Conductivities_full.csv")
+Conductivities <- Conductivities %>% filter(X > 0 & Barrier %in% c("b1", "b2", "b4", "b6", "b8", "b9"))
+```
+
+Create Conductivity_Dico and Conductivity_Mono.
+The function *set_conductivities* process and convert to the right units.
 
 ```{r, eval = F}
-# Virtual_Roots <- read.csv("Data/Virtual Roots/Virtual_Root_2023-07-17_30x20.csv")
-# 
-# Conductivities <- read.csv(file = paste0(simu_path, "Conductivities_full.csv"))
-# source("FUNCTIONS/T-Root/Functions.R")
-# # Conductivities <- distinct(Conductivities) # To avoid repetitions
-# 
+Virtual_Roots <- read.csv("Data/Virtual Roots/Virtual_Root_2023-07-17_30x20.csv")
+
+Conductivities <- read.csv(file = paste0(simu_path, "Conductivities_full.csv"))
+source("FUNCTIONS/T-Root/Functions.R")
+# Conductivities <- distinct(Conductivities) # To avoid repetitions
+
+#==================================================================================
+# Clean data and create dico and mono
+Conductivities_dico <- set_conductivities(Conductivities, Barriers = c("b6", "b9", "b8"))
+Conductivities_mono <- set_conductivities(Conductivities, Barriers = c("b1", "b3", "b4"))
+
 # #==================================================================================
-# # Clean data and create dico and mono
-# Conductivities_dico <- set_conductivities_dico(Conductivities,threshold = 3)
-# Conductivities_mono <- set_conductivities_mono(Conductivities, threshold = 3)
-# 
-# # #==================================================================================
-# # # Add Radius [mm]
-# # Conductivities_dico$radius <- 10*Conductivities_dico$perimeter/(2*pi) # cm -> mm
-# # Conductivities_mono$radius <- 10*Conductivities_mono$perimeter/(2*pi)
-# #
-# # #==================================================================================
-# # # Add Kr
-# # Conductivities_dico$Kr <- Conductivities_dico$kr*Conductivities_dico$perimeter
-# # Conductivities_mono$Kr <- Conductivities_mono$kr*Conductivities_mono$perimeter
-# 
+# # Add Radius [mm]
+# Conductivities_dico$radius <- 10*Conductivities_dico$perimeter/(2*pi) # cm -> mm
+# Conductivities_mono$radius <- 10*Conductivities_mono$perimeter/(2*pi)
+#
 # #==================================================================================
-# # Change maturation stage name :
-# Conductivities_dico$Barrier <- as.factor(Conductivities_dico$Barrier)
-# Conductivities_mono$Barrier <- as.factor(Conductivities_mono$Barrier)
-# 
-# levels(Conductivities_dico$Barrier) <- c("T2", "T3", "T1")
-# levels(Conductivities_mono$Barrier) <- c("M1", "M2", "M3")
-# 
-# Conductivities_dico <- Conductivities_dico %>% mutate(Barrier = reorder(Barrier, match(Barrier, c("T1", "T2", "T3"))))
-# 
-# Conductivities_full <- rbind(Conductivities_dico, Conductivities_mono)
-# 
-# #==================================================================================
-# # Check that the data is okey (black points have to be +- homogenous) :
-# ggplot(data = Conductivities_dico, aes(x = x, y = root)) +
-#   geom_point() +
-#   ggtitle("Conductivities") +
-#   theme_bw()
-# 
-# # Export
-# write.csv(Conductivities_dico, file = paste0(simu_path, "Conductivities_dico_", Sys.Date(),".csv"), row.names = F)
-# write.csv(Conductivities_mono, file = paste0(simu_path, "Conductivities_mono_", Sys.Date(),".csv"), row.names = F)
-# # write.csv(Conductivities, file = paste0("Data/Conductivities_", Sys.Date(),".csv"), row.names = F)
+# # Add Kr
+# Conductivities_dico$Kr <- Conductivities_dico$kr*Conductivities_dico$perimeter
+# Conductivities_mono$Kr <- Conductivities_mono$kr*Conductivities_mono$perimeter
+
+#==================================================================================
+# Change maturation stage name :
+Conductivities_dico$Barrier <- as.factor(Conductivities_dico$Barrier)
+Conductivities_mono$Barrier <- as.factor(Conductivities_mono$Barrier)
+
+levels(Conductivities_dico$Barrier) <- c("T2", "T3", "T1")
+levels(Conductivities_mono$Barrier) <- c("M1", "M2", "M3")
+
+Conductivities_dico <- Conductivities_dico %>% mutate(Barrier = reorder(Barrier, match(Barrier, c("T1", "T2", "T3"))))
+
+Conductivities_full <- rbind(Conductivities_dico, Conductivities_mono)
+
+#==================================================================================
+# Check that the data is okey (black points have to be +- homogenous) :
+ggplot(data = Conductivities_dico, aes(x = x, y = root)) +
+  geom_point() +
+  ggtitle("Conductivities") +
+  theme_bw()
+
+# Export
+write.csv(Conductivities_dico, file = paste0(simu_path, "Conductivities_dico_", Sys.Date(),".csv"), row.names = F)
+write.csv(Conductivities_mono, file = paste0(simu_path, "Conductivities_mono_", Sys.Date(),".csv"), row.names = F)
+# write.csv(Conductivities, file = paste0("Data/Conductivities_", Sys.Date(),".csv"), row.names = F)
 ```
 
 Create Data Full
 
 ```{r, eval = F, include = F}
-# Virtual_Roots3 <- read.csv("Data/Virtual Roots/Virtual_Root_2023-07-17_30x20.csv")
-# Virtual_Roots3 <- merge(Virtual_Roots3, Parameters[,c(1,2,3)], by = c("name", "type"))
-# 
-# data_full <- merge(Conductivities_full, Virtual_Roots3, by = c("root", "x"))
-# # data_full <- merge(data_full, Parameters[c(1,2,3)])
-# # data_full <- data_full %>% filter(Barrier == "T1")
-# data_full1 <- data.frame(root = data_full$root,
-#                          x = data_full$x,
-#                          param_id = data_full$param_id,
-#                          name = data_full$name,
-#                          type = data_full$type,
-#                          param_value = data_full$y,
-#                          kr = data_full$kr,
-#                          Kx = data_full$Kx,
-#                          Kr = data_full$Kr,
-#                          radius = data_full$radius,
-#                          Barrier = data_full$Barrier,
-#                          kAQP = data_full$kAQP)
-# 
-# 
-# final_df <- data.frame()
-# for(root_i in unique(data_full1$root)){
-#   print(root_i)
-# 
-#   for(x_i in unique(data_full1$x)){
-#     print(x_i)
-# 
-#     for(kaqp in unique(data_full1$kAQP)){
-#       # print(kaqp)
-#       for(MS in unique(data_full1$Barrier)){
-#         # print(MS)
-#         temp_df <- data_full1 %>% filter(root == root_i & x == x_i & kAQP == kaqp & Barrier == MS)
-#         temp_df_e <- data.frame(root = unique(temp_df$root),
-#                                 x = unique(temp_df$x),
-#                                 kr = unique(temp_df$kr),
-#                                 Kx = unique(temp_df$Kx),
-#                                 Kr= unique(temp_df$Kr),
-#                                 radius = unique(temp_df$radius),
-#                                 Barrier = unique(temp_df$Barrier),
-#                                 kAQP = unique(temp_df$kAQP))
-# 
-#         temp_df4 <- pivot_wider(temp_df[c(3,6)],
-#                                 names_from = param_id,
-#                                 values_from = param_value)
-# 
-#         temp_df_e2 <- cbind(temp_df_e, temp_df4)
-#         # print(head(temp_df_e2))
-# 
-#         final_df <- rbind(final_df, temp_df_e2)
-#       }
-#     }
-#   }
-# }
-# 
-# # Export final database
-# write.csv(final_df, "Data/DATA_FULL_FINAL.csv", row.names = F)
+Virtual_Roots3 <- read.csv("Data/Virtual Roots/Virtual_Root_2023-07-17_30x20.csv")
+Virtual_Roots3 <- merge(Virtual_Roots3, Parameters[,c(1,2,3)], by = c("name", "type"))
+
+data_full <- merge(Conductivities_full, Virtual_Roots3, by = c("root", "x"))
+# data_full <- merge(data_full, Parameters[c(1,2,3)])
+# data_full <- data_full %>% filter(Barrier == "T1")
+data_full1 <- data.frame(root = data_full$root,
+                         x = data_full$x,
+                         param_id = data_full$param_id,
+                         name = data_full$name,
+                         type = data_full$type,
+                         param_value = data_full$y,
+                         kr = data_full$kr,
+                         Kx = data_full$Kx,
+                         Kr = data_full$Kr,
+                         radius = data_full$radius,
+                         Barrier = data_full$Barrier,
+                         kAQP = data_full$kAQP)
+
+
+final_df <- data.frame()
+for(root_i in unique(data_full1$root)){
+  print(root_i)
+
+  for(x_i in unique(data_full1$x)){
+    print(x_i)
+
+    for(kaqp in unique(data_full1$kAQP)){
+      # print(kaqp)
+      for(MS in unique(data_full1$Barrier)){
+        # print(MS)
+        temp_df <- data_full1 %>% filter(root == root_i & x == x_i & kAQP == kaqp & Barrier == MS)
+        temp_df_e <- data.frame(root = unique(temp_df$root),
+                                x = unique(temp_df$x),
+                                kr = unique(temp_df$kr),
+                                Kx = unique(temp_df$Kx),
+                                Kr= unique(temp_df$Kr),
+                                radius = unique(temp_df$radius),
+                                Barrier = unique(temp_df$Barrier),
+                                kAQP = unique(temp_df$kAQP))
+
+        temp_df4 <- pivot_wider(temp_df[c(3,6)],
+                                names_from = param_id,
+                                values_from = param_value)
+
+        temp_df_e2 <- cbind(temp_df_e, temp_df4)
+        # print(head(temp_df_e2))
+
+        final_df <- rbind(final_df, temp_df_e2)
+      }
+    }
+  }
+}
+
+# Export final database
+write.csv(final_df, "Data/DATA_FULL_FINAL.csv", row.names = F)
 ```
 
-Load Data
+# LOAD PRE-PROCESSED DATA
 
 ```{r Load Data}
 Conductivities_dico <- read.csv(paste0(simu_path, "Conductivities_dico_2024-02-12.csv"))
@@ -171,7 +186,7 @@ Conductivities <- Conductivities %>% filter(x != 0)
 Data_Full <- Data_Full %>% filter(x != 0)
 ```
 
-# Visual analysis
+# VISUAL ANALYSIS
 
 ## Plot pure data
 
@@ -331,8 +346,40 @@ dev.off()
 ## 0) Global Correlations
 
 ```{r Correlations}
+Data_Full_2cor <- Data_Full %>% 
+  gather(colnames(Data_Full)[9:29], key = Params, value = ParamValue) %>% 
+  filter(!(Params %in% c("endodermis_n_layers", 
+                       "epidermis_n_layers",
+                       "pericycle_n_layers",
+                       "xylem_n_files", 
+                       "exodermis_n_layers"))) %>% 
+  spread(key = Params, value = ParamValue) 
+
+Data_Full_2cor_T1 <- Data_Full_2cor %>% 
+  filter(Barrier == "T1") %>%
+  subset(select = -c(1, 7))
+
+Data_Full_2cor_T2 <- Data_Full_2cor %>% 
+  filter(Barrier == "T2") %>%
+  subset(select = -c(1, 7))
+
+Data_Full_2cor_T3 <- Data_Full_2cor %>% 
+  filter(Barrier == "T3") %>%
+  subset(select = -c(1, 7))
+
 library(corrplot)
-corrplot(cor(subset(Data_Full %>% filter(Barrier == "T1", kAQP == 4e-04), select = -c(1, 7))))
+
+svg(filename = "plots/Results_Correlations_T1.svg", width = 7, height = 7)
+corrplot(cor(Data_Full_2cor_T1), method = 'color')
+dev.off()
+
+svg(filename = "plots/Results_Correlations_T2.svg", width = 7, height = 7)
+corrplot(cor(Data_Full_2cor_T2), method = 'color')
+dev.off()
+
+svg(filename = "plots/Results_Correlations_T3.svg", width = 7, height = 7)
+corrplot(cor(Data_Full_2cor_T3), method = 'color')
+dev.off()
 ```
 
 ## 1) Effect of Radius
@@ -561,10 +608,10 @@ mean_T1 <- DL_mean$emmean[DL_mean$Barrier == "T1"]
 mean_T2 <- DL_mean$emmean[DL_mean$Barrier == "T2"]
 mean_T3 <- DL_mean$emmean[DL_mean$Barrier == "T3"]
 
-print(paste0("Difference between T1 and M1 : ", (mean_M1-mean_T1)*100/mean_M1))
-print(paste0("Difference between T2 and T1 : ", (mean_T1-mean_T2)*100/mean_T1))
-print(paste0("Difference between T3 and T1 : ", (mean_T1-mean_T3)*100/mean_T1))
-print(paste0("Difference between M2 and M3 : ", (mean_M2-mean_M3)*100/mean_M2))
+print(paste0("Difference between T1 and M1 [%] : ", (mean_M1-mean_T1)*100/mean_M1))
+print(paste0("Difference between T2 and T1 [%] : ", (mean_T1-mean_T2)*100/mean_T1))
+print(paste0("Difference between T3 and T1 [%] : ", (mean_T1-mean_T3)*100/mean_T1))
+print(paste0("Difference between M2 and M3 [%] : ", (mean_M2-mean_M3)*100/mean_M2))
 ```
 
 # STATISTICAL ANALYSIS FULL

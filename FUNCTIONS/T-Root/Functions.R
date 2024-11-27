@@ -682,7 +682,7 @@ set_conductivities <- function(Conductivities, threshold = 3, Barriers = NULL){
     stop("Please set Barriers.")
   }
   
-  colnames(Conductivities)[c(1,2)] <- c("root", "x")
+  colnames(Conductivities)[c("Root","X")] <- c("root", "x")
   # Virtual_Roots <- merge(x = Virtual_Roots, y = Parameters[,c(1,2,3)])
   
   #==========================================================================
