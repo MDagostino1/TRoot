@@ -804,22 +804,19 @@ radius_reg <- function(x_vec, timing = c(7, 25)){
 #===============================================================================
 
 # Simple computation of the linear regression of kr
-kr_reg <- function(x, MS, kAQP, radius){
+kr_reg <- function(x, MS, kAQP, radius, coef){
   
   # First maturation stage : barier = b5
   if(MS == "T1"){
-    # kr <- 6.52e-08 + 8.196e-10*x - 1.159e-07*radius + 6.566e-05*kAQP # Old
-    kr <- 6.127e-08 + 6.224e-10*x - 1.012e-07*radius + (4.394e-05)*kAQP 
+    kr <- coef$a + coef$x*x + coef$r*radius + (coef$kAQP)*kAQP 
   }
   # Second maturation stage : barrier = b6
   else if (MS == "T2"){
-    # kr <- 6.52e-08 + 8.196e-10*x - 1.159e-07*radius + (6.566e-05 - 2.661e-05)*kAQP Old
-    kr <- 6.127e-08 + 6.224e-10*x - 1.012e-07*radius + (4.394e-05 - 5.654e-06)*kAQP - 7.868e-10
+    kr <- coef$a + coef$x*x + coef$r*radius + (coef$kAQP + coef$T2_kAQP)*kAQP + coef$T2
   }
   # Third maturation stage : barrier  = b4
   else if (MS == "T3"){
-    # kr <- 6.52e-08 + 8.196e-10*x - 1.159e-07*radius + (6.566e-05 - 5.208e-05)*kAQP  Old
-    kr <- 6.127e-08 + 6.224e-10*x - 1.012e-07*radius + (4.394e-05 - 3.484e-05)*kAQP - 1.141e-08 
+    kr <- coef$a + coef$x*x + coef$r*radius + (coef$kAQP + coef$T3_kAQP)*kAQP + coef$T3_kAQP 
   }
   else{print("error in x")}
   
@@ -903,42 +900,6 @@ axial_reg <- function(x,
   return(kx)
 }
 
-#===============================================================================
-#===============================================================================
-
-# # Prerequire radius_reg()
-# radial_reg2 <- function(x, timing = c(7, 25)){
-#   # For scenario 2 (no exodermis suberization)
-#   
-#   radius <- 0.18
-#   
-#   # First maturation stage : barier = b5
-#   if(x <= timing[1]){
-#     c_i <- 5.9e-08 -2.36e-08*radius + 6.44e-08 -2.079e-07*radius
-#   }
-#   # Second maturation stage : barrier = b6
-#   else if (x > timing[1]){
-#     c_i <- 5.9e-08 -2.36e-08*radius + 3.86e-08 -1.28e-07*radius
-#   }
-#   else{print("error in x")}
-#   
-#   return(c_i)
-#   
-# }
-# 
-# #===============================================================================
-# #===============================================================================
-# 
-# axial_reg2 <- function(x){
-#   # if(x < 25){
-#   # kx <- exp(-4.75 + 0.105*x)
-#   kx <- exp(-4.75)
-#   # }else{
-#   #   kx <- exp(-12.5 + 0.437*x)
-#   # }
-#   
-#   return(kx)
-# }
 
 #===============================================================================
 #===============================================================================

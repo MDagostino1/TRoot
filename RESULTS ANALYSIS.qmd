@@ -541,6 +541,51 @@ pander(coefficients_kr)
 # write.csv(coefficients_kr, "Data/CRB-MARSHAL/kr_coef_full.csv", row.names = F)
 ```
 
+```{r}
+source("src/FUNCTIONS/T-Root/Functions.R")
+kr_reg_df <- Data_Full[c("kr", "Combination_ID", "x", "radius", "Barrier_Name", "kAQP")] %>% 
+  filter(Barrier_Name %in% c("T1", "T2", "T3"))
+kr_reg_df$kr_reg <- NaN
+
+for(i in 1:nrow(kr_reg_df)){
+  kr_reg_df$kr_reg[i] <- kr_reg(x = kr_reg_df$x[i], 
+                                MS = kr_reg_df$Barrier_Name[i]
+                                , kAQP = kr_reg_df$kAQP[i]
+                                , radius = kr_reg_df$radius[i]
+                                , coef = coefficients_kr)
+}
+
+ggplot(kr_reg) +
+  geom_point(aes(x = kr, y = kr_reg, color = x, size = radius)) +
+  coord_fixed() +
+  xlim(-27, -18) +
+  ylim(-27, -18) +
+  geom_abline() +
+  scale_color_viridis() +
+  theme_bw()
+  
+```
+
+
+```{r}
+
+
+ggplot(Kx_reg) +
+  geom_point(aes(x = x, y = Kx)) +
+  geom_point(aes(x = x, y = Kx_reg), color = "red") 
+# write.csv(coefficients_Kx, "Data/CRB-MARSHAL/Kx_coef_full.csv", row.names = F)
+
+ggplot(Kx_reg) +
+  geom_point(aes(x = ln(Kx), y = ln(Kx_reg), color = x, size = radius)) +
+  coord_fixed() +
+  xlim(-27, -18) +
+  ylim(-27, -18) +
+  geom_abline() +
+  scale_color_viridis() +
+  theme_bw()
+```
+
+
 
 Let's compute final coefficients for the regression equation :
 
@@ -553,9 +598,9 @@ cat("\n")
 cat("T1_t : ", (coefficients_kr$x)*1e8, "x 10e8) \n")
 cat("T1_r : ", (coefficients_kr$r)*1e8, "x 10e8) \n")
 cat("\n")
-cat("T1_kAQP : ", (coefficients_kr$kAQP)*1e8, "x 10e8) \n")
-cat("T2_kAQP : ", (coefficients_kr$kAQP + coefficients_kr$T2_kAQP)*1e2, "x 10e8 x 10e6) \n")
-cat("T3_kAQP : ", (coefficients_kr$kAQP + coefficients_kr$T3_kAQP)*1e3, "x 10e8 x 10e7) \n")
+cat("T1_kAQP : ", (coefficients_kr$kAQP)*1e8*1e-06, "x 10e8 x10e-6) \n")
+cat("T2_kAQP : ", (coefficients_kr$kAQP + coefficients_kr$T2_kAQP)*1e8*1e-6, "x 10e8 x 10e-6) \n")
+cat("T3_kAQP : ", (coefficients_kr$kAQP + coefficients_kr$T3_kAQP)*1e8*1e-5, "x 10e8 x 10e-5) \n")
 ```
 
 This is very nice. So we see different informations : - The whole linear model is significant at R2 = 0.918 - On the ANOVA, all variables are significant - The less significant factor is T2 (p = 0.0178).
@@ -565,15 +610,38 @@ Really nice !
 ## 2) Axial Kr
 
 ```{r}
-lm2 <- lm(data = Data_Full%>%filter(Barrier_Name == "T1" & kAQP == 0.0004), formula = ln(Kx) ~ radius + x)
+ggplot(Data_Full) + 
+  geom_point(aes(x = x, y = ln(Kx), color = xylem_max_size)) +
+  scale_color_viridis()
+
+lm2 <- lm(data = Data_Full%>%filter(Barrier_Name == "T1" & kAQP == 1.1570e-07), 
+          formula = ln(Kx) ~ radius + x + xylem_max_size)
 summary(lm2)
 anova(lm2)
+plot(lm2)
 
-coefficients_Kx <- tibble(a = -25.97,
-                          r = 6.52,
-                          x = 0.139)
+coefficients_Kx <- tibble(a = lm2$coefficients[1],
+                          r = lm2$coefficients[2],
+                          x = lm2$coefficients[3],
+                          xms = lm2$coefficients[4])
 
+Kx_reg <- Data_Full[c("Kx", "Combination_ID", "x", "radius", "xylem_max_size")] %>% 
+  mutate(Kx_reg = exp(coefficients_Kx$a + coefficients_Kx$r*radius + coefficients_Kx$x*x + coefficients_Kx$xms*xylem_max_size))
+
+ggplot(Kx_reg) +
+  geom_point(aes(x = x, y = Kx)) +
+  geom_point(aes(x = x, y = Kx_reg), color = "red") 
 # write.csv(coefficients_Kx, "Data/CRB-MARSHAL/Kx_coef_full.csv", row.names = F)
+
+ggplot(Kx_reg) +
+  geom_point(aes(x = ln(Kx), y = ln(Kx_reg), color = x, size = radius)) +
+  coord_fixed() +
+  xlim(-27, -18) +
+  ylim(-27, -18) +
+  geom_abline() +
+  scale_color_viridis() +
+  theme_bw()
+  
 ```
 
 # PREDICTION CURVES
