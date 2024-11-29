@@ -806,9 +806,21 @@ radius_reg <- function(x_vec, timing = c(7, 25)){
 # Simple computation of the linear regression of kr
 kr_reg <- function(x, MS, kAQP, radius, coef){
   
-  # First maturation stage : barier = b5
-  if(MS == "T1"){
+  if(MS == "M1"){
     kr <- coef$a + coef$x*x + coef$r*radius + (coef$kAQP)*kAQP 
+  }
+  
+  else if(MS == "M2"){
+    kr <- coef$a + coef$x*x + coef$r*radius + (coef$kAQP + coef$M2_kAQP)*kAQP + coef$M2
+  }
+  
+  else if(MS == "M3"){
+    kr <- coef$a + coef$x*x + coef$r*radius + (coef$kAQP + coef$M3_kAQP)*kAQP + coef$M3
+  }
+  
+  # First maturation stage : barier = b5
+  else if(MS == "T1"){
+    kr <- coef$a + coef$x*x + coef$r*radius + (coef$kAQP + coef$T1_kAQP)*kAQP + coef$T1
   }
   # Second maturation stage : barrier = b6
   else if (MS == "T2"){
@@ -816,7 +828,7 @@ kr_reg <- function(x, MS, kAQP, radius, coef){
   }
   # Third maturation stage : barrier  = b4
   else if (MS == "T3"){
-    kr <- coef$a + coef$x*x + coef$r*radius + (coef$kAQP + coef$T3_kAQP)*kAQP + coef$T3_kAQP 
+    kr <- coef$a + coef$x*x + coef$r*radius + (coef$kAQP + coef$T3_kAQP)*kAQP + coef$T3
   }
   else{print("error in x")}
   
@@ -824,10 +836,19 @@ kr_reg <- function(x, MS, kAQP, radius, coef){
   
 }
 
-Kx_reg <- function(x, radius){
-  Kx <- exp(-25.97 + 6.52*x + 0.14*radius)
+#===============================================================================
+#===============================================================================
+
+Kx_reg <- function(x, radius, xms=0, coef){
+  if(xms==0){
+    coef$xms <- 0
+  }
+  Kx <- exp(coef$a + coef$x*x + coef$r*radius + coef$xms*xms)
   return(Kx)
 }
+
+#===============================================================================
+#===============================================================================
 
 # Same function as kr_reg but take x, kAQP and coefficients into input
 radial_reg <- function(x, 
