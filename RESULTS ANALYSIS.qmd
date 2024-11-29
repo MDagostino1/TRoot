@@ -12,7 +12,7 @@ DIR_path <- getwd()
 options(rstudio.help.showDataPreview = FALSE)
 rm(list = ls())
 
-TRoot_path <- "FUNCTIONS/T-Root/"
+TRoot_path <- "src/FUNCTIONS/T-Root/"
 for (i in list.files(TRoot_path)) {
   print(i)
   source(paste0(TRoot_path, i))
@@ -55,134 +55,77 @@ But we filter to have only 30 days and 6 barriers :
 ```{r}
 Conductivities <- read.csv("Results/12-01-2023/Conductivities_full.csv")
 Conductivities <- Conductivities %>% filter(X > 0 & Barrier %in% c("b1", "b2", "b4", "b6", "b8", "b9"))
+Conductivities$Root_ID <- sapply(Conductivities$Root, function(i) unlist(str_split(string = i, pattern = "root"))[2])
+ggplot(data = Conductivities, aes(x = X, y = Root_ID)) + geom_point() + theme_bw()
 ```
 
 Create Conductivity_Dico and Conductivity_Mono.
 The function *set_conductivities* process and convert to the right units.
 
 ```{r, eval = F}
-Virtual_Roots <- read.csv("Data/Virtual Roots/Virtual_Root_2023-07-17_30x20.csv")
-
+Virtual_Roots  <- read.csv("Data/Virtual Roots/Virtual_Root_2023-07-17_30x20.csv")
+Barriers       <- read_xlsx("Data/Barriers.xlsx")
 Conductivities <- read.csv(file = paste0(simu_path, "Conductivities_full.csv"))
-source("FUNCTIONS/T-Root/Functions.R")
-# Conductivities <- distinct(Conductivities) # To avoid repetitions
 
+source("src/FUNCTIONS/T-Root/Functions.R")
 #==================================================================================
 # Clean data and create dico and mono
-Conductivities_dico <- set_conductivities(Conductivities, Barriers = c("b6", "b9", "b8"))
-Conductivities_mono <- set_conductivities(Conductivities, Barriers = c("b1", "b3", "b4"))
-
-# #==================================================================================
-# # Add Radius [mm]
-# Conductivities_dico$radius <- 10*Conductivities_dico$perimeter/(2*pi) # cm -> mm
-# Conductivities_mono$radius <- 10*Conductivities_mono$perimeter/(2*pi)
-#
-# #==================================================================================
-# # Add Kr
-# Conductivities_dico$Kr <- Conductivities_dico$kr*Conductivities_dico$perimeter
-# Conductivities_mono$Kr <- Conductivities_mono$kr*Conductivities_mono$perimeter
+Conductivities_processed          <- set_conductivities(Conductivities, Barriers = c("b1", "b3", "b4", "b6", "b9", "b8"))
 
 #==================================================================================
 # Change maturation stage name :
-Conductivities_dico$Barrier <- as.factor(Conductivities_dico$Barrier)
-Conductivities_mono$Barrier <- as.factor(Conductivities_mono$Barrier)
-
-levels(Conductivities_dico$Barrier) <- c("T2", "T3", "T1")
-levels(Conductivities_mono$Barrier) <- c("M1", "M2", "M3")
-
-Conductivities_dico <- Conductivities_dico %>% mutate(Barrier = reorder(Barrier, match(Barrier, c("T1", "T2", "T3"))))
-
-Conductivities_full <- rbind(Conductivities_dico, Conductivities_mono)
-
+Conductivities_processed$Barrier  <- as.factor(Conductivities_processed$Barrier)
+Conductivities_processed          <- left_join(Conductivities_processed, Barriers[c("Barrier", "Barrier_Name")])
 #==================================================================================
 # Check that the data is okey (black points have to be +- homogenous) :
-ggplot(data = Conductivities_dico, aes(x = x, y = root)) +
+ggplot(data = Conductivities_processed, aes(x = x, y = root)) +
   geom_point() +
   ggtitle("Conductivities") +
   theme_bw()
 
 # Export
-write.csv(Conductivities_dico, file = paste0(simu_path, "Conductivities_dico_", Sys.Date(),".csv"), row.names = F)
-write.csv(Conductivities_mono, file = paste0(simu_path, "Conductivities_mono_", Sys.Date(),".csv"), row.names = F)
-# write.csv(Conductivities, file = paste0("Data/Conductivities_", Sys.Date(),".csv"), row.names = F)
+write.csv(Conductivities_processed, file = paste0("Data/Conductivities_processed.csv"), row.names = F)
 ```
 
 Create Data Full
 
 ```{r, eval = F, include = F}
-Virtual_Roots3 <- read.csv("Data/Virtual Roots/Virtual_Root_2023-07-17_30x20.csv")
-Virtual_Roots3 <- merge(Virtual_Roots3, Parameters[,c(1,2,3)], by = c("name", "type"))
+Parameters     <- read.csv("Data/Anatomy/Parameters.csv")
+Virtual_Roots <- read.csv("Data/Virtual Roots/Virtual_Root_2023-07-17_30x20.csv")
+Virtual_Roots <- left_join(Virtual_Roots, Parameters[c("name", "type", "param_id")])
 
-data_full <- merge(Conductivities_full, Virtual_Roots3, by = c("root", "x"))
-# data_full <- merge(data_full, Parameters[c(1,2,3)])
-# data_full <- data_full %>% filter(Barrier == "T1")
-data_full1 <- data.frame(root = data_full$root,
-                         x = data_full$x,
-                         param_id = data_full$param_id,
-                         name = data_full$name,
-                         type = data_full$type,
-                         param_value = data_full$y,
-                         kr = data_full$kr,
-                         Kx = data_full$Kx,
-                         Kr = data_full$Kr,
-                         radius = data_full$radius,
-                         Barrier = data_full$Barrier,
-                         kAQP = data_full$kAQP)
+data_full1 <- left_join(Conductivities_processed, Virtual_Roots)
+data_full1$kAQP <- as.factor(data_full1$kAQP)
 
+Combinations <- unique(data_full1[c("root", "x", "kAQP", "Barrier_Name")]) %>% mutate(Combination_ID = paste0(root, "_", x, "_", kAQP, "_", Barrier_Name))
 
-final_df <- data.frame()
-for(root_i in unique(data_full1$root)){
-  print(root_i)
+# Isolate Kr, Kx, kr, radius per COmbination_ID
+data_full2 <- left_join(data_full1, Combinations)
+data_full2 <- unique(data_full2[c("Kr", "Kx", "kr", "radius", "Combination_ID")])
 
-  for(x_i in unique(data_full1$x)){
-    print(x_i)
+# Isolate parameters per Combination_ID
+data_full3 <- left_join(data_full1, Combinations)
+data_full3 <- unique(data_full3[c("Combination_ID", "param_id", "y")])
+data_full3 <- data_full3 %>% spread(key = param_id, value = y)
 
-    for(kaqp in unique(data_full1$kAQP)){
-      # print(kaqp)
-      for(MS in unique(data_full1$Barrier)){
-        # print(MS)
-        temp_df <- data_full1 %>% filter(root == root_i & x == x_i & kAQP == kaqp & Barrier == MS)
-        temp_df_e <- data.frame(root = unique(temp_df$root),
-                                x = unique(temp_df$x),
-                                kr = unique(temp_df$kr),
-                                Kx = unique(temp_df$Kx),
-                                Kr= unique(temp_df$Kr),
-                                radius = unique(temp_df$radius),
-                                Barrier = unique(temp_df$Barrier),
-                                kAQP = unique(temp_df$kAQP))
-
-        temp_df4 <- pivot_wider(temp_df[c(3,6)],
-                                names_from = param_id,
-                                values_from = param_value)
-
-        temp_df_e2 <- cbind(temp_df_e, temp_df4)
-        # print(head(temp_df_e2))
-
-        final_df <- rbind(final_df, temp_df_e2)
-      }
-    }
-  }
-}
+# Join both
+data_final <- left_join(data_full2, data_full3)
+data_final <- left_join(data_final, Combinations)
 
 # Export final database
-write.csv(final_df, "Data/DATA_FULL_FINAL.csv", row.names = F)
+write.csv(data_final, "Data/DATA_FULL_FINAL.csv", row.names = F)
 ```
 
 # LOAD PRE-PROCESSED DATA
 
 ```{r Load Data}
-Conductivities_dico <- read.csv(paste0(simu_path, "Conductivities_dico_2024-02-12.csv"))
-Conductivities_mono <- read.csv(paste0(simu_path, "Conductivities_mono_2024-02-12.csv"))
-
-Conductivities <- rbind(Conductivities_dico, Conductivities_mono)
-
-Anatomy_Full <- read.csv("Data/Anatomy/Anatomy_Full.csv")
-Data_Full <- read.csv("Data/DATA_FULL_FINAL.csv")
+Conductivities_processed <- read.csv("Data/Conductivities_processed.csv")
+Anatomy_Full             <- read.csv("Data/Anatomy/Anatomy_Full.csv")
+Data_Full                <- read.csv("Data/DATA_FULL_FINAL.csv")
+Parameters               <- read.csv("Data/Anatomy/Parameters.csv")
 
 # Remove day zero
-Conductivities_dico <- Conductivities_dico %>% filter(x != 0)
-Conductivities_mono <- Conductivities_mono %>% filter(x != 0)
-Conductivities <- Conductivities %>% filter(x != 0)
+Conductivities_processed <- Conductivities_processed %>% filter(x != 0)
 Data_Full <- Data_Full %>% filter(x != 0)
 ```
 
@@ -192,11 +135,11 @@ Data_Full <- Data_Full %>% filter(x != 0)
 
 ```{r Plot Pure Data}
 # kr vs kAQP
-kAQP_plot1 <- ggplot(data = Conductivities_dico,
+kAQP_plot1 <- ggplot(data = Conductivities_processed,
                      aes(x=(kAQP*10000), 
                          y = kr*1e08,
-                         color = Barrier))+
-  geom_point(aes(x = as.factor(kAQP*10000)),
+                         color = Barrier_Name))+
+  geom_point(aes(x = kAQP*10000),
              position = "jitter",
              alpha = 0.05) +
   # geom_boxplot(aes(x = as.factor(kAQP*10000), y = kr, color = Barrier))+
@@ -210,47 +153,30 @@ kAQP_plot1 <- ggplot(data = Conductivities_dico,
   theme_test() 
   # theme(legend.position = "none")
 kAQP_plot1
-ggsave(filename = "plots/AQP_influence.svg", plot = kAQP_plot1, device = "svg", width = 4, height = 3, units = "in")
+# ggsave(filename = "plots/AQP_influence.svg", plot = kAQP_plot1, device = "svg", width = 4, height = 3, units = "in")
 #============================================================================
 # kr
-kr_plot1 <- ggplot(data = Conductivities_dico,
+kr_plot1 <- ggplot(data = Conductivities_processed,
        aes(x = x, 
            y = kr*10^8,
            color = kAQP*10000)) +
   geom_point(alpha = 0.5, position = "jitter") +
-  facet_wrap(~Barrier) +
+  facet_wrap(~Barrier_Name) +
   scale_color_viridis() +
   # geom_smooth(aes(x = x, y = radius/5000000), color = "red") +
   # ylim(0, 3e-08) +
   ylab(expression(k[r] ~ 10^{-8} ~ "[" * m ~ MPa^{-1} ~ s^{-1}*"]")) +
   xlab("Age [d]") +
-  ggtitle("kr DICOTS") +
+  ggtitle("Radial conductivity") +
   theme_test()
 kr_plot1
 #============================================================================
-kr_plot0 <- ggplot(data = Conductivities_mono,
-       aes(x = x, 
-           y = kr,
-           color = kAQP)) +
-  geom_point(alpha = 0.2, position = "jitter") +
-  facet_wrap(~Barrier) +
-  scale_color_viridis() +
-  # geom_smooth(aes(x = x, y = radius/5000000), color = "red") +
-  # ylim(0, 2e-04) +
-  ylab(expression(k[r] ~ 10^{8} ~ "[" * cm ~ MPa^{-1} ~ s^{-1}*"]")) +
-  xlab("Age [d]") +
-  # coord_fixed() +
-  ggtitle("kr MONOCOTS") +
-  theme_test()
-kr_plot0
-# Kr
-#============================================================================
-Kr_plot1 <- ggplot(data = Conductivities_dico,
+Kr_plot1 <- ggplot(data = Conductivities_processed,
        aes(x = x, 
            y = Kr,
            color = kAQP)) +
   geom_jitter(alpha = 0.2) +
-  facet_wrap(~Barrier) +
+  facet_wrap(~Barrier_Name) +
   scale_color_viridis() +
   ylab("Radial Conductance [m^3 MPa-1 d-1]") +
   xlab("Age [d]") +
@@ -259,7 +185,7 @@ Kr_plot1 <- ggplot(data = Conductivities_dico,
 Kr_plot1
 #============================================================================
 # Radius
-Radius_plot1 <- ggplot(data = Conductivities_dico,
+Radius_plot1 <- ggplot(data = Conductivities_processed,
                        aes(x = x, y = radius)) +
   geom_point(alpha = 0.01) +
   # geom_smooth() +
@@ -270,7 +196,7 @@ Radius_plot1 <- ggplot(data = Conductivities_dico,
 Radius_plot1
 #============================================================================
 # Perimeter
-Perimeter_plot1 <- ggplot(data = Conductivities_dico,
+Perimeter_plot1 <- ggplot(data = Conductivities_processed,
                        aes(x = x, y = perimeter)) +
   geom_point(alpha = 0.01) +
   # geom_smooth() +
@@ -281,7 +207,7 @@ Perimeter_plot1 <- ggplot(data = Conductivities_dico,
 Perimeter_plot1
 #============================================================================
 # Kx
-kx_plot1 <- ggplot(data = Conductivities_dico%>%filter(Barrier == "T1"),
+kx_plot1 <- ggplot(data = Conductivities_processed%>%filter(Barrier_Name == "T1"),
        aes(x = x, 
            y = Kx)) +
   geom_point(alpha = 0.1) +
@@ -290,22 +216,11 @@ kx_plot1 <- ggplot(data = Conductivities_dico%>%filter(Barrier == "T1"),
   # geom_smooth(method = "lm", se = T) +
   # scale_color_viridis() +
   # ylim(0, 3e-08) +
-  ylab("Axial Kr [cm^3 d-1 hPa-1]") +
+  ylab("ln(Kx) [cm^3 d-1 hPa-1]") +
   xlab("Age [d]") +
+  ggtitle("ln of Axial Conductance") +
   theme_test()
 kx_plot1
-#============================================================================
-#MS
-MS_plot1 <- ggplot(data = Conductivities_dico) +
-  geom_point(aes(x= Barrier, y = kr, color = kAQP), 
-             position="jitter", 
-             alpha = 0.1) +
-  geom_boxplot(aes(x = Barrier, y = kr)) +
-  theme_test() +
-  scale_color_viridis() +
-  xlab("Maturation Stage") +
-  ylab("Radial conductivity [cm d-1 MPa-1]")
-MS_plot1
 ```
 
 Export plots
@@ -315,30 +230,25 @@ svg("Plots/kAQP_1.svg", height = 4, width = 6)
 kAQP_plot1
 dev.off()
 
-svg("Plots/kr_kAQP_1.svg", height = 3, width = 6)
+svg("Plots/kr_plot_1.svg", height = 5, width = 8)
 kr_plot1 
 dev.off()
 
-svg("Plots/kx_kAQP_1.svg", height = 5, width = 8)
+svg("Plots/Kx_plot_1.svg", height = 5, width = 8)
 kx_plot1
 dev.off()
 
-svg("Plots/Kr_kAQP_1.svg", height = 5, width = 8)
+svg("Plots/Kr_plot_1.svg", height = 5, width = 8)
 Kr_plot1
 dev.off()
 
-svg("Plots/Radius_kAQP_1.svg", height = 5, width = 8)
+svg("Plots/Radius_plot_1.svg", height = 5, width = 8)
 Radius_plot1
 dev.off()
 
-svg("Plots/Perimeter_kAQP_1.svg", height = 3, width = 8)
+svg("Plots/Perimeter_plot_1.svg", height = 3, width = 8)
 Perimeter_plot1
 dev.off()
-
-svg("Plots/Maturation_Stage_1.svg", height = 5, width = 8)
-MS_plot1
-dev.off()
-
 ```
 
 # Statistical Analysis per variable
@@ -346,39 +256,27 @@ dev.off()
 ## 0) Global Correlations
 
 ```{r Correlations}
-Data_Full_2cor <- Data_Full %>% 
-  gather(colnames(Data_Full)[9:29], key = Params, value = ParamValue) %>% 
-  filter(!(Params %in% c("endodermis_n_layers", 
-                       "epidermis_n_layers",
-                       "pericycle_n_layers",
-                       "xylem_n_files", 
-                       "exodermis_n_layers"))) %>% 
-  spread(key = Params, value = ParamValue) 
-
-Data_Full_2cor_T1 <- Data_Full_2cor %>% 
-  filter(Barrier == "T1") %>%
-  subset(select = -c(1, 7))
-
-Data_Full_2cor_T2 <- Data_Full_2cor %>% 
-  filter(Barrier == "T2") %>%
-  subset(select = -c(1, 7))
-
-Data_Full_2cor_T3 <- Data_Full_2cor %>% 
-  filter(Barrier == "T3") %>%
-  subset(select = -c(1, 7))
-
 library(corrplot)
 
-svg(filename = "plots/Results_Correlations_T1.svg", width = 7, height = 7)
-corrplot(cor(Data_Full_2cor_T1), method = 'color')
-dev.off()
+print(colnames(Data_Full))
 
-svg(filename = "plots/Results_Correlations_T2.svg", width = 7, height = 7)
-corrplot(cor(Data_Full_2cor_T2), method = 'color')
-dev.off()
+Data_Full_2cor <- Data_Full %>% 
+  select(-any_of(c("endodermis_n_layers", 
+                   "epidermis_n_layers",
+                   "pericycle_n_layers",
+                   "xylem_n_files", 
+                   "exodermis_n_layers",
+                   "Combination_ID", 
+                   "root", 
+                   "Barrier_Name",
+                   "Barrier")
+  ))
 
-svg(filename = "plots/Results_Correlations_T3.svg", width = 7, height = 7)
-corrplot(cor(Data_Full_2cor_T3), method = 'color')
+Data_Full_2cor <- as_tibble(scale(Data_Full_2cor))
+                   
+
+svg(filename = "plots/Results_Correlations.svg", width = 7, height = 7)
+corrplot(cor(Data_Full_2cor), method = 'color')
 dev.off()
 ```
 
@@ -429,8 +327,8 @@ Here we start by looking at the relation between kr, root age and root radius, p
 
 ```{r Effect of radius on kr}
 # =============================================================================
-subset1 <- Conductivities_dico %>% filter(x < 25)
-subset2 <- Conductivities_dico %>% filter(x >= 25)
+subset1 <- Conductivities_processed %>% filter(x < 25)
+subset2 <- Conductivities_processed %>% filter(x >= 25)
 
 subset1_1 <- subset1%>%filter(kAQP == "4e-04")
 subset2_1 <- subset2%>%filter(kAQP == "4e-04")
@@ -441,7 +339,7 @@ cor(subset2$kr, subset2$radius)
 #===============================================================================
 # Individual MS
 
-MS_indi <- ggplot(data = Conductivities_dico%>%filter(kAQP == "4e-04")) +
+MS_indi <- ggplot(data = Conductivities_processed%>%filter(kAQP == "4e-04")) +
   geom_point(aes(x = x, y = kr), color = "blue", alpha = 0.3) + 
   # geom_smooth(aes(x = x, y = kr), color = "blue") +
   geom_smooth(data = subset1_1, aes(x = x, y = kr), color = "blue", method = "lm") +
@@ -497,14 +395,14 @@ anova(rad_lm)
 ## 2) Influence of Aquaporins
 
 ```{r}
-ggplot(data = Conductivities_dico) +
+ggplot(data = Conductivities_processed) +
   geom_jitter(aes(x = kAQP*10000, y = kr, color = Barrier), alpha = 0.1) +
   geom_smooth(aes(x = kAQP*10000, y = kr, color = Barrier)) +
   # facet_wrap(~Barrier) +
   
   theme_test()
 
-kAQP_lm <- lm(data = Conductivities_dico, formula = kr ~ kAQP*Barrier)
+kAQP_lm <- lm(data = Conductivities_processed, formula = kr ~ kAQP*Barrier)
 anova(kAQP_lm)
 ```
 
@@ -513,79 +411,54 @@ anova(kAQP_lm)
 Globally, we clearly see that all maturation stages are different and significantly.
 
 ```{r}
-# KR
-kr_plot_dicot <- ggplot(data = Conductivities_dico, aes(x = as.factor(x), y = kr, color = Barrier, fill = Barrier)) +
-  # geom_point() +
-  # geom_line() +
-  geom_boxplot(alpha = 0.5) +
-  # facet_wrap(~Barrier, ncol = 2) +
-  # facet_grid(~factor(Barrier, levels=c('b1', 'b5', 'b6', 'b4'))) +
-  theme_bw() +
-  theme(axis.ticks.x = element_blank(),
-        axis.text.x = element_blank()) +
-  ylim(2e-08, 1.25e-07) +
-  # theme(legend.position="none") +
-  xlab("Root age [d]") +
-  ylab("Radial conductivity [m s-1 MPa-1") +
-  ggtitle("Dicot barriers- Kr")
-
-kr_plot_dicot
-
-#===============================================================================
-
-# KR
-kr_plot_monocot <- ggplot(data = Conductivities_mono, aes(x = as.factor(x), y = kr, color = Barrier, fill = Barrier)) +
-  # geom_point() +
-  # geom_line() +
-  geom_boxplot(alpha = 0.5) +
-  # facet_wrap(~Barrier, ncol = 2) +
-  # facet_grid(~factor(Barrier, levels=c('b1', 'b3', 'b4'))) +
-  theme_bw() +
-  ylim(2e-08, 1.25e-07) +
-  # theme(legend.position="none") +
-  theme(axis.ticks.x = element_blank(),
-        axis.text.x = element_blank()) +
-  scale_color_brewer(palette ="Set2") +
-  scale_fill_brewer(palette ="Set2") +
-  xlab("Root age [d]") +
-  ylab("Radial conductivity [m s-1 MPa-1") +
-  ggtitle("Monocots barriers - kr")
-  
-# ggexport(kr_plot, filename=paste0("Kr.pdf"), plot = image)
-# svg(filename = paste0("Plots/kr_plot_monocot_",date,".svg"), width = 10, height = 10)
-kr_plot_monocot
-# dev.off()
-
-#===============================================================================
 # MS_subset <- Conductivities %>% filter(kAQP == 5e-04)
-MS_all <- ggplot(data = Conductivities %>% filter(kAQP == 5e-04), 
-                 aes(x = Barrier, y = kr*10^08, fill = Barrier)) +
-  geom_jitter(width = 0.1,
+MS_all <- ggplot(data = Conductivities_processed) +
+  
+  geom_jitter(aes(x = Barrier_Name, 
+                  y = kr*10^08, 
+                  color = kAQP), 
+              width = 0.05, 
               alpha = 0.1) +
-  geom_boxplot() + 
+  
+  geom_violin(aes(x = Barrier_Name, 
+                  y = kr*10^08), 
+              alpha = 0.1,
+              draw_quantiles = "0.5") +
+
+  # geom_boxplot(aes(x = Barrier_Name, 
+  #                  y = kr*10^8),
+  #              width = 0.5,
+  #              alpha = 0.5) +
+  
   xlab("Maturation Stage") +
   ylab(expression(k[r] ~ "[" ~ 10^{-08} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
-  scale_fill_manual(values=c("white","white","white", "grey", "grey", "grey")) +
-  theme_bw() +
+  
+  # scale_fill_manual(values=c("white","white","white", "grey", "grey", "grey")) +
+  scale_color_viridis() +
+  
+  theme_bw() 
   # ggtitle(expression(k[r] ~ "[" ~ 10^{-08} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
-  theme(legend.position = "none") 
+  # theme(legend.position = "none") 
 
-
-# svg("Plots/Maturation_Stages_All.svg", height = 4, width = 4)
 MS_all
+ggsave(filename = "Plots/Maturation_Stages_All.png", plot = MS_all, device = "png", 
+       width = 5, height = 4, dpi = 300, units = "in")
+
+# svg("Plots/Maturation_Stages_All.svg", height = 4, width = 5)
+# MS_all
 # dev.off()
 ```
 
 Stats :
 
 ```{r}
-MS_lm <- lm(data = Conductivities, formula = kr ~ Barrier)
+MS_lm <- lm(data = Conductivities_processed, formula = kr ~ Barrier_Name)
 
 summary(MS_lm)
 anova(MS_lm)
-emmeans(MS_lm, specs = pairwise ~ Barrier)
+emmeans(MS_lm, specs = pairwise ~ Barrier_Name)
 
-visreg(MS_lm)
+# visreg(MS_lm)
 
 DL_pred <- tibble(DL = c("M1", "M2", "M3", "T1", "T2", "T3"),
                   Estimate = MS_lm$coefficients)
@@ -593,7 +466,7 @@ DL_pred <- tibble(DL = c("M1", "M2", "M3", "T1", "T2", "T3"),
 DL_pred2 <- tibble(DL2 = c("M1", "M2", "M3", "T1", "T2", "T3"),
                   Estimate2 = MS_lm$coefficients)
 
-EM <- emmeans(MS_lm, specs = pairwise ~ Barrier)
+EM <- emmeans(MS_lm, specs = pairwise ~ Barrier_Name)
 DL_mean <- as_tibble(EM$emmeans)
 DL_contrast <- as_tibble(EM$contrasts)
 ```
@@ -601,12 +474,12 @@ DL_contrast <- as_tibble(EM$contrasts)
 Some interesting stats :
 
 ```{r}
-mean_M1 <- DL_mean$emmean[DL_mean$Barrier == "M1"]
-mean_M2 <- DL_mean$emmean[DL_mean$Barrier == "M2"]
-mean_M3 <- DL_mean$emmean[DL_mean$Barrier == "M3"]
-mean_T1 <- DL_mean$emmean[DL_mean$Barrier == "T1"]
-mean_T2 <- DL_mean$emmean[DL_mean$Barrier == "T2"]
-mean_T3 <- DL_mean$emmean[DL_mean$Barrier == "T3"]
+mean_M1 <- DL_mean$emmean[DL_mean$Barrier_Name == "M1"]
+mean_M2 <- DL_mean$emmean[DL_mean$Barrier_Name == "M2"]
+mean_M3 <- DL_mean$emmean[DL_mean$Barrier_Name == "M3"]
+mean_T1 <- DL_mean$emmean[DL_mean$Barrier_Name == "T1"]
+mean_T2 <- DL_mean$emmean[DL_mean$Barrier_Name == "T2"]
+mean_T3 <- DL_mean$emmean[DL_mean$Barrier_Name == "T3"]
 
 print(paste0("Difference between T1 and M1 [%] : ", (mean_M1-mean_T1)*100/mean_M1))
 print(paste0("Difference between T2 and T1 [%] : ", (mean_T1-mean_T2)*100/mean_T1))
@@ -614,26 +487,75 @@ print(paste0("Difference between T3 and T1 [%] : ", (mean_T1-mean_T3)*100/mean_T
 print(paste0("Difference between M2 and M3 [%] : ", (mean_M2-mean_M3)*100/mean_M2))
 ```
 
-# STATISTICAL ANALYSIS FULL
+# COMPLETE STATISTICAL ANALYSIS
 
 ## 1) Radial conductivity
 
 ```{r}
-lm_kr0 <- lm(data = Conductivities_dico, formula = kr ~ x + radius + Barrier + kAQP + kAQP:Barrier)
+# lm_kr0 <- lm(data = Conductivities_processed, formula = kr ~ x + radius + Barrier + kAQP + kAQP:Barrier)
+lm_kr0 <- lm(data = Data_Full %>% filter(Barrier_Name %in% c("T1", "T2", "T3")), 
+             formula = kr ~ 
+               x + 
+               radius + 
+               Barrier_Name + 
+               kAQP + 
+               kAQP:Barrier_Name 
+               # cortex_n_layers + 
+               # endodermis_cell_diameter +
+               # cortex_cell_diameter + 
+               # stele_layer_diameter
+               )
 summary(lm_kr0)
 anova(lm_kr0)
-emmeans(lm_kr0, specs = pairwise ~ Barrier:kAQP)
+emmeans(lm_kr0, specs = pairwise ~ Barrier_Name:kAQP)
+```
 
-coefficients_kr <- tibble(a = lm_kr0$coefficients[1], 
-                                  x = lm_kr0$coefficients[2], 
-                                  r = lm_kr0$coefficients[3], 
-                                  T2 = lm_kr0$coefficients[4], 
-                                  T3 = lm_kr0$coefficients[5],
-                                  kAQP = lm_kr0$coefficients[6],
-                                  T2kAQP = lm_kr0$coefficients[7],
-                                  T3kAQP = lm_kr0$coefficients[8])
+```{r}
+# IN CASE OF ALL DEPOSITION LEVELS
+# coefficients_kr <- tibble(a = lm_kr0$coefficients[1],
+#                           x = lm_kr0$coefficients[2],
+#                           r = lm_kr0$coefficients[3],
+#                           M2 = lm_kr0$coefficients[4],
+#                           M3 = lm_kr0$coefficients[5],
+#                           T1 = lm_kr0$coefficients[6],
+#                           T2 = lm_kr0$coefficients[7],
+#                           T3 = lm_kr0$coefficients[8],
+#                           kAQP = lm_kr0$coefficients[9],
+#                           M2_kAQP = lm_kr0$coefficients[10],
+#                           M3_kAQP = lm_kr0$coefficients[11],
+#                           T1_kAQP = lm_kr0$coefficients[12],
+#                           T2_kAQP = lm_kr0$coefficients[13],
+#                           T3_kAQP = lm_kr0$coefficients[14])
 
+# IN CASE OF ONLY TOMATO DL
+coefficients_kr <- tibble(a = lm_kr0$coefficients[1],
+                          x = lm_kr0$coefficients[2],
+                          r = lm_kr0$coefficients[3],
+                          T2 = lm_kr0$coefficients[4],
+                          T3 = lm_kr0$coefficients[5],
+                          kAQP = lm_kr0$coefficients[6],
+                          T2_kAQP = lm_kr0$coefficients[7],
+                          T3_kAQP = lm_kr0$coefficients[8])
+                    
+pander(coefficients_kr)
 # write.csv(coefficients_kr, "Data/CRB-MARSHAL/kr_coef_full.csv", row.names = F)
+```
+
+
+Let's compute final coefficients for the regression equation :
+
+```{r}
+# T1 :
+cat("T1_alpha : ", (coefficients_kr$a)*1e8, "(x 10e8) \n")
+cat("T2_alpha : ", (coefficients_kr$a + coefficients_kr$T2)*1e8, "x 10e8) \n")
+cat("T3_alpha : ", (coefficients_kr$a + coefficients_kr$T3)*1e8, "x 10e8) \n")
+cat("\n")
+cat("T1_t : ", (coefficients_kr$x)*1e8, "x 10e8) \n")
+cat("T1_r : ", (coefficients_kr$r)*1e8, "x 10e8) \n")
+cat("\n")
+cat("T1_kAQP : ", (coefficients_kr$kAQP)*1e8, "x 10e8) \n")
+cat("T2_kAQP : ", (coefficients_kr$kAQP + coefficients_kr$T2_kAQP)*1e2, "x 10e8 x 10e6) \n")
+cat("T3_kAQP : ", (coefficients_kr$kAQP + coefficients_kr$T3_kAQP)*1e3, "x 10e8 x 10e7) \n")
 ```
 
 This is very nice. So we see different informations : - The whole linear model is significant at R2 = 0.918 - On the ANOVA, all variables are significant - The less significant factor is T2 (p = 0.0178).
@@ -643,7 +565,7 @@ Really nice !
 ## 2) Axial Kr
 
 ```{r}
-lm2 <- lm(data = Data_Full%>%filter(Barrier == "T1" & kAQP == 0.0004), formula = ln(Kx) ~ radius + x)
+lm2 <- lm(data = Data_Full%>%filter(Barrier_Name == "T1" & kAQP == 0.0004), formula = ln(Kx) ~ radius + x)
 summary(lm2)
 anova(lm2)
 
@@ -876,14 +798,14 @@ Define data : In this chunk we
 
 ```{r}
 Data_EB <- data.frame()
-for(i in unique(Conductivities_dico$x)){
+for(i in unique(Conductivities_processed$x)){
   kAQP_value <- 4e-04
-  temp_cdt <- Conductivities_dico %>% filter(x == i & kAQP==kAQP_value)
+  temp_cdt <- Conductivities_processed %>% filter(x == i & kAQP==kAQP_value)
   # print(i)
-  for(j in unique(temp_cdt$Barrier)){
+  for(j in unique(temp_cdt$Barrier_Name)){
     # print(j)
     temp_df <- data.frame(x = i, 
-                          Barrier = j,
+                          Barrier_Name = j,
                           kr_mean = mean(temp_cdt$kr[temp_cdt$Barrier == j]),
                           kr_sd = sd(temp_cdt$kr[temp_cdt$Barrier == j]),
                           kr_median = median(temp_cdt$kr[temp_cdt$Barrier == j]),
@@ -901,9 +823,9 @@ for(i in unique(Conductivities_dico$x)){
 }
 
 # ================================================================================
-Data_EB_timed = Data_EB %>% filter(Barrier == "T1" & x <= 7)
-Data_EB_timed = rbind(Data_EB_timed, Data_EB%>% filter(Barrier == "T2" & x <= 20 & x > 7))
-Data_EB_timed = rbind(Data_EB_timed, Data_EB%>% filter(Barrier == "T3" & x > 20))
+Data_EB_timed = Data_EB %>% filter(Barrier_Name == "T1" & x <= 7)
+Data_EB_timed = rbind(Data_EB_timed, Data_EB%>% filter(Barrier_Name == "T2" & x <= 20 & x > 7))
+Data_EB_timed = rbind(Data_EB_timed, Data_EB%>% filter(Barrier_Name == "T3" & x > 20))
 # ================================================================================
 
 # timings :
