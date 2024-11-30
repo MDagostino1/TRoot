@@ -12,9 +12,29 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path)) # Set working direct
 rm(list = ls())
 
 options(rstudio.help.showDataPreview = FALSE)
-MPath <- "./CRB-MARSHAL/"
+MPath <- "./src/CRB-MARSHAL/"
 
-libs <- c("fmsb", "SciViews", "pander", "visreg", "readxl", "EnvStats", "FactoMineR", "factoextra", "knitr", "data.table", "reticulate", "xml2", "tidyverse", "dplyr", "viridis", "Hmisc", "ggplot2", "gridExtra", "outliers", "Matrix", "emmeans")
+libs <- c("fmsb", 
+          "SciViews", 
+          "pander", 
+          "visreg", 
+          "readxl", 
+          "EnvStats", 
+          "FactoMineR", 
+          "factoextra", 
+          "knitr", 
+          "data.table", 
+          "reticulate", 
+          "xml2", 
+          "tidyverse", 
+          "dplyr", 
+          "viridis", 
+          "Hmisc", 
+          "ggplot2", 
+          "gridExtra", 
+          # "outliers", 
+          "Matrix", 
+          "emmeans")
 
 for(pk in libs) {
   library(pk, character.only = T)
@@ -25,7 +45,7 @@ source(paste0(MPath, "Get_SUF.R")) # MARSHAL
 source(paste0(MPath, "SUF.R"))
 source(paste0(MPath, "CRBM_functions.R"))
 
-TRoot_path <- "FUNCTIONS/T-Root/"
+TRoot_path <- "./src/FUNCTIONS/T-Root/"
 for (i in list.files(TRoot_path, pattern = ".R")) {
   print(i)
   source(paste0(TRoot_path, i))
@@ -55,8 +75,8 @@ for (i in list.files(TRoot_path, pattern = ".R")) {
 ## Load DB tables and RSA
 
 ```{r}
-Scenarios.IDs <- read.csv("CRB-MARSHAL/inputs/Scenarios_ID.csv")
-RSA.IDs <- read.csv("CRB-MARSHAL/inputs/RSA_ID.csv")
+Scenarios.IDs <- read.csv(paste0(MPath, "inputs/Scenarios_ID.csv"))
+RSA.IDs <- read.csv(paste0(MPath, "inputs/RSA_ID.csv"))
 # RSHA.IDs <- read.csv("CRB-MARSHAL/inputs/RSHA_ID.csv")
 
 RSA_list <- RSA.IDs$RSA_id[1] # Implement a way to select RSA_ids
@@ -64,7 +84,7 @@ RSA_list <- RSA.IDs$RSA_id[1] # Implement a way to select RSA_ids
 # LOAD RSA FILES AND CREATE A META FILE
 RSA.all      <- tibble()
 for(RSA_id in RSA_list){
-  RSAi <- read.csv(paste0("CRB-MARSHAL/inputs/RSA/", RSA_id, ".csv"))
+  RSAi <- read.csv(paste0(MPath, "inputs/RSA/", RSA_id, ".csv"))
   RSAi$RSA_id <- RSA_id
   RSA.all <- rbind(RSA.all, RSAi)
 }
@@ -110,7 +130,7 @@ conds$y[conds$type == "kr" & conds$x >= 7] <- 1.8e-5
 ## Loop MARSHAL
 
 ```{r, include = F}
-path.out <- paste0("CRB-MARSHAL/outputs/", Scenario_id, "/")
+path.out <- paste0(MPath, "outputs/", Scenario_id, "/")
 
 # Create folder for the Scenario
 if(dir.exists(path.out)){
@@ -121,7 +141,7 @@ if(dir.exists(path.out)){
 
 # MARSHAL PARAMETERS
 # conds        <- read.csv("CRB-MARSHAL/inputs/conductivities3.csv")
-soil         <- read.csv("CRB-MARSHAL/inputs/soil.csv")
+soil         <- read.csv(paste0(MPath, "inputs/soil.csv"))
 
 # ============================================================================ #
 results <- run.MARSHAL.loop(RSA_list, RSA.all, 
@@ -142,7 +162,7 @@ Make plots
 
 ```{r}
 Scenario_id <- "no_sub"
-path.out <- paste0("CRB-MARSHAL/outputs/", Scenario_id, "/")
+path.out <- paste0(MPath, "outputs/", Scenario_id, "/")
 
 RSHA.all <- read.csv(paste0(path.out, "RSHA_all.csv"))
 Macro.all <- read.csv(paste0(path.out, "Macro_all.csv"))
@@ -174,17 +194,6 @@ img_animated <- image_animate(img_join, delay = 10)
   
 image_write(image = img_animated,
             path = paste0(path.out, "animated.gif"))
-```
-
-```{r}
-LWP2 <- LWP_cleaned %>% 
-  group_by(DateTime) %>% 
-  summarise(LWP_mean = mean(LWP))
-```
-
-```{r}
-ggplot(LWP2) +
-  geom_line(aes(x = DateTime, y = LWP_mean))
 ```
 
 
