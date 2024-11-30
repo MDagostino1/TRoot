@@ -872,27 +872,27 @@ Define data : In this chunk we
 2\) Apply Maturation Stages Timings
 
 ```{r}
+kAQP_value <- unique(Data_Full$kAQP)[5]
+
 Data_EB <- data.frame()
 for(i in unique(Conductivities_processed$x)){
-  kAQP_value <- 4e-04
   temp_cdt <- Conductivities_processed %>% filter(x == i & kAQP==kAQP_value)
-  # print(i)
   for(j in unique(temp_cdt$Barrier_Name)){
-    # print(j)
+    cat("x = ", i, " | Barrier_Name = ", j, "\n")
     temp_df <- data.frame(x = i, 
                           Barrier_Name = j,
-                          kr_mean = mean(temp_cdt$kr[temp_cdt$Barrier == j]),
-                          kr_sd = sd(temp_cdt$kr[temp_cdt$Barrier == j]),
-                          kr_median = median(temp_cdt$kr[temp_cdt$Barrier == j]),
-                          kr_mad = mad(temp_cdt$kr[temp_cdt$Barrier == j]),
-                          Kx_mean = mean(temp_cdt$Kx[temp_cdt$Barrier == j]),
-                          Kx_sd = sd(temp_cdt$Kx[temp_cdt$Barrier == j]),
-                          Kx_median = median(temp_cdt$Kx[temp_cdt$Barrier == j]),
-                          Kx_mad = mad(temp_cdt$Kx[temp_cdt$Barrier == j]),
-                          Kr_mean = mean(temp_cdt$Kr[temp_cdt$Barrier == j]),
-                          Kr_sd = sd(temp_cdt$Kr[temp_cdt$Barrier == j]),
-                          Kr_median = median(temp_cdt$Kr[temp_cdt$Barrier == j]),
-                          Kr_mad = mad(temp_cdt$Kr[temp_cdt$Barrier == j]))
+                          kr_mean = mean(temp_cdt$kr[temp_cdt$Barrier_Name == j]),
+                          kr_sd = sd(temp_cdt$kr[temp_cdt$Barrier_Name == j]),
+                          kr_median = median(temp_cdt$kr[temp_cdt$Barrier_Name == j]),
+                          kr_mad = mad(temp_cdt$kr[temp_cdt$Barrier_Name == j]),
+                          Kx_mean = mean(temp_cdt$Kx[temp_cdt$Barrier_Name == j]),
+                          Kx_sd = sd(temp_cdt$Kx[temp_cdt$Barrier_Name == j]),
+                          Kx_median = median(temp_cdt$Kx[temp_cdt$Barrier_Name == j]),
+                          Kx_mad = mad(temp_cdt$Kx[temp_cdt$Barrier_Name == j]),
+                          Kr_mean = mean(temp_cdt$Kr[temp_cdt$Barrier_Name == j]),
+                          Kr_sd = sd(temp_cdt$Kr[temp_cdt$Barrier_Name == j]),
+                          Kr_median = median(temp_cdt$Kr[temp_cdt$Barrier_Name == j]),
+                          Kr_mad = mad(temp_cdt$Kr[temp_cdt$Barrier_Name == j]))
     Data_EB <- rbind(Data_EB, temp_df)
   }
 }
@@ -905,21 +905,21 @@ Data_EB_timed = rbind(Data_EB_timed, Data_EB%>% filter(Barrier_Name == "T3" & x 
 
 # timings :
 t0 <- c(0, 7)
-t1 <- c(8, 24)
-t2 <- c(25, 30)
+t1 <- c(8, 31)
+# t2 <- c(25, 30)
 
 m1 <- subset(Data_EB, 
-             Barrier == "T1" & x >= t0[1] & x <= t0[2])
+             Barrier_Name == "T1" & x >= t0[1] & x <= t0[2])
 m2 <- subset(Data_EB, 
-             Barrier == "T2" & x >= t1[1] & x <= t1[2])
-m3 <- subset(Data_EB, 
-             Barrier == "T3" & x >= t2[1] & x <= t2[2])
+             Barrier_Name == "T2" & x >= t1[1] & x <= t1[2])
+# m3 <- subset(Data_EB,
+#              Barrier_Name == "T3" & x >= t2[1] & x <= t2[2])
 
 
 
 
 # MERGE
-Data_EB_MS <- rbind(m1, m2, m3)
+Data_EB_MS <- rbind(m1, m2)
 # write_csv(m_full, "Data/m_full.csv")
 ```
 
@@ -927,8 +927,8 @@ Data_EB_MS <- rbind(m1, m2, m3)
 
 ```{r}
 EB_kr <- ggplot(data = Data_EB_MS) + 
-  geom_point(aes(x = x, y = kr_median, color = Barrier)) +
-  geom_errorbar(mapping=aes(x=x, ymin=kr_median-kr_mad, ymax=kr_median+kr_mad, color = Barrier), 
+  geom_point(aes(x = x, y = kr_median, color = Barrier_Name)) +
+  geom_errorbar(mapping=aes(x=x, ymin=kr_median-kr_mad, ymax=kr_median+kr_mad, color = Barrier_Name), 
                 width=0.5, 
                 linewidth=1,
                 alpha = 0.75) + 
@@ -943,11 +943,11 @@ EB_kr <- ggplot(data = Data_EB_MS) +
         plot.title = element_text(hjust = 0.5))
 # ==============================================================================
 EB_Kx <- ggplot(data = Data_EB_MS) + 
-  geom_point(aes(x = x, y = ln(Kx_median), color = Barrier)) +
+  geom_point(aes(x = x, y = ln(Kx_median), color = Barrier_Name)) +
   geom_errorbar(mapping=aes(x=x, 
                             ymin= ln(Kx_median - Kx_mad), 
                             ymax= ln(Kx_median + Kx_mad), 
-                            color = Barrier),
+                            color = Barrier_Name),
                 width=0.5,
                 linewidth=1,
                 alpha = 0.75) +
@@ -958,8 +958,8 @@ EB_Kx <- ggplot(data = Data_EB_MS) +
         plot.title = element_text(hjust = 0.5))
 # ==============================================================================
 EB_Kr <- ggplot(data = Data_EB_MS) + 
-  geom_point(aes(x = x, y = Kr_median, color = Barrier)) +
-  geom_errorbar(mapping=aes(x=x, ymin=Kr_median-Kr_mad, ymax=Kr_median+Kr_mad, color = Barrier), 
+  geom_point(aes(x = x, y = Kr_median, color = Barrier_Name)) +
+  geom_errorbar(mapping=aes(x=x, ymin=Kr_median-Kr_mad, ymax=Kr_median+Kr_mad, color = Barrier_Name), 
                 width=0.5, 
                 linewidth=1,
                 alpha = 0.75) + 
@@ -995,7 +995,7 @@ pg2 <- plot_grid(pg1 +
 Export
 
 ```{r, eval=F}
-svg("Plots/Error_Bar_Plots2.svg", height = 12, width = 3)
+svg("Plots/Error_Bar_Plots2.svg", height = 10, width = 3)
 pg2 
 dev.off()
 ```
@@ -1003,16 +1003,17 @@ dev.off()
 ## Full Plots
 
 ```{r}
-treshold <- 25
+treshold <- 31
 
-p_kr <- ggplot(data = Data_Full, aes(x = x, y = kr*10^8, color = kAQP*1e4)) +
-  geom_jitter(data = Data_Full%>%filter(Barrier == "T1" & x < 7), 
+
+p_kr <- ggplot(data = Data_Full, aes(x = x, y = kr*10^8, color = kAQP*1e7)) +
+  geom_jitter(data = Data_Full%>%filter(Barrier_Name == "T1" & x < 7), 
               alpha = 0.4, 
               size = 2) +
-  geom_jitter(data = Data_Full%>%filter(Barrier == "T2" & x >= 7 & x < treshold), 
+  geom_jitter(data = Data_Full%>%filter(Barrier_Name == "T2" & x >= 7 & x < treshold), 
               alpha = 0.4,
               size = 2) +
-  geom_jitter(data = Data_Full%>%filter(Barrier == "T3" & x >= treshold), 
+  geom_jitter(data = Data_Full%>%filter(Barrier_Name == "T3" & x >= treshold), 
               alpha = 0.4,
               size = 2) +
   scale_color_viridis() +
@@ -1026,7 +1027,8 @@ p_kr <- ggplot(data = Data_Full, aes(x = x, y = kr*10^8, color = kAQP*1e4)) +
         plot.title = element_text(hjust = 0.5))
 p_kr
 #===============================================================================
-p_Kx <- ggplot(data = Data_Full%>%filter(Barrier == "T1" & kAQP == "1e-04"), aes(x = x, y = ln(Kx), color = xylem_max_size)) +
+p_Kx <- ggplot(data = Data_Full%>%
+                 filter(Barrier_Name == "T1" & kAQP == kAQP_value), aes(x = x, y = ln(Kx), color = radius)) +
   geom_jitter() +
   scale_color_viridis() +
   xlab("Age [d]") +
@@ -1038,14 +1040,15 @@ p_Kx <- ggplot(data = Data_Full%>%filter(Barrier == "T1" & kAQP == "1e-04"), aes
         plot.title = element_text(hjust = 0.5))
 p_Kx
 #===============================================================================
-p_Kr <- ggplot(data = Data_Full, aes(x = x, y = Kr*1e8, color = kAQP*1e4)) +
-  geom_jitter(data = Data_Full%>%filter(Barrier == "T1" & x < 7), 
+p_Kr <- ggplot(data = Data_Full, 
+               aes(x = x, y = Kr*1e8, color = kAQP*1e7)) +
+  geom_jitter(data = Data_Full%>%filter(Barrier_Name == "T1" & x < 7), 
               alpha = 0.4, 
               size = 2) +
-  geom_jitter(data = Data_Full%>%filter(Barrier == "T2" & x >= 7 & x < treshold), 
+  geom_jitter(data = Data_Full%>%filter(Barrier_Name == "T2" & x >= 7 & x < treshold), 
               alpha = 0.4,
               size = 2) +
-  geom_jitter(data = Data_Full%>%filter(Barrier == "T3" & x >= treshold), 
+  geom_jitter(data = Data_Full%>%filter(Barrier_Name == "T3" & x >= treshold), 
               alpha = 0.4,
               size = 2) +
   scale_color_viridis() +
@@ -1060,16 +1063,6 @@ p_Kr <- ggplot(data = Data_Full, aes(x = x, y = Kr*1e8, color = kAQP*1e4)) +
         plot.title = element_text(hjust = 0.5)) 
 p_Kr
 
-```
-
-Correlations
-
-```{r}
-Data_Full_sample <- Data_Full %>% filter(Barrier == "T1" & kAQP == 1e-04)
-
-cor(Data_Full$Kx, Data_Full$xylem_n_cells)
-cor(Data_Full$Kx, Data_Full$stele_layer_diameter)
-cor(Data_Full$Kx, Data_Full$xylem_cell_diameter)
 ```
 
 ```{r, eval = F}
