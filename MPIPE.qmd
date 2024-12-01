@@ -162,6 +162,7 @@ Conds.conv <- rbind(Conds.conv,
 
 ```{r, include = F}
 conds <- Conds.conv
+Scenario_id <- "Scenario_1A"
 path.out <- paste0(MPath, "outputs/", Scenario_id, "/")
 
 # Create folder for the Scenario
@@ -179,7 +180,7 @@ soil         <- read.csv(paste0(MPath, "inputs/soil.csv"))
 results <- run.MARSHAL.loop(RSA_list, RSA.all, 
                             Scenario_id = Scenario_id, 
                             conds, soil, 
-                            tmin = 1, tmax = 30, step = 0.5,       # Decomposition of RSA timing 
+                            tmin = 1, tmax = 30, step = 2,       # Decomposition of RSA timing 
                             timing1 = 7, timing2 = 20)           # SG timing
 # ============================================================================ #
 
@@ -213,7 +214,7 @@ unlink(paste0(plot.path, "*"), recursive = F)
 
 for(ti in unique(RSHA.all$age)){
   cat("ti : ", ti, "\n")
-  plot.CRBM(RSHA.all, Macro.all, ti, path.plot = plot.path, Krs.max = 0.1)
+  plot.CRBM(RSHA.all, Macro.all, ti, path.plot = plot.path, Krs.max = max(Macro.all$Krs))
 }
 ```
 

@@ -75,14 +75,19 @@ and for MECHA 10 kAQP x 10 barriers = 100.
 But we filter to have only 30 days and 6 barriers : 
 
 ```{r}
-Conductivities <- read.csv("Results/12-01-2023/Conductivities_full.csv")
-Conductivities <- Conductivities %>% filter(X > 0 & Barrier %in% c("b1", "b2", "b4", "b6", "b8", "b9"))
+Conductivities         <- read.csv("Results/12-01-2023/Conductivities_full.csv")
+Conductivities         <- Conductivities %>% filter(X > 0 & Barrier %in% c("b1", "b2", "b4", "b6", "b8", "b9"))
 Conductivities$Root_ID <- sapply(Conductivities$Root, function(i) unlist(str_split(string = i, pattern = "root"))[2])
+
 ggplot(data = Conductivities, aes(x = X, y = Root_ID)) + geom_point() + theme_bw()
 ```
 
 Create Conductivity_Dico and Conductivity_Mono.
-The function *set_conductivities* process and convert to the right units.
+The function *set_conductivities* process and convert to the right units : 
+
+* kr is converted to $m s^{-1} MPa^{-1}$
+
+* Kx is converted to $m^3 s^{-1} MPa^{-1}$
 
 ```{r, eval = F}
 Virtual_Roots  <- read.csv("Data/Virtual Roots/Virtual_Root_2023-07-17_30x20.csv")

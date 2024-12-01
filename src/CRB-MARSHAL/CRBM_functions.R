@@ -117,22 +117,31 @@ run.MARSHAL.loop <- function(RSA_list,
 # ==============================================================================
 
 plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max){
+  
+  RSA_id_i <- unique(RSHA.all$RSA_id)[1]
+  
   require(cowplot)
   # PLOT ALL
-  p_kr <- ggplot(RSHA.all %>% filter(RSA_id == unique(RSHA.all$RSA_id)[1] & age == ti)) + 
-    geom_segment(aes(x= x1, xend = x2, y = z1, yend = z2, color = kr, size = radius)) +
+  p_kr <- ggplot(RSHA.all %>% filter(RSA_id == RSA_id_i  & age == ti)) + 
+    geom_segment(aes(x= x1, xend = x2, y = z1, yend = z2, 
+                     color = kr, size = radius)) +
     xlim(-15, 15) +
     ylim(-30, 0) +
-    scale_size_continuous(range = c(1, 3), limits = c(min(RSHA.all$radius), max(RSHA.all$radius))) +
-    scale_color_viridis_c(option = "D", limits = c(min(RSHA.all$kr), max(RSHA.all$kr))) +
+    
+    scale_size_continuous(range = c(1, 3), 
+                          limits = c(min(RSHA.all$radius), max(RSHA.all$radius))) +
+    scale_color_viridis_c(option = "D", 
+                          limits = c(min(RSHA.all$kr), max(RSHA.all$kr))) +
+    
     coord_fixed() +
     # facet_wrap(~RSA_id, nrow = 2) +
     # ggtitle(paste0("kr | time : ", ti)) +
     ggtitle("Kr") +
     theme_test()
   
-  p_kx <- ggplot(RSHA.all %>% filter(RSA_id == unique(RSHA.all$RSA_id)[1] & age == ti)) +
-    geom_segment(aes(x= x1, xend = x2, y = z1, yend = z2, color = Kx, size = radius)) +
+  p_kx <- ggplot(RSHA.all %>% filter(RSA_id == RSA_id_i & age == ti)) +
+    geom_segment(aes(x= x1, xend = x2, y = z1, yend = z2, 
+                     color = Kx, size = radius)) +
     xlim(-15, 15) +
     ylim(-30, 0) +
     scale_size_continuous(range = c(1, 3), limits = c(min(RSHA.all$radius), max(RSHA.all$radius))) +
@@ -143,19 +152,22 @@ plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max){
     ggtitle("Kx") +
     theme_test()
   
-  p_suf <- ggplot(RSHA.all %>% filter(RSA_id == unique(RSHA.all$RSA_id)[1] & age == ti)) +
-    geom_segment(aes(x= x1, xend = x2, y = z1, yend = z2, color = SUF, size = radius)) +
+  p_suf <- ggplot(RSHA.all %>% filter(RSA_id == RSA_id_i & age == ti)) +
+    geom_segment(aes(x= x1, xend = x2, y = z1, yend = z2, 
+                     color = SUF, size = radius)) +
     xlim(-15, 15) +
     ylim(-30, 0) +
-    scale_size_continuous(range = c(1, 3), limits = c(min(RSHA.all$radius), max(RSHA.all$radius))) +
-    scale_color_viridis_c(option = "D", limits = c(0, max())) +
+    scale_size_continuous(range = c(1, 3), 
+                          limits = c(min(RSHA.all$radius), max(RSHA.all$radius))) +
+    scale_color_viridis_c(option = "D", 
+                          limits = c(0, max(RSHA.all$SUF[RSHA.all$RSA_id == RSA_id_i]))) +
     coord_fixed() +
     # facet_wrap(~RSA_id, nrow = 2) +
     # ggtitle(paste0("SUF | time : ", ti)) +
     ggtitle("SUF") +
     theme_test()
   
-  p_krs <- ggplot(Macro.all %>% filter(RSA_id == unique(RSHA.all$RSA_id)[1] & age <= ti)) +
+  p_krs <- ggplot(Macro.all %>% filter(RSA_id == RSA_id_i & age <= ti)) +
     geom_line(aes(x = age, y = Krs), size = 1) +
     xlim(0, max(Macro.all$age)) +
     ylim(0, Krs.max) +
