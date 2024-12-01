@@ -71,7 +71,6 @@ for (i in list.files(TRoot_path, pattern = ".R")) {
 # write.csv(RSHA.IDs, "CRB-MARSHAL/inputs/RSHA_ID.csv", row.names = F)
 ```
 
-
 ## Load DB tables and RSA
 
 ```{r}
@@ -122,14 +121,47 @@ kx_reg <- function(x, timing){
 ```{r}
 Scenario_id  <- "no_sub"
 
-# Generate conds file
-conds <- create.conds(xmax = 40, timing1 = 7, timing2 = 20, SG = T)
-conds$y[conds$type == "kr" & conds$x >= 7] <- 1.8e-5
+# Generate conds filte
+conds.test <- create.conds(xmax = 40, timing1 = 7, timing2 = 20, SG = T)
+conds.test$y[conds.test$type == "kr" & conds.test$x >= 7] <- 1.8e-5
 ```
+
+## Load pre-computed scenarios
+
+```{r}
+Conds_1A <- read.csv("./Data/conds_scenarios/1A.csv")
+Conds_1B <- read.csv("./Data/conds_scenarios/1B.csv")
+Conds_2 <- read.csv("./Data/conds_scenarios/2.csv")
+Conds_3 <- read.csv("./Data/conds_scenarios/3.csv")
+```
+
+Convert 
+
+```{r}
+order_id = c(1,2,3)
+order = c("Taproot", "Lateral", "LongLateral")
+
+orders_df <- tibble(order_id, order)
+
+Conds.conv <- Conds_1A[c("x", "kr", "Kx")] 
+colnames(Conds.conv) <- c("x", "kr", "kx")
+Conds.conv <- Conds.conv %>% 
+  gather(kr, kx, key = "type", value = "y")
+
+Conds.conv <- merge(Conds.conv, orders_df)
+Conds.conv$id <- seq(1, nrow(Conds.conv))
+Conds.conv <- Conds.conv[c("order_id", "order", "x", "type", "y", "id")]
+
+# Add a zero x
+Conds.conv <- rbind(Conds.conv, 
+                    Conds.conv %>% filter(x == 1) %>% mutate(x = 0))
+```
+
 
 ## Loop MARSHAL
 
 ```{r, include = F}
+conds <- Conds.conv
 path.out <- paste0(MPath, "outputs/", Scenario_id, "/")
 
 # Create folder for the Scenario
@@ -161,7 +193,7 @@ write.csv(Macro.all, paste0(path.out, "Macro_all.csv"), row.names = F)
 Make plots
 
 ```{r}
-Scenario_id <- "no_sub"
+Scenario_id <- "Scenario_1A"
 path.out <- paste0(MPath, "outputs/", Scenario_id, "/")
 
 RSHA.all <- read.csv(paste0(path.out, "RSHA_all.csv"))

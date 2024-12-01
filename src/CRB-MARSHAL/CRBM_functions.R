@@ -187,7 +187,8 @@ plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max){
 create.conds <- function(xmax = 50, 
                          timing1, timing2, SG = T, 
                          # kr.coeff, kx.coeff,
-                         orders_id = c(1,2,3), orders_names = c("Taproot", "Lateral", "LongLateral")){
+                         orders_id = c(1,2,3), 
+                         orders_names = c("Taproot", "Lateral", "LongLateral")){
   
   conds.out <- tibble()
   for(order_id in orders_id){

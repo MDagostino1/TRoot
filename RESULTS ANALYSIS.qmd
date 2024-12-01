@@ -18,9 +18,31 @@ for (i in list.files(TRoot_path)) {
   source(paste0(TRoot_path, i))
 }
 
-pkg_list <- c("fmsb", "packcircles", "pander", "readxl", "visreg", "EnvStats", "factoextra", "data.table",
-              "reticulate", "xml2", "tidyverse", "plyr", "deldir", "viridis", "Hmisc", "devtools", "ggplot2",
-              "gridExtra", "dplyr", "cowplot", "stats", "emmeans", "corrplot", "sf", "SciViews")
+pkg_list <- c("fmsb", 
+              "packcircles", 
+              "pander", 
+              "readxl", 
+              "visreg", 
+              "EnvStats", 
+              "factoextra", 
+              "data.table",
+              "reticulate", 
+              "xml2", 
+              "tidyverse", 
+              "plyr", 
+              "deldir", 
+              "viridis", 
+              "Hmisc", 
+              # "devtools", 
+              "ggplot2",
+              "gridExtra", 
+              "dplyr", 
+              "cowplot", 
+              "stats", 
+              "emmeans", 
+              "corrplot", 
+              "sf", 
+              "SciViews")
 
 load_packages(pkg_list)
 
@@ -540,7 +562,7 @@ coefficients_kr <- tibble(a = lm_kr0$coefficients[1],
 #                           T3_kAQP = lm_kr0$coefficients[8])
                     
 pander(coefficients_kr)
-# write.csv(coefficients_kr, "Data/CRB-MARSHAL/kr_coef_full.csv", row.names = F)
+write.csv(coefficients_kr, "./Data/kr_coefficients.csv", row.names = F)
 ```
 
 ```{r}
@@ -606,6 +628,8 @@ coefficients_Kx <- tibble(a = lm2$coefficients[1],
                           r = lm2$coefficients[2],
                           x = lm2$coefficients[3],
                           xms = lm2$coefficients[4])
+
+write.csv(coefficients_Kx, "./Data/Kx_coefficients.csv", row.names = F)
 # ==============================================================================
 
 Kx_reg <- Data_Full[c("Kx", "Combination_ID", "x", "radius", "xylem_max_size")] %>% 
@@ -629,6 +653,15 @@ ggplot(Kx_reg) +
 
 # PREDICTION CURVES
 
+Here we build and plot conductivities curves that we will apply in MARSHAL.
+
+```{r}
+coefficients_kr <- read.csv("./Data/kr_coefficients.csv")
+coefficients_Kx <- read.csv("./Data/Kx_coefficients.csv")
+
+source("./src/FUNCTIONS/T-Root/Functions.R")
+```
+
 ## Scenario 1A : 
 
 * Secondary Growth
@@ -638,7 +671,6 @@ ggplot(Kx_reg) +
 * Fixed kAQP
 
 ```{r}
-source("./src/FUNCTIONS/T-Root/Functions.R")
 # Create Reg2
 Reg2                     <- tibble(x = seq(1:30))
 Reg2$radius              <- radius_reg(Reg2$x)
@@ -673,6 +705,11 @@ Reg2$Kr <- Reg2$kr * 2 *3.1415 * Reg2$radius/1000
 # 
 # Reg2$Kx[Reg2$x > 30] <- Reg2$Kx[Reg2$x == 30]
 
+write.csv(Reg2, "./Data/conds_scenarios/1A.csv")
+```
+
+
+```{r}
 Reg_plot <- ggplot(data = Reg2) +
   geom_line(aes(x = x, y = kr*1e8), color = "red", linewidth = 1) +
   geom_line(aes(x = x, y = Kx*1e9), color = "blue", linewidth = 1) +
@@ -700,13 +737,17 @@ dev.off()
 
 ```{r}
 # Create kAQP function
-kAQP_fun <- function(x, th = 10){
+kAQP_fun <- function(x, th = 10, delta = 1, max = 1.16e-6,  min = 1.16e-7){
   if(x < th){
-    kaqp <- max(unique(Data_Full$kAQP))
+    kaqp <- max
   }else{
-    kaqp <- max(unique(Data_Full$kAQP)) - min(unique(Data_Full$kAQP))*(x-th)
+    kaqp <- max - delta*(x - th)*max 
   }
-  if(kaqp < min(unique(Data_Full$kAQP))){kaqp <- min(unique(Data_Full$kAQP))}
+  
+  if(kaqp < min){
+    kaqp <- min
+    }
+  
   return(kaqp)
 }
 
@@ -719,23 +760,31 @@ Reg2$MS <- 0
 # Set maturation stages timing
 timing <- c(7, 31)
 Reg2$MS[Reg2$x <= timing[1]] <- "T1"
-Reg2$MS[Reg2$x > timing[1] & Reg2$x < timing[2]] <- "T2"
-Reg2$MS[Reg2$x >= timing[2]] <- "T3"
+Reg2$MS[Reg2$x > timing[1]]   <- "T2"
 
 Reg2$kr <- 0
 Reg2$Kx <- 0
 Reg2$Kr <- 0
-Reg2$kAQP <- sapply(Reg2$x, kAQP_fun)
+
+Reg2$kAQP <- sapply(Reg2$x, kAQP_fun, th = 10, delta = 0.05, max = 1.16e-6,  min = 0)
 
 # Loop for each day
 for(i in 1:nrow(Reg2)){
-  Reg2$kr[Reg2$x == i] <- kr_reg(x = Reg2$x[i], MS = Reg2$MS[i], kAQP = Reg2$kAQP[i], radius = Reg2$radius[i], coef = coefficients_kr)
-  Reg2$Kx[Reg2$x == i] <- Kx_reg(x = Reg2$x[i], radius = Reg2$radius[i], coef = coefficients_Kx)
+  Reg2$kr[Reg2$x == i] <- kr_reg(x = Reg2$x[i], 
+                                 MS = Reg2$MS[i], 
+                                 kAQP = Reg2$kAQP[i], 
+                                 radius = Reg2$radius[i], 
+                                 coef = coefficients_kr)
+  Reg2$Kx[Reg2$x == i] <- Kx_reg(x = Reg2$x[i], 
+                                 radius = Reg2$radius[i], 
+                                 coef = coefficients_Kx)
 }
-
 
 Reg2$Kr <- Reg2$kr * 2 *3.1415 * Reg2$radius/1000
 # Reg2$Kx[Reg2$x > 30] <- Reg2$Kx[Reg2$x == 30]
+
+write.csv(Reg2, "./Data/conds_scenarios/1B.csv")
+# ==============================================================================
 
 Reg_plot <- ggplot(data = Reg2) +
   geom_line(aes(x = x, y = kr*1e8), color = "red", linewidth = 1) +
@@ -769,8 +818,8 @@ Reg2$kAQP                <- mean(unique(Data_Full$kAQP))
 
 # Set maturation stages timing
 timing                       <- c(7, 31)
-Reg2$MS[Reg2$x <= timing[1]] <- "T1"
-Reg2$MS[Reg2$x > timing[1]]  <- "T2"
+Reg2$MS <- "T1"
+# Reg2$MS[Reg2$x > timing[1]]  <- "T2"
 
 Reg2$kr <- 0
 Reg2$Kx <- 0
@@ -789,8 +838,9 @@ for(i in 1:nrow(Reg2)){
 }
 
 Reg2$Kr <- Reg2$kr * 2 *3.1415 * Reg2$radius/1000
-# 
-# Reg2$Kx[Reg2$x > 30] <- Reg2$Kx[Reg2$x == 30]
+
+write.csv(Reg2, "./Data/conds_scenarios/2.csv")
+# ==============================================================================
 
 Reg_plot <- ggplot(data = Reg2) +
   geom_line(aes(x = x, y = kr*1e8), color = "red", linewidth = 1) +
@@ -823,8 +873,8 @@ Reg2$kAQP                <- mean(unique(Data_Full$kAQP))
 
 # Set maturation stages timing
 timing                       <- c(7, 31)
-Reg2$MS[Reg2$x <= timing[1]] <- "T1"
-Reg2$MS[Reg2$x > timing[1]]  <- "T2"
+Reg2$MS <- "T1"
+# Reg2$MS[Reg2$x > timing[1]]  <- "T2"
 
 Reg2$kr <- 0
 Reg2$Kx <- 0
@@ -845,6 +895,9 @@ for(i in 1:nrow(Reg2)){
 Reg2$Kr <- Reg2$kr * 2 *3.1415 * Reg2$radius/1000
 # 
 # Reg2$Kx[Reg2$x > 30] <- Reg2$Kx[Reg2$x == 30]
+
+write.csv(Reg2, "./Data/conds_scenarios/3.csv")
+# ==============================================================================
 
 Reg_plot <- ggplot(data = Reg2) +
   geom_line(aes(x = x, y = kr*1e8), color = "red", linewidth = 1) +
