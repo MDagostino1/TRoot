@@ -186,29 +186,31 @@ kAQP_plot1
 kr_plot1 <- ggplot(data = Conductivities_processed,
        aes(x = x, 
            y = kr*10^8,
-           color = kAQP*10000)) +
+           color = kAQP*1e7)) +
   geom_point(alpha = 0.5, position = "jitter") +
   facet_wrap(~Barrier_Name) +
   scale_color_viridis() +
   # geom_smooth(aes(x = x, y = radius/5000000), color = "red") +
   # ylim(0, 3e-08) +
-  ylab(expression(k[r] ~ 10^{-8} ~ "[" * m ~ MPa^{-1} ~ s^{-1}*"]")) +
+  ylab(expression(k[r] ~ 10^{-8} ~ "[" ~ m~ s^{-1} ~ MPa^{-1} ~ "]")) +
+  labs(color = expression(kAQP ~  "[" ~ 10^{-7} ~ m ~ s^{-1} ~ MPa^{-1} ~ "]")) +
   xlab("Age [d]") +
-  ggtitle("Radial conductivity") +
-  theme_test()
+  # ggtitle("Hydraulic Radial conductivity") +
+  theme_bw()
 kr_plot1
 #============================================================================
 Kr_plot1 <- ggplot(data = Conductivities_processed,
        aes(x = x, 
            y = Kr,
-           color = kAQP)) +
+           color = kAQP*1e7)) +
   geom_jitter(alpha = 0.2) +
   facet_wrap(~Barrier_Name) +
   scale_color_viridis() +
-  ylab("Radial Conductance [m^3 MPa-1 d-1]") +
+  ylab(expression(K[r] ~ "[" ~ m^{3} ~ s^{-1} ~ MPa^{-1} ~ "]")) + 
   xlab("Age [d]") +
   # ylim(0, 3e-08) +
-  theme_test()
+  labs(color = expression(kAQP ~  "[" ~ 10^{-7} ~ m ~ s^{-1} ~ MPa^{-1} ~ "]")) +
+  theme_dark()
 Kr_plot1
 #============================================================================
 # Radius
@@ -234,19 +236,22 @@ Perimeter_plot1 <- ggplot(data = Conductivities_processed,
 Perimeter_plot1
 #============================================================================
 # Kx
-kx_plot1 <- ggplot(data = Conductivities_processed%>%filter(Barrier_Name == "T1"),
+kx_plot1 <- ggplot(data = Conductivities_processed%>%
+                     filter(Barrier_Name == "T1" & kAQP == min(Conductivities_processed$kAQP)),
        aes(x = x, 
-           y = Kx)) +
-  geom_point(alpha = 0.1) +
-  geom_smooth(method = "lm") +
+           y = Kx,
+           color = radius)) +
+  geom_point(alpha = 1) +
+  # geom_smooth(method = "lm") +
   scale_y_log10() +
   # geom_smooth(method = "lm", se = T) +
-  # scale_color_viridis() +
+  scale_color_viridis(option = "magma", direction = 1) +
   # ylim(0, 3e-08) +
-  ylab("ln(Kx) [cm^3 d-1 hPa-1]") +
+  ylab(expression(ln(K[x]) ~ "[" ~ m^{4} ~ s^{-1} ~ hPa^{-1} ~ "]")) +
   xlab("Age [d]") +
-  ggtitle("ln of Axial Conductance") +
-  theme_test()
+  labs(color = "Radius [cm]") +
+  # ggtitle("Hydraulic axial conductance") +
+  theme_bw()
 kx_plot1
 ```
 
@@ -257,11 +262,11 @@ svg("Plots/kAQP_1.svg", height = 4, width = 6)
 kAQP_plot1
 dev.off()
 
-svg("Plots/kr_plot_1.svg", height = 5, width = 8)
+png("Plots/kr_plot_1.png", height = 5, width = 8, units = "in", res = 300)
 kr_plot1 
 dev.off()
 
-svg("Plots/Kx_plot_1.svg", height = 5, width = 8)
+png("Plots/Kx_plot_1.png", height = 3, width = 5, units = "in", res = 300)
 kx_plot1
 dev.off()
 
@@ -464,7 +469,7 @@ MS_all <- ggplot(data = Conductivities_processed) +
   scale_color_viridis() +
   
   theme_bw() 
-  # ggtitle(expression(k[r] ~ "[" ~ 10^{-08} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  # ggtitle("Radial Hydraulic Conductivity per hydrophobic deposition level") 
   # theme(legend.position = "none") 
 
 MS_all
