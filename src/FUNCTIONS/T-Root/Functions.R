@@ -675,7 +675,10 @@ remove_outliers <- function(data, threshold = 2) {
 #===============================================================================
 #===============================================================================
 
-set_conductivities <- function(Conductivities, threshold = 3, Barriers = NULL){
+set_conductivities <- function(Conductivities, 
+                               conv_kr = 0.001157407,
+                               conv_kx = 1.157407e-09,
+                               threshold = 3, Barriers = NULL){
   
   if(is.null(Barriers)){
     stop("Please set Barriers.")
@@ -687,17 +690,18 @@ set_conductivities <- function(Conductivities, threshold = 3, Barriers = NULL){
   #==========================================================================
   # Convert Kr from cm hPa-1 d to m s-1 Mpa-1
   # cm HPa-1 d-1 = 0.01m * (100 * 10-6 MPa)-1 * (24*60*60 s)-1
-  conv <- 0.01 * (100 * 1e-06)^-1 * (24*60*60)^-1
-  Conductivities$kr <- Conductivities$Kr * conv
+  # conv_kr <- 0.01 * (100 * 1e-06)^-1 * (24*60*60)^-1
+  Conductivities$kr <- Conductivities$Kr * conv_kr
   
   Conductivities$radius <- 10*Conductivities$perimeter/(2*pi) # cm -> mm
   Conductivities$Kr <- Conductivities$kr * Conductivities$perimeter * 1e-3 # because radius is in mm and kr in m...
   
   # Convert Kx from cm4 hPa-1 d-1 to m4 MPa-1 s-1
-  Conductivities$Kx <- 1e-8 * 1e4 * (1/86400) * Conductivities$Kx 
+  # conv_kx <- (0.01^4) * (100 *1e-6)^-1 * (24*60*60)^-1
+  Conductivities$Kx <- Conductivities$Kx * conv_kx
   
-  # Convert kAQP from cm hPa-1 d-1 to m MPa-1 s-1
-  Conductivities$kAQP <- (0.01 / (1e-4 * 24 * 60 * 60)) * Conductivities$kAQP
+  # Convert kAQP from cm hPa-1 d-1 to m MPa-1 s-1 (same as kr)
+  Conductivities$kAQP <- Conductivities$kAQP * conv_kr
   Conductivities$kAQP <- round(x = Conductivities$kAQP, digits = 10)
   
   #==========================================================================

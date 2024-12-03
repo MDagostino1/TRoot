@@ -118,11 +118,16 @@ run.MARSHAL.loop <- function(RSA_list,
 
 plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max){
   
-  RSA_id_i <- unique(RSHA.all$RSA_id)[1]
+  RSA_id_i   <- unique(RSHA.all$RSA_id)[1]
+  
+  data2plot  <- RSHA.all %>% filter(RSA_id == RSA_id_i  & age == ti)
+  macro2plot_all <- Macro.all %>% filter(RSA_id == RSA_id_i)
+  macro2plot_i <- Macro.all %>% filter(RSA_id == RSA_id_i & age == ti)
   
   require(cowplot)
   # PLOT ALL
-  p_kr <- ggplot(RSHA.all %>% filter(RSA_id == RSA_id_i  & age == ti)) + 
+  # ========================================================================== #
+  p_kr <- ggplot(data2plot) + 
     geom_segment(aes(x= x1, xend = x2, y = z1, yend = z2, 
                      color = kr, size = radius)) +
     xlim(-15, 15) +
@@ -142,20 +147,27 @@ plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max){
     
     theme_test()
   
-  p_kx <- ggplot(RSHA.all %>% filter(RSA_id == RSA_id_i & age == ti)) +
+  # ========================================================================== #
+  p_kx <- ggplot(data2plot) +
     geom_segment(aes(x= x1, xend = x2, y = z1, yend = z2, 
                      color = Kx, size = radius)) +
     xlim(-15, 15) +
     ylim(-30, 0) +
-    scale_size_continuous(range = c(1, 3), limits = c(min(RSHA.all$radius), max(RSHA.all$radius))) +
-    scale_color_viridis_c(option = "D", limits = c(min(RSHA.all$Kx), max(RSHA.all$Kx))) +
+    
+    scale_size_continuous(range = c(1, 3),
+                          limits = c(min(RSHA.all$radius), 
+                                    max(RSHA.all$radius))) +
+    scale_color_viridis_c(option = "D", 
+                          limits = c(min(RSHA.all$Kx), 
+                                     max(RSHA.all$Kx))) +
     coord_fixed() +
     # facet_wrap(~RSA_id, nrow = 2) +
     # ggtitle(paste0("Kx | time : ", ti)) +
     ggtitle(expression(K[x] ~ "[" ~ cm^{4} ~ hPa^{-1} ~ d^{-1} ~ "]")) +
     theme_test()
   
-  p_suf <- ggplot(RSHA.all %>% filter(RSA_id == RSA_id_i & age == ti)) +
+  # ========================================================================== #
+  p_suf <- ggplot(data2plot) +
     geom_segment(aes(x= x1, xend = x2, y = z1, yend = z2, 
                      color = SUF, size = radius)) +
     xlim(-15, 15) +
@@ -167,9 +179,18 @@ plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max){
     
     # Color of SUF
     scale_color_viridis_c(option = "magma",
+                          breaks = c(min(data2plot$SUF), 
+                                     max(data2plot$SUF)),
+                          labels = c("low", "high"),
                           direction = 1
                           # , limits = c(0, max(RSHA.all$SUF[RSHA.all$RSA_id == RSA_id_i]))
                           ) +
+    
+    # Fix position of legends
+    guides(
+      color = guide_colorbar(order = 1),  # Color legend appears first
+      size = guide_legend(order = 2)   # Size legend appears second
+    ) +
     
     coord_fixed() +
     # facet_wrap(~RSA_id, nrow = 2) +
@@ -177,31 +198,20 @@ plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max){
     
     theme_test() +
     # theme(legend.position = "none") +
-    ggtitle("SUF") 
+    ggtitle("SUF [normalised]") 
   
-  p_krs <- ggplot(Macro.all %>% filter(RSA_id == RSA_id_i & age <= ti)) +
-    geom_line(aes(x = age, y = Krs), size = 1) +
-    xlim(0, max(Macro.all$age)) +
+  # ========================================================================== #
+  p_krs <- ggplot() +
+    geom_line(data = macro2plot_all, aes(x = age, y = Krs), size = 1) +
+    geom_point(data = macro2plot_i, aes(x = age, y = Krs), size = 4, color = "red") +
+    xlim(0, max(macro2plot_all$age)) +
     ylim(0, Krs.max) +
     ggtitle(expression(K[rs] ~ "[" ~ m^{3} ~ s^{-1} ~ MPa^{-1} ~ "]")) +
     theme_bw()
   
-  
-  
-  # ggsave(filename = paste0(path.plot, "/kr/test", "_", ti, ".png"),
-  #        plot = p_kr, device = "png", width = 12, height = 6, units = "in", dpi = 200)
-  # 
-  # ggsave(filename = paste0(path.plot, "/Kx/test", "_", ti, ".png"),
-  #        plot = p_kx, device = "png", width = 4, height = 4, units = "in", dpi = 200)
-  # 
-  # ggsave(filename = paste0(path.plot, "/SUF/test", "_", ti, ".png"),
-  #        plot = p_suf, device = "png", width = 4, height = 4, units = "in", dpi = 200)
-  # 
-  # ggsave(filename = paste0(path.plot, "/Krs/test", "_", ti, ".png"),
-  #        plot = p_krs, device = "png", width = 4, height = 4, units = "in", dpi = 200)
-  
-  title <- ggdraw() + draw_label(paste0("Time : ", format(round(ti, 2), nsmall = 2)))
-  
+  # ========================================================================== #
+  # MERGE ALL PLOTS
+  title  <- ggdraw() + draw_label(paste0("Time : ", format(round(ti, 2), nsmall = 2)))
   p_full <- plot_grid(p_kr, p_kx, p_suf, p_krs, nrow = 2)
   p_full <- plot_grid(title, p_full, nrow = 2, rel_heights = (c(0.1, 0.7)))
   pfinal <- ggdraw(p_full) + theme(plot.background = element_rect(fill = "white"))

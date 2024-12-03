@@ -198,19 +198,19 @@ kr_plot1 <- ggplot(data = Conductivities_processed,
   theme_bw()
 kr_plot1
 #============================================================================
-Kr_plot1 <- ggplot(data = Conductivities_processed,
-       aes(x = x, 
-           y = Kr,
-           color = kAQP*1e7)) +
-  geom_jitter(alpha = 0.2) +
-  facet_wrap(~Barrier_Name) +
-  scale_color_viridis() +
-  ylab(expression(K[r] ~ "[" ~ m^{3} ~ s^{-1} ~ MPa^{-1} ~ "]")) + 
-  xlab("Age [d]") +
-  # ylim(0, 3e-08) +
-  labs(color = expression(kAQP ~  "[" ~ 10^{-7} ~ m ~ s^{-1} ~ MPa^{-1} ~ "]")) +
-  theme_dark()
-Kr_plot1
+# Kr_plot1 <- ggplot(data = Conductivities_processed,
+#        aes(x = x, 
+#            y = Kr,
+#            color = kAQP*1e7)) +
+#   geom_jitter(alpha = 0.2) +
+#   facet_wrap(~Barrier_Name) +
+#   scale_color_viridis() +
+#   ylab(expression(K[r] ~ "[" ~ m^{3} ~ s^{-1} ~ MPa^{-1} ~ "]")) + 
+#   xlab("Age [d]") +
+#   # ylim(0, 3e-08) +
+#   labs(color = expression(kAQP ~  "[" ~ 10^{-7} ~ m ~ s^{-1} ~ MPa^{-1} ~ "]")) +
+#   theme_dark()
+# Kr_plot1
 #============================================================================
 # Radius
 Radius_plot1 <- ggplot(data = Conductivities_processed,
@@ -309,6 +309,7 @@ Data_Full_2cor <- as_tibble(scale(Data_Full_2cor))
 svg(filename = "plots/Results_Correlations.svg", width = 7, height = 7)
 corrplot(cor(Data_Full_2cor), method = 'color')
 dev.off()
+corrplot(cor(Data_Full_2cor), method = 'color')
 ```
 
 ## 1) Effect of Radius
@@ -940,7 +941,7 @@ Data_EB <- data.frame()
 for(i in unique(Conductivities_processed$x)){
   temp_cdt <- Conductivities_processed %>% filter(x == i & kAQP==kAQP_value)
   for(j in unique(temp_cdt$Barrier_Name)){
-    cat("x = ", i, " | Barrier_Name = ", j, "\n")
+    # cat("x = ", i, " | Barrier_Name = ", j, "\n")
     temp_df <- data.frame(x = i, 
                           Barrier_Name = j,
                           kr_mean = mean(temp_cdt$kr[temp_cdt$Barrier_Name == j]),
