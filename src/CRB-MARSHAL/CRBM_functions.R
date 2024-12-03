@@ -136,7 +136,10 @@ plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max){
     coord_fixed() +
     # facet_wrap(~RSA_id, nrow = 2) +
     # ggtitle(paste0("kr | time : ", ti)) +
-    ggtitle("Kr") +
+    
+    # ggtitle("Kr") +
+    ggtitle(expression(k[r] ~ "[" ~ 10^{-8} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+    
     theme_test()
   
   p_kx <- ggplot(RSHA.all %>% filter(RSA_id == RSA_id_i & age == ti)) +
@@ -149,7 +152,7 @@ plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max){
     coord_fixed() +
     # facet_wrap(~RSA_id, nrow = 2) +
     # ggtitle(paste0("Kx | time : ", ti)) +
-    ggtitle("Kx") +
+    ggtitle(expression(K[x] ~ "[" ~ cm^{4} ~ hPa^{-1} ~ d^{-1} ~ "]")) +
     theme_test()
   
   p_suf <- ggplot(RSHA.all %>% filter(RSA_id == RSA_id_i & age == ti)) +
@@ -157,20 +160,30 @@ plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max){
                      color = SUF, size = radius)) +
     xlim(-15, 15) +
     ylim(-30, 0) +
+    
+    # Size of radius
     scale_size_continuous(range = c(1, 3), 
                           limits = c(min(RSHA.all$radius), max(RSHA.all$radius))) +
-    scale_color_viridis_c(option = "D", 
-                          limits = c(0, max(RSHA.all$SUF[RSHA.all$RSA_id == RSA_id_i]))) +
+    
+    # Color of SUF
+    scale_color_viridis_c(option = "magma",
+                          direction = 1
+                          # , limits = c(0, max(RSHA.all$SUF[RSHA.all$RSA_id == RSA_id_i]))
+                          ) +
+    
     coord_fixed() +
     # facet_wrap(~RSA_id, nrow = 2) +
     # ggtitle(paste0("SUF | time : ", ti)) +
-    ggtitle("SUF") +
-    theme_test()
+    
+    theme_test() +
+    # theme(legend.position = "none") +
+    ggtitle("SUF") 
   
   p_krs <- ggplot(Macro.all %>% filter(RSA_id == RSA_id_i & age <= ti)) +
     geom_line(aes(x = age, y = Krs), size = 1) +
     xlim(0, max(Macro.all$age)) +
     ylim(0, Krs.max) +
+    ggtitle(expression(K[rs] ~ "[" ~ m^{3} ~ s^{-1} ~ MPa^{-1} ~ "]")) +
     theme_bw()
   
   
@@ -187,7 +200,8 @@ plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max){
   # ggsave(filename = paste0(path.plot, "/Krs/test", "_", ti, ".png"),
   #        plot = p_krs, device = "png", width = 4, height = 4, units = "in", dpi = 200)
   
-  title <- ggdraw() + draw_label(paste0("Time : ", ti))
+  title <- ggdraw() + draw_label(paste0("Time : ", format(round(ti, 2), nsmall = 2)))
+  
   p_full <- plot_grid(p_kr, p_kx, p_suf, p_krs, nrow = 2)
   p_full <- plot_grid(title, p_full, nrow = 2, rel_heights = (c(0.1, 0.7)))
   pfinal <- ggdraw(p_full) + theme(plot.background = element_rect(fill = "white"))
