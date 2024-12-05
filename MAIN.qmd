@@ -320,14 +320,28 @@ By default, MECHA can simulate different scenarios : \*
 Here we choose to compute scenarios 0, 1, 5 and 6. You can change the simulated scenarios in *MECHA/Projects/granar/in/Maize_Geometry.xml* in line 19.
 
 ```{r}
-anatomy_file <- "Data/sorghum_7cm.xml"
+anatomy_file <- "MECHA/cellsetdata/sorghum_7cm.xml"
 file.copy(anatomy_file, "MECHA/cellsetdata/")
 file.rename(paste0("MECHA/cellsetdata/", anatomy_file), "MECHA/cellsetdata/current_root.xml")
+
+test <- get_root_section(anatomy_file)
+ggplot(test) +
+    # geom_polygon(aes_string("x", "y", group="id_cell", fill=col), colour="white") +
+    geom_polygon(aes(x = x, y = y, fill = type, group = id_cell),
+                 color = "white") +
+    theme_classic() +
+    coord_fixed() +
+    theme(axis.line=element_blank(),
+          axis.text.x=element_blank(),
+          axis.text.y=element_blank(),
+          axis.ticks=element_blank(),
+          axis.title.x=element_blank(),
+          axis.title.y=element_blank())
 ```
 
 ```{r, eval=FALSE}
 # Change current_root with the desired anatomy
-write_anatomy_xml(sim1, "MECHA/cellsetdata/current_root.xml")
+# write_anatomy_xml(sim1, "MECHA/cellsetdata/current_root.xml")
 
 #========================================================
 library(reticulate)

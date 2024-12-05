@@ -1,0 +1,629 @@
+
+marshal_tomato <- function(RS_1_dico, 
+                           dico_conductivities, 
+                           Timing_kr = c(7, 25),
+                           Timing_Kx = c(7, 25),
+                           kr_coef, 
+                           kx_coef,
+                           psiCollar = -15000,
+                           soil = data.frame(id = c(1,2,3,4),
+                                             z = c(0, -40, -80, -120),
+                                             psi = c(-15000, -300, -300, -300))){
+  
+  # Set radius for laterals : 0.18 is the mean value for x < 25
+  # RS_1_dico$radius[RS_1_dico$type == 2] <- 0.18
+  RS_1_dico$type <- as.factor(RS_1_dico$type)
+  
+  p1 <- ggplot(data = RS_1_dico, aes(color = time, size = radius)) + 
+    # geom_point(aes(x = x1, y = z1)) +
+    geom_segment(aes(x = x1, y = z1, xend = x2, yend = z2)) +
+    xlim(-10, 10) +
+    # scale_color_brewer(palette = "Set2") +
+    # scale_color_viridis_d() +
+    theme_bw()
+  
+  # svg(filename = "Plots/Root_System1.svg", height = 10)
+  p1
+  # dev.off()
+  
+  #===============================================================================
+  # Correct the branching
+  #===============================================================================
+  
+  # We go through the banchID
+  suppressWarnings({
+    for(i in unique(RS_1_dico$branchID)[-1]){
+      RS_1_dico$node1ID[RS_1_dico$branchID == i][-1] <- which(RS_1_dico$branchID == i)[-length(which(RS_1_dico$branchID == 1))]
+      if(RS_1_dico$type[RS_1_dico$branchID == i][1] == 2){ # connection with the parental root
+        x1_child <- RS_1_dico$x1[RS_1_dico$branchID == i][1]
+        y1_child <- RS_1_dico$y1[RS_1_dico$branchID == i][1]
+        z1_child <- RS_1_dico$z1[RS_1_dico$branchID == i][1]
+
+        tmp_time <- RS_1_dico$time[RS_1_dico$branchID == i][1]
+        
+        nearest <- RS_1_dico%>%filter(branchID != i)%>%
+          mutate(euc = sqrt((x1-x1_child)^2+ (y1 - y1_child)^2 + (z1 - z1_child)^2))
+        nearest <- nearest[nearest$euc == min(nearest$euc), ]
+        RS_1_dico$node1ID[RS_1_dico$branchID == i][1] <- nearest$node2ID[1] # oldest segments
+      }
+    }  
+  })
+  
+  #===============================================================================
+  # Set conductivities
+  #===============================================================================
+  
+  # Change conductivities in RS_conducts
+  # /!\ MARSHAL units are in cm d-1 HPa-1 where my units are m s-1 MPa-1 -> need for conversion
+  for (id in dico_conductivities$id) {
+    # print(id)
+    # print(dico_conductivities$type[dico_conductivities$id == id])
+    
+    # Kr main root
+    if (dico_conductivities$type[dico_conductivities$id == id] == "kr" & dico_conductivities$order_id[dico_conductivities$id == id] == 1){
+      dico_conductivities$y[dico_conductivities$id == id] = radial_reg(x = dico_conductivities$x[dico_conductivities$id == id], 
+                                                                       timing = Timing_kr,
+                                                                       coefficients  = kr_coef)*864
+    }
+    
+    # Kr lateral
+    else if(dico_conductivities$type[dico_conductivities$id == id] == "kr" & dico_conductivities$order_id[dico_conductivities$id == id] == 2){
+      # dico_conductivities$y[dico_conductivities$id == id] = 7.5e-08
+      dico_conductivities$y[dico_conductivities$id == id] = radial_reg(x = dico_conductivities$x[dico_conductivities$id == id], 
+                                                                       timing = Timing_kr,
+                                                                       coefficients  = kr_coef)*864
+    }
+      
+    # Kx main root
+    else if (dico_conductivities$type[dico_conductivities$id == id] == "kx" & dico_conductivities$order_id[dico_conductivities$id == id] == 1){
+      dico_conductivities$y[dico_conductivities$id == id ] = axial_reg(x = dico_conductivities$x[dico_conductivities$id == id],
+                                                                       timing = Timing_Kx,
+                                                                       coefficients = kx_coef)*8640000
+    }
+    
+    #Kx lateral
+    else if (dico_conductivities$type[dico_conductivities$id == id] == "kx" & dico_conductivities$order_id[dico_conductivities$id == id] == 2){
+      # dico_conductivities$y[dico_conductivities$id == id] = 0.05
+      dico_conductivities$y[dico_conductivities$id == id ] = axial_reg(x = dico_conductivities$x[dico_conductivities$id == id],
+                                                                       timing = Timing_Kx,
+                                                                       coefficients = kx_coef)*8640000
+    }
+  }
+  
+  #===============================================================================
+  #Set up MARSHAL
+  #===============================================================================
+  kx_vec = 1
+  kr_vec = 1
+  all_marshal <- NULL
+  tot_marshal_sim <- length(kr_vec) * length(kx_vec)
+  stock1 <- list()   # va stocker tous les outputs
+  stock2 <- list()
+  plot_list <- list() # stocke les plots
+  RMS_df <- data.frame(kr = c(), kx = c(), krs = c(), RMS = c())
+  current_rootsystem <- RS_1_dico
+  #=============================================================================
+  #=============================================================================
+  
+  # RUN MARSHAL
+  hydraulic_temp <- getSUF(current_rootsystem, table_cond = dico_conductivities, soil, psiCollar, hetero = F)
+  
+  #=============================================================================
+  #=============================================================================
+    # Update results into hydraulic architecture 
+  hydraulic_archi_temp <- current_rootsystem
+  hydraulic_archi_temp$suf <- hydraulic_temp$suf[,1]
+  hydraulic_archi_temp$kr <- hydraulic_temp$kr[,1]
+  hydraulic_archi_temp$kx <- hydraulic_temp$kx[,1]
+  hydraulic_archi_temp$jr <- hydraulic_temp$jr[,1]
+  hydraulic_archi_temp$jxl <- hydraulic_temp$jxl[,1]
+  hydraulic_archi_temp$psi <- hydraulic_temp$psi
+  # print(paste0("Krs : ", hydraulic_temp$krs/864000, " m3 s-1 MPa-1"))
+  # print("==================================================================")
+  # Save only the relevant results of the simulation data in a new dataframe. 
+  all_marshal2 <- tibble("length" = sum(current_rootsystem$length),
+                         "transpiration" = hydraulic_temp$tact,
+                         "krs" = hydraulic_temp$krs/864000)
+  # Export all the results of the simulation
+  # write.csv(hydraulic_archi_temp, file = paste0("CRB-MARSHAL/outputs/HA_", Sys.Date(),"_",n_marshal_sim, ".csv"))
+  # write.csv(all_marshal2, file = paste0("CRB-MARSHAL/outputs/All_Marshal_", Sys.Date(),"_",n_marshal_sim, ".csv"))
+  return(list(hydraulic_archi_temp, hydraulic_temp$krs))
+  
+}
+#===============================================================================
+#===============================================================================
+#===============================================================================
+marshal_monocot <- function(RS_1_mono, 
+                            RS_1_mono_conductivities, 
+                            psiCollar = -15000,
+                            soil = data.frame(id = c(1,2,3,4),
+                                              z = c(0, -40, -80, -120),
+                                              psi = c(-15000, -300, -300, -300))){
+  
+  # Change radius
+  RS_1_mono$radius <- 0.1889
+  
+  p2 <- ggplot(data = RS_1_mono, aes(color = type)) + 
+    # geom_point(aes(x = x1, y = z1)) +
+    geom_segment(aes(x = x1, y = z1, xend = x2, yend = z2), linewidth = 2) +
+    xlim(-10, 10) +
+    # scale_color_brewer(palette = "Set2") +
+    # scale_color_viridis() +
+    theme_bw()
+  
+  # svg(filename = "Plots/Root_System1.svg", height = 10)
+  p2
+  # dev.off()
+  
+  # Correct nodes
+  # We go through the banchID
+  suppressWarnings({
+    for(i in unique(RS_1_mono$branchID)[-1]){
+      
+      RS_1_mono$node1ID[RS_1_mono$branchID == i][-1] <- which(RS_1_mono$branchID == i)[-length(which(RS_1_mono$branchID == 1))]
+      
+      if(RS_1_mono$type[RS_1_mono$branchID == i][1] == 2){ # connection with the parental root
+        x1_child <- RS_1_mono$x1[RS_1_mono$branchID == i][1]
+        y1_child <- RS_1_mono$y1[RS_1_mono$branchID == i][1]
+        z1_child <- RS_1_mono$z1[RS_1_mono$branchID == i][1]
+        
+        tmp_time <- RS_1_mono$time[RS_1_mono$branchID == i][1]
+        
+        nearest <- RS_1_mono%>%filter(branchID != i)%>%
+          mutate(euc = sqrt((x1-x1_child)^2+ (y1 - y1_child)^2 + (z1 - z1_child)^2))
+        nearest <- nearest[nearest$euc == min(nearest$euc), ]
+        RS_1_mono$node1ID[RS_1_mono$branchID == i][1] <- nearest$node2ID[1] # oldest segments
+      }
+    }  
+  })
+  
+  
+  #======================
+  # ADD CONDUCTIVITIES
+  #======================
+  
+  # RS_1_mono$kr <- NULL
+  # RS_1_mono$kx <- NULL
+  
+  # Main Root kr
+  for (z_i in RS_1_mono$z1[RS_1_mono$type == 1]) {
+    RS_1_mono$kr[RS_1_mono$type == 1 & RS_1_mono$z1 == z_i] <- radial_reg(abs(min(RS_1_mono$z1[RS_1_mono$type == 1])-z_i))
+    RS_1_mono$kx[RS_1_mono$type == 1 & RS_1_mono$z1 == z_i] <- axial_reg(abs(min(RS_1_mono$z1[RS_1_mono$type == 1])-z_i))
+  }
+
+  # Lateral Roots kr
+  for(b_i in unique(RS_1_mono$branchID)){
+    temp_root <- RS_1_mono %>% filter(branchID == b_i)
+    for (z_i in temp_root$z1) {
+      temp_root$kr[temp_root$z1 == z_i] <- radial_reg2(abs(min(temp_root$z1)-z_i))
+      # temp_root$kx[temp_root$z1 == z_i] <- axial_reg2(abs(min(temp_root$z1)-z_i))
+      temp_root$kx[temp_root$z1 == z_i] <- 0.033
+    }
+    RS_1_mono$kr[RS_1_mono$branchID == b_i] = temp_root$kr
+    RS_1_mono$kx[RS_1_mono$branchID == b_i] = temp_root$kx
+  }
+
+  
+  # PLot
+  p2 <- ggplot(data = RS_1_mono, aes(color = kr)) + 
+    # geom_point(aes(x = x1, y = z1)) +
+    geom_segment(aes(x = x1, y = z1, xend = x2, yend = z2)) +
+    xlim(-10, 10) + 
+    # scale_color_viridis() +
+    # facet_wrap(~type) +
+    theme_bw()
+  
+  p3 <- ggplot(data = RS_1_mono, aes(color = kx)) + 
+    # geom_point(aes(x = x1, y = z1)) +
+    geom_segment(aes(x = x1, y = z1, xend = x2, yend = z2)) +
+    xlim(-10, 10) + 
+    scale_color_viridis() +
+    # facet_wrap(~type) +
+    theme_bw()
+  
+  # svg(filename = "Plots/Root_System2.svg", height = 10)
+  p2
+  # dev.off()
+  
+  # svg(filename = "Plots/Root_System3.svg", height = 10)
+  p3
+  # dev.off()
+  
+  # Set up conductivities
+  for (id in RS_1_mono_conductivities$id) {
+    if (RS_1_mono_conductivities$type[RS_1_mono_conductivities$id == id] == "kr"){
+      # RS_1_mono_conductivities$y[RS_1_mono_conductivities$id == id] = radial_reg2(RS_1_mono_conductivities$x[RS_1_mono_conductivities$id == id])
+      RS_1_mono_conductivities$y[RS_1_mono_conductivities$id == id] = 5e-08
+    }
+    else if (RS_1_mono_conductivities$type[RS_1_mono_conductivities$id == id] == "kx"){
+      # RS_1_mono_conductivities$y[RS_1_mono_conductivities$id == id] = axial_reg2(RS_1_mono_conductivities$x[RS_1_mono_conductivities$id == id])
+      RS_1_mono_conductivities$y[RS_1_mono_conductivities$id == id] = 1e-08
+      }
+  }  
+  
+  # DEFAULT PARAMETERS & VARIABLES
+  # psiCollar <- -15000
+  # psiCollar_vec <- c(-15000)
+  # soil <- read_csv(paste0(MPath,"inputs/soil.csv"))
+  
+  # psi_collar :
+  # soil$psi[soil$z != 0] = -14999
+
+  # ======================================================
+  current_rootsystem <- RS_1_mono
+  # ======================================================
+  
+  # Run MARSHAL
+  conds2 <- RS_1_mono_conductivities
+  hydraulics2 <- getSUF(current_rootsystem, conds2, soil, psiCollar, hetero = F)
+  
+  # Update results into hydraulic architecture 
+  hydraulic_archi2 <- current_rootsystem
+  hydraulic_archi2$suf <- hydraulics2$suf[,1]
+  hydraulic_archi2$kr <- hydraulics2$kr[,1]
+  hydraulic_archi2$kx <- hydraulics2$kx[,1]
+  hydraulic_archi2$jr <- hydraulics2$jr[,1]
+  hydraulic_archi2$jxl <- hydraulics2$jxl[,1]
+  hydraulic_archi2$psi <- hydraulics2$psi
+  
+  print(paste0("Krs : ", hydraulics2$krs))
+  print("==================================================================")
+  
+  # Save only the relevant results of the simulation data in a new dataframe. 
+  # all_marshal2 <- tibble("kx" = kx_in,
+  #                        "kr" = kr_in,
+  #                        "length" = sum(current_rootsystem$length),
+  #                        "transpiration" = hydraulics2$tact,
+  #                        "krs" = hydraulics2$krs)
+  
+  # Export all the results of the simulation
+  return(hydraulic_archi2)
+}
+#===============================================================================
+#===============================================================================
+#===============================================================================
+plot_RS <- function(RSHA){
+  ggplot(data = RSHA, aes(color= suf, size = radius)) +
+    # geom_point(aes(x = x1, y = z1)) +
+    geom_segment(aes(x = x1, y = z1, xend = x2, yend = z2)) +
+    xlim(-10, 10) +
+    scale_color_viridis() +
+    theme_bw()
+}
+
+analysis <- function(RSHA_dico, RSHA_mono){
+  #===============================================================================
+  # COMPARAISON
+  #===============================================================================
+  
+  # PLot both with the same scale
+  RSHA_dico$id <- 1
+  RSHA_mono$id <- 2
+  full_RSHA <- rbind(RSHA_dico, RSHA_mono, fill = T)
+  
+  # ==============================================================================
+  Radius <- ggplot(data = full_RSHA, aes(x = time2, y = radius, color = type)) +
+    geom_point() +
+    facet_wrap(~id) +
+    theme_test()
+   
+  
+  Comparative_kr <- ggplot() + 
+    # geom_point(aes(x = x1, y = z1)) +
+    geom_segment(data = full_RSHA%>%filter(type==2),
+                 aes(x = x1, y = z1, xend = x2, yend = z2, linewidth = radius, color = kr)) +
+    geom_segment(data = full_RSHA%>%filter(type==1),
+                 aes(x = x1, y = z1, xend = x2, yend = z2, linewidth = radius, color = kr)) +
+    xlim(-10, 10) +
+    scale_color_viridis() + 
+    facet_wrap(~id) +
+    ggtitle("Radial Conductivity") +
+    theme_test()
+  
+  Comparative_KR <- ggplot() + 
+    # geom_point(aes(x = x1, y = z1)) +
+    geom_segment(data = full_RSHA%>%filter(type==2),
+                 aes(x = x1, y = z1, xend = x2, yend = z2, linewidth = radius, color = kr*2*pi*radius)) +
+    geom_segment(data = full_RSHA%>%filter(type==1),
+                 aes(x = x1, y = z1, xend = x2, yend = z2, linewidth = radius, color = kr*2*pi*radius)) +
+    xlim(-10, 10) +
+    scale_color_viridis() + 
+    facet_wrap(~id) +
+    ggtitle("Radial Conductance") +
+    theme_test()
+  
+  Comparative_Kx <- ggplot() + 
+    # geom_point(aes(x = x1, y = z1)) +
+    geom_segment(data = full_RSHA%>%filter(type==2),
+                 aes(x = x1, y = z1, xend = x2, yend = z2, linewidth = radius, color = kx)) +
+    geom_segment(data = full_RSHA%>%filter(type==1),
+                 aes(x = x1, y = z1, xend = x2, yend = z2, linewidth = radius, color = kx)) +
+    xlim(-10, 10) +
+    scale_color_viridis() + 
+    facet_wrap(~id) +
+    ggtitle("Axial Conductance") +
+    theme_test()
+  
+  Comparative_SUF <- ggplot() + 
+    # geom_point(aes(x = x1, y = z1)) +
+    geom_segment(data = full_RSHA%>%filter(type==2),
+                 aes(x = x1, y = z1, xend = x2, yend = z2, linewidth = radius, color = suf)) +
+    geom_segment(data = full_RSHA%>%filter(type==1),
+                 aes(x = x1, y = z1, xend = x2, yend = z2, linewidth = radius, color = suf)) +
+    xlim(-10, 10) +
+    scale_color_viridis() + 
+    facet_wrap(~id) +
+    ggtitle("SUF (tomato vs mono") +
+    theme_test()
+  
+  # Comparative_SUF_main <- ggplot(data = full_RSHA%>%filter(type == 1), aes(color= suf)) + 
+  #   # geom_point(aes(x = x1, y = z1)) +
+  #   geom_segment(aes(x = x1, y = z1, xend = x2, yend = z2, linewidth = radius)) +
+  #   xlim(-10, 10) +
+  #   scale_color_viridis() + 
+  #   facet_wrap(~id) +
+  #   ggtitle("SUF main root (tomato vs mono)") +
+  #   theme_test()
+  
+  # ==============================================================================
+  print(Comparative_kr)
+  print(Comparative_Kx)
+  print(Comparative_KR)
+  print(Comparative_SUF)
+  # print(Comparative_SUF_main)
+  print(Radius)
+  #===============================================================================
+  
+  Kr1 <- ggplot(data = full_RSHA, aes(x = time2, y = kr, color = type)) +
+    geom_line() +
+    facet_wrap(~id) +
+    ggtitle("Radial conductivity (tomato vs mono)")+
+    theme_test()
+  print(Kr1)
+  
+  Kx1 <- ggplot(data = full_RSHA, aes(x = time2, y = kx, color = type)) +
+    geom_line() +
+    facet_wrap(~id) +
+    ggtitle("Axial conductivity (tomato vs mono)")+
+    theme_test()
+  print(Kx1)
+  
+  SUF0 <- ggplot(data = full_RSHA, aes(x = time2, y = suf, color = type)) +
+    geom_point() +
+    facet_wrap(~id) +
+    theme_test() +
+    ggtitle("SUF") 
+  print(SUF0)
+  
+  Kr2 <- ggplot(data = full_RSHA, aes(x = time2, y = kr*2*pi*radius, color = type)) +
+    geom_point() +
+    ggtitle("Radial Conductance") +
+    theme_test() +
+    facet_wrap(~id)
+  print(Kr2)
+  
+  # ==============================================================================
+  # SCATTERPLOTS
+  # ==============================================================================
+  
+  # Main root SUF
+  SUF1 <- ggplot() + 
+    geom_point(aes(y = full_RSHA$suf[full_RSHA$type == 1 & full_RSHA$id == 2], 
+                   x = full_RSHA$suf[full_RSHA$type == 1 & full_RSHA$id == 1])) +
+    geom_abline(intercept = 0, slope = 1) +
+    xlab("Tomato main root SUF") +
+    ylab("Monocot main root SUF") +
+    ggtitle("Comparative SUF of main root") +
+    theme_test()
+  
+  print(SUF1)
+  
+  # Lateral root SUF
+  SUF2 <- ggplot() + 
+    geom_point(aes(y = full_RSHA$suf[full_RSHA$type == 2 & full_RSHA$id == 2], 
+                   x = full_RSHA$suf[full_RSHA$type == 2 & full_RSHA$id == 1])) +
+    geom_abline(intercept = 0, slope = 1) +
+    xlab("Tomato lateral root SUF") +
+    ylab("Monocot lateral root SUF") +
+    ggtitle("Comparative SUF of lateral root") +
+    theme_test()
+  
+  print(SUF2)
+  
+  # Numbers :
+  print(paste0("Tomato SUF main root : ", sum(full_RSHA$suf[full_RSHA$id == 1 & full_RSHA$type == 1])))
+  print(paste0("Tomato SUF lateral root : ", sum(full_RSHA$suf[full_RSHA$id == 1 & full_RSHA$type == 2])))
+  print(paste0("Monocot SUF main root : ", sum(full_RSHA$suf[full_RSHA$id == 2 & full_RSHA$type == 1])))
+  print(paste0("Monocot SUF lateral root : ", sum(full_RSHA$suf[full_RSHA$id == 2 & full_RSHA$type == 2])))
+  
+  print(paste0("Difference (in %) between tomato and monocot : ",(sum(full_RSHA$suf[full_RSHA$id == 1 & full_RSHA$type == 1]) - sum(full_RSHA$suf[full_RSHA$type == 1 & full_RSHA$id == 2]) ) * 100 ))
+  
+  
+  # Tomato
+  suf_df <- data.frame()
+  for(x_fac in seq(round(min(full_RSHA$z2[full_RSHA$id == 1])), 0)){
+    # Select a subset
+    subs <- full_RSHA %>% filter(id == 1 & z2 >= x_fac-0.5 & z2 < x_fac+0.5)
+    temp_df <- data.frame(x = x_fac,
+                          SUF_mean = sum(subs$suf),
+                          SUF_sd = sd(subs$suf))
+    suf_df <- rbind(suf_df, temp_df)
+  }
+  
+  # ==============================================================================
+  # Monocot
+  suf_df2 <- data.frame()
+  for(x_fac in seq(round(min(full_RSHA$z2[full_RSHA$id == 1])), 0)){
+    # Select a subset
+    subs <- full_RSHA %>% filter(id == 2 & z2 >= x_fac-0.5 & z2 < x_fac+0.5)
+    temp_df <- data.frame(x = x_fac,
+                          SUF_mean = sum(subs$suf),
+                          SUF_sd = sd(subs$suf))
+    suf_df2 <- rbind(suf_df2, temp_df)
+  }
+  
+  suf_df$exp <- 1
+  suf_df2$exp <- 2
+  combined_data <- rbind(suf_df, suf_df2)
+  
+  # svg("Plots/SUF_comparaison2.svg", height = 4, width = 6)  
+  SUF_bar <- ggplot() +
+    geom_bar(data = suf_df, aes(x = x, y = SUF_mean), stat = "identity", fill = "#00AFBB", alpha = 0.5) +
+    geom_bar(data = suf_df2, aes(x = x, y = SUF_mean), stat = "identity", fill = "#E7B800", alpha = 0.5) +
+    ggtitle("Blue = Tomato | Orange = Monocot") +
+    theme_bw()
+  # dev.off()
+  print(SUF_bar)
+
+  #===============================================================================
+  r <- list(Comparative_kr, 
+            Comparative_KR, 
+            Comparative_Kx,
+            Comparative_SUF,
+            # Comparative_SUF_main,
+            Radius,
+            Kr1,
+            Kr2,
+            Kx1,
+            SUF0,
+            SUF1,
+            SUF2, 
+            SUF_bar)
+  print("==================================================================")
+  return(r)
+}
+
+# ==============================================================================
+# ==============================================================================
+# ==============================================================================
+
+MARSHAL_LOOP <- function(RS_path, scenario){
+  # Runs MARSHAL for all RS files in csv format present in RS_path file
+  # For different scenarios :
+  # - S1 : Tomato ; LC in exo, SUB exo, SUB endo at 25 days, SG at 25 days
+  # - S2 : No LC and no SUB in exo ; SUB endo at 25 days; SG at 25 days
+  # - S2b : same that S2 but sub ENDO at 7 days
+  # - S3 : No LC and no SUB in EXO ; SUB in ENDO at 25 days ; no SG
+  # - S4 : No LC but SUB in EXO ; SUB in endo at 25 days ; SG at 25 days
+  
+  RSHA_table <- tibble()
+  Krs_table <- tibble()
+  
+  for(RS_i in list.files(RS_path, pattern = ".csv")){
+    
+    # print(RS_i)
+    
+    RS_i_name <- strsplit(RS_i, split = ".csv")[[1]]
+    
+    RS <- read.csv(paste0(RS_path, RS_i))
+    
+    # ==========================================================================
+    # SCENRAIO 1
+    if(scenario == "S1"){
+      RS$time2 <- max(RS$time) - RS$time
+      RS$radius[RS$type == 1] <- radius_reg(x = abs(RS$time2[RS$type == 1]), 
+                                                  timing = c(7, 25))
+      RS$radius[RS$type == 2] <- radius_reg(x = abs(RS$time2[RS$type == 2]), 
+                                                  timing = c(7, 25))
+      
+      RSHA <- marshal_tomato(RS, 
+                              dico_conductivities, 
+                              Timing_kr = c(7, 25),
+                              # Timing_Kx = c(7, 20),
+                              kr_coef = kr_coef, 
+                              kx_coef = kx_coef,
+                              psiCollar = psi_Collar,
+                              soil = my_soil)
+    }
+    
+    # ==========================================================================
+    # SCENRAIO 2
+    if(scenario == "S2"){
+      RS$time2 <- max(RS$time) - RS$time
+      RS$radius[RS$type == 1] <- radius_reg(x = abs(RS$time2[RS$type == 1]), 
+                                                  timing = c(7, 25))
+      RS$radius[RS$type == 2] <- radius_reg(x = abs(RS$time2[RS$type == 2]), 
+                                                  timing = c(7, 25))
+      
+      RSHA <- marshal_tomato(RS, 
+                              dico_conductivities, 
+                              Timing_kr = c(25,26),
+                              Timing_Kx = c(7,25),
+                              kr_coef = kr_coef_mono, 
+                              kx_coef = kx_coef,
+                              psiCollar = psi_Collar,
+                              soil = my_soil)
+    }
+    
+    # ==========================================================================
+    # SCENARIO 2bis
+    if(scenario == "S2b"){
+      RS$time2 <- max(RS$time) - RS$time
+      RS$radius[RS$type == 1] <- radius_reg(x = abs(RS$time2[RS$type == 1]), 
+                                                    timing = c(7, 25))
+      RS$radius[RS$type == 2] <- radius_reg(x = abs(RS$time2[RS$type == 2]), 
+                                                    timing = c(7, 25))
+      
+      RSHA <- marshal_tomato(RS, 
+                               dico_conductivities, 
+                               Timing_kr = c(7,25),
+                               Timing_Kx = c(7,25),
+                               kr_coef = kr_coef_mono, 
+                               kx_coef = kx_coef,
+                               psiCollar = psi_Collar,
+                               soil = my_soil)
+    }
+    
+    # ==========================================================================
+    # SCENRAIO 3
+    if(scenario == "S3"){
+      RS$time2 <- max(RS$time) - RS$time
+      RS$radius[RS$type == 1] <- 0.18
+      RS$radius[RS$type == 2] <- 0.18
+      
+      RSHA <- marshal_tomato(RS, 
+                              dico_conductivities, 
+                              Timing_kr = c(7, 25),
+                              Timing_Kx = c(7, 50), # /!\
+                              kr_coef = kr_coef, 
+                              kx_coef = kx_coef,
+                              psiCollar = psi_Collar,
+                              soil = my_soil)
+    }
+    
+    # ==========================================================================
+    # SCENARIO 4
+    if(scenario == "S4"){
+      RS$time2 <- max(RS$time) - RS$time
+      RS$radius[RS$type == 1] <- radius_reg(x = abs(RS$time2[RS$type == 1]), 
+                                                  timing = c(7, 25))
+      RS$radius[RS$type == 2] <- radius_reg(x = abs(RS$time2[RS$type == 2]), 
+                                                  timing = c(7, 25))
+      
+      RSHA <- marshal_tomato(RS, 
+                              dico_conductivities, 
+                              Timing_kr = c(25,26),
+                              Timing_Kx = c(7,25),
+                              kr_coef = kr_coef, 
+                              kx_coef = kx_coef,
+                              psiCollar = psi_Collar,
+                              soil = my_soil)
+    }
+    
+    # ==========================================================================
+    # EXPORT RESULTS
+    RSHA_i <- RSHA[[1]]
+    RSHA_i$RSHA_id <- RS_i_name
+    RSHA_table <- rbind(RSHA_table, RSHA_i)
+    
+    Krs_i <- RSHA[[2]]/864000
+    Krs_table <- rbind(Krs_table, tibble(Krs = Krs_i,
+                                         RSHA_id = RS_i_name))
+    
+  }
+  
+  return(list(RSHA_table, Krs_table))
+}
+
+
+

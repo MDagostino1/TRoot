@@ -14,29 +14,28 @@ MPath <- "./CRB-MARSHAL/"
 libs <- c("fmsb", "SciViews", "pander", "visreg", "readxl", "EnvStats", "FactoMineR", "factoextra", "knitr", "data.table", "reticulate", "xml2", "tidyverse", "dplyr", "viridis", "Hmisc", "ggplot2", "gridExtra", "outliers", "Matrix", "emmeans")
 
 for(pk in libs) {
-  library(pk, character.only = T)
+  try(library(pk, character.only = T))
 }
 
 # Custom functions
 rm(list = ls()) # clean worshop
 
 
-MPath <- "./CRB-MARSHAL/"
+MPath <- "./src/CRB-MARSHAL/"
 
-source(paste0(MPath,"inputs/io_function.R")) # CROOTBOX
+# source(paste0(MPath,"io_function.R")) # CROOTBOX
 source(paste0(MPath, "Get_SUF.R")) # MARSHAL
 source(paste0(MPath, "SUF.R"))
-source(paste0(MPath, "Hydrus.R"))
 
 # GRANAR2_path <- "GRANAR/R/GRANAR2/"
-TRoot_path <- "FUNCTIONS/T-Root/"
+TRoot_path <- "./src/FUNCTIONS/T-Root/"
 
 # for (i in list.files(GRANAR2_path)) {
 #   print(i)
 #   source(paste0(GRANAR2_path, i))
 # }
 
-for (i in list.files(TRoot_path)) {
+for (i in list.files(TRoot_path, pattern = ".R")) {
   # print(i)
   source(paste0(TRoot_path, i))
   
@@ -66,6 +65,13 @@ RS_maize <- read.csv("Data/CRB-MARSHAL/RootSystem_maize.csv")
 RS_4 <- read.csv("Data/CRB-MARSHAL/RS_Tomato_60_1.csv")
 RS_5 <- read.csv("Data/CRB-MARSHAL/RS_Tomato_60_2.csv")
 ```
+
+```{r}
+ggplot(RS_1 %>% filter(time < 20)) +
+  geom_segment(aes(x = x1, xend = x2, y = z1, yend = z2, color = time)) +
+  coord_fixed()
+```
+
 
 # Process rough root system
 
