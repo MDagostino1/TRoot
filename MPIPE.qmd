@@ -50,6 +50,11 @@ for (i in list.files(TRoot_path, pattern = ".R")) {
   print(i)
   source(paste0(TRoot_path, i))
 }
+
+# CHOOSE SCENARIO AND CONDS
+Scenario_id  <- "3"
+path.out     <- paste0(MPath, "outputs/Scenario_", Scenario_id, "/")
+it_length    <- 0.25
 ```
 
 # Pipeline to run MARSHAL
@@ -94,36 +99,35 @@ for(RSA_id in RSA_list){
 kr_reg and kx_reg function (TO DEVELOP)
 
 ```{r}
-kr_reg <- function(x, timing){
-  if(x <= timing[1]){
-    kr <- 4.11e-8
-  }else if(x > timing[1] & x <= timing[2]){
-    kr <- 6.4e-8
-  }else if(x > timing[2]){
-    kr <- 8.4e-8
-  }
-  return(kr)
-}
-
-kx_reg <- function(x, timing){
-  if(x <= timing[1]){
-    kx <- 2.07e-11
-  }else if(x > timing[1] & x <= timing[2]){
-    kx <- 1e-9
-  }else if(x > timing[2]){
-    kx <- 1.2e-8
-  }
-  return(kx)
-}
+# kr_reg <- function(x, timing){
+#   if(x <= timing[1]){
+#     kr <- 4.11e-8
+#   }else if(x > timing[1] & x <= timing[2]){
+#     kr <- 6.4e-8
+#   }else if(x > timing[2]){
+#     kr <- 8.4e-8
+#   }
+#   return(kr)
+# }
+# 
+# kx_reg <- function(x, timing){
+#   if(x <= timing[1]){
+#     kx <- 2.07e-11
+#   }else if(x > timing[1] & x <= timing[2]){
+#     kx <- 1e-9
+#   }else if(x > timing[2]){
+#     kx <- 1.2e-8
+#   }
+#   return(kx)
+# }
 ```
 
-
 ```{r}
-Scenario_id  <- "no_sub"
-
-# Generate conds filte
-conds.test <- create.conds(xmax = 40, timing1 = 7, timing2 = 20, SG = T)
-conds.test$y[conds.test$type == "kr" & conds.test$x >= 7] <- 1.8e-5
+# Scenario_id  <- "no_sub"
+# 
+# # Generate conds filte
+# conds.test <- create.conds(xmax = 40, timing1 = 7, timing2 = 20, SG = T)
+# conds.test$y[conds.test$type == "kr" & conds.test$x >= 7] <- 1.8e-5
 ```
 
 ## Load pre-computed scenarios
@@ -133,12 +137,21 @@ conv_kr <- 0.001157407
 conv_kx <- 1.157407e-09
 
 Conds_1A <- read.csv("./Data/conds_scenarios/1A.csv")
+Conds_1A$S_id <- "1A"
+
 Conds_1B <- read.csv("./Data/conds_scenarios/1B.csv")
+Conds_1B$S_id <- "1B"
+
 Conds_2 <- read.csv("./Data/conds_scenarios/2.csv")
+Conds_2$S_id <- "2"
+
 Conds_3 <- read.csv("./Data/conds_scenarios/3.csv")
+Conds_3$S_id <- "3"
+
+Conds.tot <- rbind(Conds_1A, Conds_1B, Conds_2, Conds_3)
 
 # Convert m[4]*s-1*MPa-1 back to cm[4]*d-1*HPa-1
-df <- Conds_1A
+df <- Conds.tot %>% filter(S_id == Scenario_id)
 df$kr <- df$kr/conv_kr
 df$Kx <- df$Kx/conv_kx
 ```
@@ -165,8 +178,6 @@ Conds.conv           <- rbind(Conds.conv, Conds.conv %>% filter(x == 1) %>% muta
 
 ```{r, include = F}
 conds <- Conds.conv
-Scenario_id <- "Scenario_1A"
-path.out <- paste0(MPath, "outputs/", Scenario_id, "/")
 
 # Create folder for the Scenario
 if(dir.exists(path.out)){
@@ -184,7 +195,8 @@ results <- run.MARSHAL.loop(RSA_list, RSA.all,
                             Scenario_id = Scenario_id, 
                             conds, 
                             soil, 
-                            tmin = 1, tmax = 30, step = 0.25,       # Decomposition of RSA timing 
+                            tmin = 1, tmax = 30, 
+                            step = it_length,       # Decomposition of RSA timing 
                             timing1 = 7, timing2 = 20)           # SG timing
 # ============================================================================ #
 
@@ -207,8 +219,6 @@ Make plots
 
 ```{r}
 source("./src/CRB-MARSHAL/CRBM_functions.R")
-Scenario_id <- "Scenario_1A"
-path.out <- paste0(MPath, "outputs/", Scenario_id, "/")
 
 RSHA.all <- read.csv(paste0(path.out, "RSHA_all.csv"))
 Macro.all <- read.csv(paste0(path.out, "Macro_all.csv"))
