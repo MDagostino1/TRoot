@@ -15,11 +15,10 @@ First we load the packages. NB : you may need to install some of them manually.
 
 ```{r, include=F}
 options(rstudio.help.showDataPreview = FALSE)
-
 rm(list = ls())
 
 # LOAD FUNCTION
-TRoot_path <- "FUNCTIONS/T-Root/"
+TRoot_path <- "src/FUNCTIONS/T-Root/"
 for (i in list.files(TRoot_path, pattern = ".R")) {
   print(i)
   source(paste0(TRoot_path, i))
@@ -41,15 +40,15 @@ for (i in list.files(GRANAR_path, pattern = ".R")) {
 
 # source("Data_preparation.R")
 
-Plants <- read.csv("Data/Anatomy/Plants.csv")
-Segments <- read.csv("Data/Anatomy/Segments.csv")
+Plants        <- read.csv("Data/Anatomy/Plants.csv")
+Segments      <- read.csv("Data/Anatomy/Segments.csv")
 CrossSections <- read.csv("Data/Anatomy/CrossSections.csv")
-anatomy1 <- read.csv("Data/Anatomy/anatomy1.csv")
-anatomy2 <- read.csv("Data/Anatomy/anatomy2.csv")
-Parameters <- read.csv("Data/Anatomy/Parameters.csv")[,-1]
-Anatomy_Full <- read.csv("Data/Anatomy/Anatomy_Full.csv")
+anatomy1      <- read.csv("Data/Anatomy/anatomy1.csv")
+anatomy2      <- read.csv("Data/Anatomy/anatomy2.csv")
+Parameters    <- read.csv("Data/Anatomy/Parameters.csv")[,-1]
+Anatomy_Full  <- read.csv("Data/Anatomy/Anatomy_Full.csv")
 
-date <- Sys.Date()
+date          <- Sys.Date()
 ```
 
 Now we need to load all necessary libraries
@@ -569,7 +568,7 @@ Make_Virtual_Anatomies_M(Virtual_Roots = Virtual_Roots,
 In this part we create jobs to send to HPC, and load result data. We used that method because GRANAR was 10x slower than before optimized update.
 
 ## Instructions, computing and data extraction
-
+ 
 global scratch : */auto/globalscratch/users/m/d/mdago/\
 *main dir : */home/users/m/d/mdago/*
 
