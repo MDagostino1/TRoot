@@ -92,6 +92,9 @@ for(RSA_id in RSA_list){
   RSAi$RSA_id <- RSA_id
   RSA.all     <- rbind(RSA.all, RSAi)
 }
+
+ggplot(RSA.all) +
+  geom_segment(aes(x = x1, xend = x2, y = z1, yend = z2))
 ```
 
 ## Define example scenario
@@ -120,9 +123,7 @@ kr_reg and kx_reg function (TO DEVELOP)
 #   }
 #   return(kx)
 # }
-```
 
-```{r}
 # Scenario_id  <- "no_sub"
 # 
 # # Generate conds filte
@@ -133,34 +134,34 @@ kr_reg and kx_reg function (TO DEVELOP)
 ## Load pre-computed scenarios
 
 ```{r}
-conv_kr <- 0.001157407
-conv_kx <- 1.157407e-09
+conv_kr       <- 0.001157407
+conv_kx       <- 1.157407e-09
 
-Conds_1A <- read.csv("./Data/conds_scenarios/1A.csv")
+Conds_1A      <- read.csv("./Data/conds_scenarios/1A.csv")
 Conds_1A$S_id <- "1A"
 
-Conds_1B <- read.csv("./Data/conds_scenarios/1B.csv")
+Conds_1B      <- read.csv("./Data/conds_scenarios/1B.csv")
 Conds_1B$S_id <- "1B"
 
-Conds_2 <- read.csv("./Data/conds_scenarios/2.csv")
-Conds_2$S_id <- "2"
+Conds_2       <- read.csv("./Data/conds_scenarios/2.csv")
+Conds_2$S_id  <- "2"
 
-Conds_3 <- read.csv("./Data/conds_scenarios/3.csv")
-Conds_3$S_id <- "3"
+Conds_3       <- read.csv("./Data/conds_scenarios/3.csv")
+Conds_3$S_id  <- "3"
 
-Conds.tot <- rbind(Conds_1A, Conds_1B, Conds_2, Conds_3)
+Conds.tot     <- rbind(Conds_1A, Conds_1B, Conds_2, Conds_3)
 
 # Convert m[4]*s-1*MPa-1 back to cm[4]*d-1*HPa-1
-df <- Conds.tot %>% filter(S_id == Scenario_id)
-df$kr <- df$kr/conv_kr
-df$Kx <- df$Kx/conv_kx
+df            <- Conds.tot %>% filter(S_id == Scenario_id)
+df$kr         <- df$kr/conv_kr
+df$Kx         <- df$Kx/conv_kx
 ```
 
 ```{r}
 # Define root orders
-order_id = c(1,2,3)
-order = c("Taproot", "Lateral", "LongLateral")
-orders_df            <- tibble(order_id, order)
+orders_df            <- tibble(order_id = c(1,2,3),
+                               order    = c("Taproot", "Lateral", "LongLateral")
+                               )
 
 # Create Conds.conv
 Conds.conv           <- df[c("x", "kr", "Kx")] 
@@ -188,7 +189,7 @@ if(dir.exists(path.out)){
 
 # MARSHAL PARAMETERS
 # conds        <- read.csv("CRB-MARSHAL/inputs/conductivities3.csv")
-soil         <- read.csv(paste0(MPath, "inputs/soil.csv"))
+soil           <- read.csv(paste0(MPath, "inputs/soil.csv"))
 
 # ============================================================================ #
 results <- run.MARSHAL.loop(RSA_list, RSA.all, 
@@ -200,7 +201,7 @@ results <- run.MARSHAL.loop(RSA_list, RSA.all,
                             timing1 = 7, timing2 = 20)           # SG timing
 # ============================================================================ #
 
-RSHA.all <- results$RSHA.all
+RSHA.all  <- results$RSHA.all
 Macro.all <- results$Macro.all
 
 write.csv(RSHA.all, paste0(path.out, "RSHA_all.csv"), row.names = F)
@@ -220,7 +221,7 @@ Make plots
 ```{r}
 source("./src/CRB-MARSHAL/CRBM_functions.R")
 
-RSHA.all <- read.csv(paste0(path.out, "RSHA_all.csv"))
+RSHA.all  <- read.csv(paste0(path.out, "RSHA_all.csv"))
 Macro.all <- read.csv(paste0(path.out, "Macro_all.csv"))
 
 plot.path <- paste0(path.out, "plots/")

@@ -7,9 +7,8 @@ editor: source
 ```{r, include=FALSE}
 # knitr::opts_chunk$set(echo = FALSE)
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path)) # Set working directory to the current file
-
+rm(list = ls()) # clean worshop
 options(rstudio.help.showDataPreview = FALSE)
-MPath <- "./CRB-MARSHAL/"
 
 libs <- c("fmsb", "SciViews", "pander", "visreg", "readxl", "EnvStats", "FactoMineR", "factoextra", "knitr", "data.table", "reticulate", "xml2", "tidyverse", "dplyr", "viridis", "Hmisc", "ggplot2", "gridExtra", "outliers", "Matrix", "emmeans")
 
@@ -17,16 +16,10 @@ for(pk in libs) {
   try(library(pk, character.only = T))
 }
 
-# Custom functions
-rm(list = ls()) # clean worshop
-
-
-MPath <- "./src/CRB-MARSHAL/"
-
 # source(paste0(MPath,"io_function.R")) # CROOTBOX
+MPath <- "./src/CRB-MARSHAL/"
 source(paste0(MPath, "Get_SUF.R")) # MARSHAL
 source(paste0(MPath, "SUF.R"))
-
 # GRANAR2_path <- "GRANAR/R/GRANAR2/"
 TRoot_path <- "./src/FUNCTIONS/T-Root/"
 
@@ -36,19 +29,17 @@ TRoot_path <- "./src/FUNCTIONS/T-Root/"
 # }
 
 for (i in list.files(TRoot_path, pattern = ".R")) {
-  # print(i)
+  print(i)
   source(paste0(TRoot_path, i))
-  
 }
 
 # source("Data_preparation.R")
-
-Plants <- read.csv("Data/Anatomy/Plants.csv")[,-1]
-Segments <- read.csv("Data/Anatomy/Segments.csv")[,-1]
+Plants        <- read.csv("Data/Anatomy/Plants.csv")[,-1]
+Segments      <- read.csv("Data/Anatomy/Segments.csv")[,-1]
 CrossSections <- read.csv("Data/Anatomy/CrossSections.csv")[,-1]
-anatomy1 <- read.csv("Data/Anatomy/anatomy1.csv")[,-1]
-anatomy2 <- read.csv("Data/Anatomy/anatomy2.csv")[,-1]
-Parameters <- read.csv("Data/Anatomy/Parameters.csv")[,-1]
+anatomy1      <- read.csv("Data/Anatomy/anatomy1.csv")[,-1]
+anatomy2      <- read.csv("Data/Anatomy/anatomy2.csv")[,-1]
+Parameters    <- read.csv("Data/Anatomy/Parameters.csv")[,-1]
 
 date <- Sys.Date()
 ```
@@ -56,14 +47,14 @@ date <- Sys.Date()
 # Data initialization
 
 ```{r}
-file <- "Data/CRB-MARSHAL/Tomato_root3.txt"
-RS_1 <- read.csv("Data/CRB-MARSHAL/RootSystem.csv")[,-1]
-RS_2 <- read.csv("Data/CRB-MARSHAL/RootSystem_tomato2.csv")
-RS_3 <- read.csv("Data/CRB-MARSHAL/RootSystem_tomato3.csv")
+file     <- "Data/CRB-MARSHAL/Tomato_root3.txt"
+RS_1     <- read.csv("Data/CRB-MARSHAL/RootSystem.csv")[,-1]
+RS_2     <- read.csv("Data/CRB-MARSHAL/RootSystem_tomato2.csv")
+RS_3     <- read.csv("Data/CRB-MARSHAL/RootSystem_tomato3.csv")
 RS_maize <- read.csv("Data/CRB-MARSHAL/RootSystem_maize.csv")
 
-RS_4 <- read.csv("Data/CRB-MARSHAL/RS_Tomato_60_1.csv")
-RS_5 <- read.csv("Data/CRB-MARSHAL/RS_Tomato_60_2.csv")
+RS_4     <- read.csv("Data/CRB-MARSHAL/RS_Tomato_60_1.csv")
+RS_5     <- read.csv("Data/CRB-MARSHAL/RS_Tomato_60_2.csv")
 ```
 
 ```{r}
@@ -101,16 +92,16 @@ Go through Root_System folder and load root systems
 
 ```{r}
 # Coefficients of the regression equations
-kr_coef <- read.csv("Data/CRB-MARSHAL/kr_coef_full.csv")
-kx_coef <- read.csv("Data/CRB-MARSHAL/Kx_coef_full.csv")
+kr_coef      <- read.csv("Data/CRB-MARSHAL/kr_coef_full.csv")
+kx_coef      <- read.csv("Data/CRB-MARSHAL/Kx_coef_full.csv")
 kr_coef_mono <- read.csv("Data/CRB-MARSHAL/kr_coef_full_mono.csv")
 ```
 
 ```{r}
 timing <- c(7, 25) # Timing of maturation
 psi_Collar = -15000
-my_soil = data.frame(id = c(1,2,3,4),
-                     z = c(0, -10, -20, -30),
+my_soil = data.frame(id  = c(1,2,3,4),
+                     z   = c(0, -10, -20, -30),
                      psi = c(-300, -300, -300, -300))
 
 # Conductivities tables (basically templates because we will modfy them later)

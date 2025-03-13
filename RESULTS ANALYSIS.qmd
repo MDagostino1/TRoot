@@ -525,10 +525,10 @@ mean_T1 <- DL_mean$emmean[DL_mean$Barrier_Name == "T1"]
 mean_T2 <- DL_mean$emmean[DL_mean$Barrier_Name == "T2"]
 mean_T3 <- DL_mean$emmean[DL_mean$Barrier_Name == "T3"]
 
-print(paste0("Difference between T1 and M1 [%] : ", (mean_M1-mean_T1)*100/mean_M1))
-print(paste0("Difference between T2 and T1 [%] : ", (mean_T1-mean_T2)*100/mean_T1))
-print(paste0("Difference between T3 and T1 [%] : ", (mean_T1-mean_T3)*100/mean_T1))
-print(paste0("Difference between M2 and M3 [%] : ", (mean_M2-mean_M3)*100/mean_M2))
+print(paste0("Difference between T1 and M1 [%] : ", round((mean_M1-mean_T1)*100/mean_M1, digits = 2)))
+print(paste0("Difference between T2 and T1 [%] : ", round((mean_T1-mean_T2)*100/mean_T1, digits = 2)))
+print(paste0("Difference between T3 and T1 [%] : ", round((mean_T1-mean_T3)*100/mean_T1, digits = 2)))
+print(paste0("Difference between M2 and M3 [%] : ", round((mean_M2-mean_M3)*100/mean_M2, digits = 2)))
 ```
 
 # COMPLETE STATISTICAL ANALYSIS
