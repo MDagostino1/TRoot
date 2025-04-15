@@ -12,7 +12,11 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path)) # Set working direct
 rm(list = ls())
 
 options(rstudio.help.showDataPreview = FALSE)
-MPath <- "./src/CRB-MARSHAL/"
+
+# Define paths
+CRBM.path    <- "./src/CRB-MARSHAL/"
+path.results <- "./Results/CRB-MARSHAL/"
+path.plots   <- "./plots/CRB-MARSHAL/"
 
 libs <- c("fmsb", 
           "SciViews", 
@@ -40,10 +44,10 @@ for(pk in libs) {
   library(pk, character.only = T)
 }
 
-# source(paste0(MPath,"io_function.R")) # CROOTBOX
-source(paste0(MPath, "Get_SUF.R")) # MARSHAL
-source(paste0(MPath, "SUF.R"))
-source(paste0(MPath, "CRBM_functions.R"))
+# source(paste0(CRBM.path,"io_function.R")) # CROOTBOX
+source(paste0(CRBM.path, "Get_SUF.R")) # MARSHAL
+source(paste0(CRBM.path, "SUF.R"))
+source(paste0(CRBM.path, "CRBM_functions.R"))
 
 TRoot_path <- "./src/FUNCTIONS/T-Root/"
 for (i in list.files(TRoot_path, pattern = ".R")) {
@@ -52,135 +56,127 @@ for (i in list.files(TRoot_path, pattern = ".R")) {
 }
 
 # LOAD DATA TABLES
-Simulations_ID <- read_xlsx(paste0(MPath, "inputs/Simulations_ID.xlsx"))
-Scenarios_ID   <- read_xlsx(paste0(MPath, "inputs/Scenarios_ID.xlsx"))
-RSA.IDs        <- read.csv(paste0(MPath, "inputs/RSA_ID.csv"))
-# RSHA.IDs     <- read.csv(paste0(MPath, "inputs/RSHA_ID.csv"))
+Simulations_ID <- read_xlsx(paste0(CRBM.path, "inputs/Simulations_ID.xlsx"))
+Scenarios_ID   <- read_xlsx(paste0(CRBM.path, "inputs/Scenarios_ID.xlsx"))
+RSA.IDs        <- read.csv(paste0(CRBM.path, "inputs/RSA_ID.csv"))
+# RSHA.IDs     <- read.csv(paste0(CRBM.path, "inputs/RSHA_ID.csv"))
 ```
 
 # Load conductivities
 
+Conductivities that we load from CSV are in SI ($m \times s^{-1} \times Pa^{-1}$).
+But MARSHAL takes non-SI units ($cm \times d^{-1} \times HPa^{-1}$).
+So we need a factor of conversion.
+
+kr : $1 \times cm*10^{-2} \times (d*60*60*24)^{-1} \times (HPa * 10^{-4})^{-1} = 1 \times m \times s^{-1} \times MPa^{-1} $
+Kx : $1 \times (cm*10^{-2})^{4} \times (d*60*60*24)^{-1} \times (HPa * 10^{-4})^{-1} = 1 \times m \times s^{-1} \times MPa^{-1}  $
+
+
 ```{r}
 # Conversion factors of kr and kx
-conv_kr       <- 0.001157407
-conv_kx       <- 1.157407e-09
+conv_kr       <- 1e-2 * (60*60*24)^-1 * (1e-4)^-1
+conv_kx       <- (1e-2)^4 * (60*60*24)^-1 * (1e-4)^-1
 
 # List hydraulic Scenarios to load
 list_S <- c("1A", "1B", "2", "3")
 
 Conds.tot <- tibble()
 for(S_id in list_S){
-  conds.temp <- read.csv(paste0("./Data/conds_scenarios/", S_id, ".csv"))
+  conds.temp             <- read.csv(paste0("./Data/conds_scenarios/", S_id, ".csv"))
   conds.temp$Scenario_ID <- S_id
-  Conds.tot <- rbind(Conds.tot, conds.temp)
+  Conds.tot              <- rbind(Conds.tot, conds.temp)
 }
+```
+
+# Plot RSA
+
+```{r}
+
 ```
 
 
 # LOOP MPIPE
 
-```{r, include=F}
-source("./src/MPIPE_function.R")
-tmin      <- 0
-tmax      <- 30
-it_length <- 10 
+## Dev
+
+```{r}
+# DEFINE SIMULATIONS MACRO PARAMETERS
+tmin          <- 0
+tmax          <- 30
+it_length     <- 15 
+S_list        <- c("3_30")
+gif.delay     <- 50
+radius.range  <- c(0.75, 2)
 
 # LOAD RSA FILES AND CREATE A META FILE
-RSA_list      <- RSA.IDs$RSA_id # Implement a way to select RSA_ids
+RSA_list      <- unique(RSA.IDs$RSA_id) # Implement a way to select RSA_ids
 RSA.all       <- tibble()
 
+RSA_id        <- RSA_list[1]
+RSAi          <- read.csv(paste0(CRBM.path, "inputs/RSA/", RSA_id, ".csv"))
+RSAi$RSA_id   <- RSA_id
+RSA.all       <- rbind(RSA.all, RSAi)
+
+# RUN MPIPE FOR EVERY SCENARIO
+for(Sim_ID in S_list){
+  Scenario_ID_i  <- Simulations_ID$Scenario_ID[Simulations_ID$Simulation_ID == Sim_ID]
+  SG_timing_1    <- Simulations_ID$SG_timing_1[Simulations_ID$Simulation_ID == Sim_ID]
+  SG_timing_2    <- Simulations_ID$SG_timing_2[Simulations_ID$Simulation_ID == Sim_ID]
+  path.out       <- paste0(path.results, "test/")
+  source("./src/MPIPE.R")
+}
+```
+
+
+## 30 days old RSA
+
+```{r, include=F}
+# DEFINE SIMULATIONS MACRO PARAMETERS
+tmin      <- 0
+tmax      <- 30
+it_length <- 1 
+S_list    <- c("1A_30", "1B_30", "2_30", "3_30")
+gif.delay <- 20
+radius.range  <- c(0.75, 2)
+
+# LOAD RSA FILES AND CREATE A META FILE
+RSA_list  <- RSA.IDs$RSA_id # Implement a way to select RSA_ids
+RSA.all   <- tibble()
 for(RSA_id in RSA_list){
-  RSAi          <- read.csv(paste0(MPath, "inputs/RSA/", RSA_id, ".csv"))
+  RSAi          <- read.csv(paste0(CRBM.path, "inputs/RSA/", RSA_id, ".csv"))
   RSAi$RSA_id   <- RSA_id
   RSA.all       <- rbind(RSA.all, RSAi)
 }
 
-for(Sim_ID in c("1A_30", "1B_30", "2_30", "3_30")){
-  # Sim_ID         <- "1A_30" # Example
+# RUN MPIPE FOR EVERY SCENARIO
+for(Sim_ID in S_list){
   Scenario_ID_i  <- Simulations_ID$Scenario_ID[Simulations_ID$Simulation_ID == Sim_ID]
-  path.out       <- paste0(MPath, "outputs/", Sim_ID, "/")
+  SG_timing_1    <- Simulations_ID$SG_timing_1[Simulations_ID$Simulation_ID == Sim_ID]
+  SG_timing_2    <- Simulations_ID$SG_timing_2[Simulations_ID$Simulation_ID == Sim_ID]
+  path.out       <- paste0(path.results, Sim_ID, "/")
   source("./src/MPIPE.R")
-  # MPIPE()
 }
-
 ```
 
-# Load and plot a single root system
-
-```{r}
-RSA <- read.csv("src/CRB-MARSHAL/inputs/RSA/Tomato_30_1.csv")
-
-ggplot(RSA) +
-  geom_segment(aes(x = x1, xend = x2, y = z1, yend = z2, size = radius)) +
-  scale_size_continuous(range = c(0.1, 1), 
-                          limits = c(min(RSA$radius), max(RSA$radius))) +
-  coord_fixed()
-```
-
-
-# Run for specific root system
+## 60 days old RSA
 
 ```{r, include = F}
-RSA.all        <- read.csv(paste0(MPath, "inputs/RSA/Tomato_60d_1.csv"))
+RSA.all        <- read.csv(paste0(CRBM.path, "inputs/RSA/Tomato_60d_1.csv"))
 RSA.all$RSA_id <- "Tomato_60d_1"
 
 tmin      <- 0
 tmax      <- 60
-it_length <- 20
+it_length <- 1
+S_list    <- c("1A_60", "1B_60", "2_60", "3_60")
+gif.delay <- 10
 
-for(Sim_ID in c("1A_60", "1B_60", "2_60", "3_60")){
+for(Sim_ID in S_list){
   Scenario_ID_i  <- Simulations_ID$Scenario_ID[Simulations_ID$Simulation_ID == Sim_ID]
-  path.out     <- paste0(MPath, "outputs/", Sim_ID, "/")
+  SG_timing_1    <- Simulations_ID$SG_timing_1[Simulations_ID$Simulation_ID == Sim_ID]
+  SG_timing_2    <- Simulations_ID$SG_timing_2[Simulations_ID$Simulation_ID == Sim_ID]
+  path.out       <- paste0(path.results, Sim_ID, "/")
   source("./src/MPIPE.R")
 }
-```
-
-# Check SUF
-
-```{r}
-RSHA.all$type <- as.factor(RSHA.all$type)
-
-data2plot <- RSHA.all %>% filter(age == 30) %>% 
-  mutate(zr = round(z1)) %>% 
-  group_by(RSHA_id, zr, type) %>% 
-  summarise(SUF_sum = sum(SUF)) 
-
-ggplot(data2plot) +
-  geom_bar(aes(x = -zr, y = SUF_sum, fill = type), 
-           stat = "identity", position = position_dodge(width = 0.5),
-           alpha = 1) +
-  facet_wrap(~RSHA_id)
-
-data2plot2 <- data2plot %>% 
-  group_by(zr, type) %>% 
-  summarise(SUF_sum_mean = mean(SUF_sum),
-            SUF_sum_sd   = sd(SUF_sum))
-  
-SUF_plot <- ggplot(data2plot2) +
-  
-  geom_bar(aes(x = -zr, 
-               y = SUF_sum_mean,
-               fill = type), stat = "identity", 
-           alpha = 1
-           ) +
-  
-  geom_point(aes(x = -zr, y = SUF_sum_mean),
-             color = "grey") +
-  
-  geom_errorbar(aes(x = -zr, 
-                    ymax = SUF_sum_mean+SUF_sum_sd, 
-                    ymin = SUF_sum_mean-SUF_sum_sd,
-                    ),
-                color = "grey"
-                ) +
-  
-  facet_wrap(~type, ncol = 1) +
-  xlab("Soil depth [cm]") +
-  ylab("Standart Uptake Fraction [-]") +
-  theme_bw()
-
-ggsave(filename = "SUF_plot.svg", plot = SUF_plot, device = "svg", path = path.out, 
-       width = 4, height = 4)
 ```
 
 # Process results of each scenario
@@ -188,10 +184,12 @@ ggsave(filename = "SUF_plot.svg", plot = SUF_plot, device = "svg", path = path.o
 ```{r}
 Macro_full <- tibble()
 RSHA_full  <- tibble()
-for(si in unique(Scenarios.IDs$Scenario_id)){
+S_list     <- c("1A_60", "1B_60", "2_60", "3_60")
+
+for(si in S_list){
   print(si)
   
-  temp_path              <- paste0(MPath, "outputs/Scenario_", si, "/")
+  temp_path              <- paste0(path.results, si, "/")
   
   temp_Macro             <- read.csv(paste0(temp_path, "Macro_all.csv"))
   temp_Macro$Scenario_ID <- si
@@ -201,16 +199,118 @@ for(si in unique(Scenarios.IDs$Scenario_id)){
   temp_RSHA$Scenario_ID  <- si
   RSHA_full <- rbind(RSHA_full, temp_RSHA)
 }
+
+Macro_full <- Macro_full %>% 
+  mutate(Sim_ID = paste0(RSA_id, "_", Scenario_ID))
 ```
 
 ## Analyse Krs
 
 ```{r}
-ggplot(Macro_full) +
-  geom_boxplot(aes(x = Scenario_ID, y = Krs)) +
-  facet_wrap(~age)
+p <- ggplot(Macro_full) +
+  geom_point(aes(x = as.factor(age), y = Krs, group = Sim_ID, color = Scenario_ID)) +
+  geom_line(aes(x = as.factor(age), 
+                y = Krs, 
+                group = Sim_ID, 
+                color = Scenario_ID), 
+            alpha = 0.2) +
+  geom_boxplot(aes(x = as.factor(age), y = Krs, fill = Scenario_ID)) +
+  xlab("Age [d]") +
+  ylab("Krs") +
+  theme_classic()
+
+# ggplotly(p)
+
+ggsave(filename = "Krs_full_60.png", plot = p
+       ,device = "png"
+       ,path = path.plots
+       ,width = 20, height = 10)
+```
+
+
+Compare all root systems at day 30
+
+```{r}
+data2plot <- RSHA_full %>% 
+  filter(age == 30) 
+
+data2plot_main <- data2plot %>% filter(type == 1)
+data2plot_lat <- data2plot %>% filter(type == 2)
+
+p <- ggplot() +
   
-ggplot(Macro_full) +
-  geom_line(aes(x = age, y = Krs, color = Scenario_ID))
+  geom_segment(data = data2plot_main,
+               aes(x = x1, xend = x2,
+                   y = z1, yend = z2,
+                   size = radius),
+               color = "blue") +  
+  
+  geom_segment(data = data2plot_lat,
+               aes(x = x1, xend = x2,
+                   y = z1, yend = z2,
+                   color = SUF, size = radius)) +
+  
+  scale_size_continuous(range = c(0.5, 1), 
+                        limits = c(min(data2plot$radius), 
+                                   max(data2plot$radius))) +
+  
+  scale_color_viridis_c(option = "magma",
+                          breaks = c(min(data2plot_lat$SUF), 
+                                     max(data2plot_lat$SUF)),
+                          # labels = c("low", "high"),
+                          direction = 1
+                          # , limits = c(0, max(RSHA.all$SUF[RSHA.all$RSA_id == RSA_id_i]))
+                          ) +
+  
+  facet_grid(Scenario_ID ~ RSA_id) +
+  coord_fixed() +
+  theme_classic() 
+
+ggsave(filename = "RSA_30.png", plot = p
+       ,device = "png"
+       ,path = path.plots
+       ,width = 30, height = 10)
+```
+
+```{r}
+data2plot <- RSHA_full %>% 
+  filter(age == 30) 
+
+data2plot_main <- data2plot %>% filter(type == 1)
+data2plot_lat <- data2plot %>% filter(type == 2)
+
+p <- ggplot() +
+  
+  geom_segment(data = data2plot_main,
+               aes(x = x1, xend = x2,
+                   y = z1, yend = z2,
+                   size = radius),
+               color = "blue") +  
+  
+  geom_segment(data = data2plot_lat,
+               aes(x = x1, xend = x2,
+                   y = z1, yend = z2,
+                   color = SUF, size = radius)) +
+  
+  scale_size_continuous(range = c(0.5, 1), 
+                        limits = c(min(data2plot$radius), 
+                                   max(data2plot$radius))) +
+  
+  scale_color_viridis_c(option = "magma",
+                          breaks = c(min(data2plot_lat$SUF), 
+                                     max(data2plot_lat$SUF)),
+                          # labels = c("low", "high"),
+                          direction = 1
+                          # , limits = c(0, max(RSHA.all$SUF[RSHA.all$RSA_id == RSA_id_i]))
+                          ) +
+  
+  facet_grid(RSA_id ~Scenario_ID) +
+  coord_fixed() +
+  theme_classic() 
+
+ggsave(filename = "RSA_60.png", plot = p
+       ,device = "png"
+       ,path = path.plots
+       ,width = 30, height = 10)
 ```
 

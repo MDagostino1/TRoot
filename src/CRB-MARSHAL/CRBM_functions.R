@@ -116,7 +116,7 @@ run.MARSHAL.loop <- function(RSA_list,
 
 # ==============================================================================
 
-plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max){
+plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max, radius.range = c(1, 3)){
   
   RSA_id_i       <- unique(RSHA.all$RSA_id)[1]
   
@@ -128,15 +128,26 @@ plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max){
   # PLOT ALL
   # ========================================================================== #
   p_kr <- ggplot(data2plot) + 
+    
+    # Plot segments
     geom_segment(aes(x= x1, xend = x2, y = z1, yend = z2, 
                      color = kr, size = radius)) +
+    
+    # Set limits
     xlim(-15, 15) +
     ylim(round(min(RSHA.all$z1)), 0) +
     
-    scale_size_continuous(range = c(1, 3), 
-                          limits = c(min(RSHA.all$radius), max(RSHA.all$radius))) +
+    # Set radius
+    scale_size_continuous(range = radius.range, 
+                          limits = c(min(RSHA.all$radius), 
+                                     max(RSHA.all$radius))
+                          ) +
+    
+    # Set colors
     scale_color_viridis_c(option = "D", 
-                          limits = c(min(RSHA.all$kr), max(RSHA.all$kr))) +
+                          limits = c(min(RSHA.all$kr), 
+                                     max(RSHA.all$kr))
+                          ) +
     
     coord_fixed() +
     # facet_wrap(~RSA_id, nrow = 2) +
@@ -154,12 +165,17 @@ plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max){
     xlim(-15, 15) +
     ylim(round(min(RSHA.all$z1)), 0) +
     
-    scale_size_continuous(range = c(1, 3),
+    scale_size_continuous(range = radius.range,
                           limits = c(min(RSHA.all$radius), 
-                                    max(RSHA.all$radius))) +
+                                    max(RSHA.all$radius)
+                                    )
+                          ) +
+    
     scale_color_viridis_c(option = "D", 
                           limits = c(min(RSHA.all$Kx), 
-                                     max(RSHA.all$Kx))) +
+                                     max(RSHA.all$Kx)
+                                     )
+                          ) +
     coord_fixed() +
     # facet_wrap(~RSA_id, nrow = 2) +
     # ggtitle(paste0("Kx | time : ", ti)) +
@@ -174,8 +190,10 @@ plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max){
     ylim(round(min(RSHA.all$z1)), 0) +
     
     # Size of radius
-    scale_size_continuous(range = c(1, 3), 
-                          limits = c(min(RSHA.all$radius), max(RSHA.all$radius))) +
+    scale_size_continuous(range = radius.range, 
+                          limits = c(min(RSHA.all$radius), 
+                                     max(RSHA.all$radius))
+                          ) +
     
     # Color of SUF
     scale_color_viridis_c(option = "magma",
@@ -215,8 +233,12 @@ plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max){
   p_full <- plot_grid(p_kr, p_kx, p_suf, p_krs, nrow = 2)
   p_full <- plot_grid(title, p_full, nrow = 2, rel_heights = (c(0.1, 0.7)))
   pfinal <- ggdraw(p_full) + theme(plot.background = element_rect(fill = "white"))
+  
   ggsave(filename = paste0(path.plot, "Full", "_", sprintf("%04d", round(ti*100)), ".png"),
-         plot = pfinal, device = "png", width = 10, height = 10, units = "in", dpi = 200)
+         plot = pfinal, device = "png", 
+         width = 10, height = 10, 
+         units = "in", dpi = 200
+         )
 }
 
 # ==============================================================================
@@ -245,3 +267,9 @@ create.conds <- function(xmax = 50,
   
   return(conds.out)
 }
+
+# ==============================================================================
+
+
+
+

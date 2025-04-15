@@ -10,14 +10,15 @@ if(dir.exists(path.out)){
 # ==============================================================================
 
 # Convert m[4]*s-1*MPa-1 back to cm[4]*d-1*HPa-1
-df            <- Conds.tot %>% 
-  filter(Scenario_ID == Scenario_ID_i) # TO CHANGE ; HERE WE SELECT ONLY THE SCENARIO IN INPUT
+df            <- Conds.tot %>% filter(Scenario_ID == Scenario_ID_i) # TO CHANGE ; HERE WE SELECT ONLY THE SCENARIO IN INPUT
 df$kr         <- df$kr/conv_kr
 df$Kx         <- df$Kx/conv_kx
 
 # Define root orders
 orders_df     <- tibble(order_id = c(1,2,3), 
-                        order    = c("Taproot", "Lateral", "LongLateral")
+                        order    = c("Taproot", 
+                                     "Lateral", 
+                                     "LongLateral")
                         )
 
 # Create Conds.conv
@@ -27,10 +28,9 @@ Conds.conv           <- Conds.conv %>% gather(kr, kx, key = "type", value = "y")
 Conds.conv           <- merge(Conds.conv, orders_df)
 Conds.conv$id        <- seq(1, nrow(Conds.conv))
 Conds.conv           <- Conds.conv[c("order_id", "order", "x", "type", "y", "id")]
+Conds.conv           <- rbind(Conds.conv, Conds.conv %>% filter(x == 1) %>% mutate(x = 0)) # Add a zero x
 
-# Add a zero x
-Conds.conv           <- rbind(Conds.conv, Conds.conv %>% filter(x == 1) %>% mutate(x = 0))
-
+# Plot of conductivities
 data2plot <- Conds.conv
 data2plot$y[data2plot$type == "kr"] <- data2plot$y[data2plot$type == "kr"]/max(data2plot$y[data2plot$type == "kr"])
 data2plot$y[data2plot$type == "kx"] <- data2plot$y[data2plot$type == "kx"]/max(data2plot$y[data2plot$type == "kx"])
@@ -41,18 +41,17 @@ cond_plot <- ggplot(data2plot) +
   theme_classic()
 
 cond_plot
-
-ggsave(filename = "Conds_plot.svg", plot = cond_plot, device = "svg", path = path.out, 
+ggsave(filename = paste0(Sim_ID, "_Conds.svg"), plot = cond_plot, device = "svg", path = path.out, 
        width = 4, height = 3)
 
 # ==============================================================================
 # LOOP MARSHAL
 # ==============================================================================
 
-conds <- Conds.conv
 # MARSHAL PARAMETERS
+conds          <- Conds.conv
 # conds        <- read.csv("CRB-MARSHAL/inputs/conductivities3.csv")
-soil           <- read.csv(paste0(MPath, "inputs/soil.csv"))
+soil           <- read.csv(paste0(CRBM.path, "inputs/soil.csv"))
 
 # ============================================================================ #
 results <- run.MARSHAL.loop(RSA_list, 
@@ -61,8 +60,8 @@ results <- run.MARSHAL.loop(RSA_list,
                             conds, 
                             soil, 
                             tmin = tmin, tmax = tmax, 
-                            step = it_length,       # Decomposition of RSA timing 
-                            timing1 = 7, timing2 = 20)           # SG timing
+                            step = it_length,            # Decomposition of RSA timing 
+                            timing1 = SG_timing_1, timing2 = SG_timing_2)   # SG timing
 # ============================================================================ #
 
 RSHA.all  <- results$RSHA.all
@@ -94,7 +93,13 @@ if(dir.exists(plot.path)){
 cat("Saving plots... \n")
 for(ti in unique(RSHA.all$age)){
   cat("ti : ", format(round(ti, 2), nsmall = 2), "\n")
-  plot.CRBM(RSHA.all, Macro.all, ti, path.plot = plot.path, Krs.max = max(Macro.all$Krs))
+  plot.CRBM(RSHA.all, 
+            Macro.all, 
+            ti, 
+            path.plot = plot.path, 
+            Krs.max = max(Macro.all$Krs),
+            radius.range = radius.range
+            )
 }
 
 # Generate GIF 
@@ -102,9 +107,9 @@ library(magick)
 img          <- list.files(plot.path, pattern = ".png")
 img_list     <- lapply(paste0(plot.path, img), image_read)
 img_join     <- image_join(img_list)
-img_animated <- image_animate(img_join, delay = 10)
+img_animated <- image_animate(img_join, delay = gif.delay)
 image_write(image = img_animated,
-            path = paste0(path.out, "animated.gif"))
+            path = paste0(path.out, Sim_ID, "_animation.gif"))
 
 # ==============================================================================
 # ANALYSE SUF
@@ -152,6 +157,6 @@ SUF_plot <- ggplot(data2plot2) +
   ylab("Standart Uptake Fraction [-]") +
   theme_bw()
 
-ggsave(filename = "SUF_plot.svg", plot = SUF_plot, device = "svg", path = path.out, 
+ggsave(filename = paste0(Sim_ID, "_SUF.svg"), plot = SUF_plot, device = "svg", path = path.out, 
        width = 4, height = 4)
 
