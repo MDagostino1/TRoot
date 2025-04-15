@@ -39,7 +39,7 @@ reconnect.nodes <- function(all_roots){
 
 run.MARSHAL.loop <- function(RSA_list, 
                              RSA.all,
-                             Scenario_id,
+                             Sim_ID,
                              conds, 
                              soil,
                              hetero = F,
@@ -72,7 +72,7 @@ run.MARSHAL.loop <- function(RSA_list,
       RSA_temp <- RSA.all.ti %>% filter(RSA_id == RSA_id_i)
       
       # Create RSHA_id_i
-      RSHA_id_i <- paste0(RSA_id_i, "_", ti, "_", Scenario_id)
+      RSHA_id_i <- paste0(RSA_id_i, "_", ti, "_", Sim_ID)
       
       cat("t : ", ti, " | RSHA_id_i : ", RSHA_id_i, "\n")
       flush.console()
@@ -118,11 +118,11 @@ run.MARSHAL.loop <- function(RSA_list,
 
 plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max){
   
-  RSA_id_i   <- unique(RSHA.all$RSA_id)[1]
+  RSA_id_i       <- unique(RSHA.all$RSA_id)[1]
   
-  data2plot  <- RSHA.all %>% filter(RSA_id == RSA_id_i  & age == ti)
+  data2plot      <- RSHA.all %>% filter(RSA_id == RSA_id_i  & age == ti)
   macro2plot_all <- Macro.all %>% filter(RSA_id == RSA_id_i)
-  macro2plot_i <- Macro.all %>% filter(RSA_id == RSA_id_i & age == ti)
+  macro2plot_i   <- Macro.all %>% filter(RSA_id == RSA_id_i & age == ti)
   
   require(cowplot)
   # PLOT ALL
@@ -131,7 +131,7 @@ plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max){
     geom_segment(aes(x= x1, xend = x2, y = z1, yend = z2, 
                      color = kr, size = radius)) +
     xlim(-15, 15) +
-    ylim(-30, 0) +
+    ylim(round(min(RSHA.all$z1)), 0) +
     
     scale_size_continuous(range = c(1, 3), 
                           limits = c(min(RSHA.all$radius), max(RSHA.all$radius))) +
@@ -152,7 +152,7 @@ plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max){
     geom_segment(aes(x= x1, xend = x2, y = z1, yend = z2, 
                      color = Kx, size = radius)) +
     xlim(-15, 15) +
-    ylim(-30, 0) +
+    ylim(round(min(RSHA.all$z1)), 0) +
     
     scale_size_continuous(range = c(1, 3),
                           limits = c(min(RSHA.all$radius), 
@@ -171,7 +171,7 @@ plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max){
     geom_segment(aes(x= x1, xend = x2, y = z1, yend = z2, 
                      color = SUF, size = radius)) +
     xlim(-15, 15) +
-    ylim(-30, 0) +
+    ylim(round(min(RSHA.all$z1)), 0) +
     
     # Size of radius
     scale_size_continuous(range = c(1, 3), 

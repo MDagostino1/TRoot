@@ -1,0 +1,216 @@
+---
+title: "MPIPE"
+format: html
+editor: source
+---
+
+# Load dependancies
+
+```{r, include=F}
+# knitr::opts_chunk$set(echo = FALSE)
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path)) # Set working directory to the current file
+rm(list = ls())
+
+options(rstudio.help.showDataPreview = FALSE)
+MPath <- "./src/CRB-MARSHAL/"
+
+libs <- c("fmsb", 
+          "SciViews", 
+          "pander", 
+          "visreg", 
+          "readxl", 
+          "EnvStats", 
+          "FactoMineR", 
+          "factoextra", 
+          "knitr", 
+          "data.table", 
+          "reticulate", 
+          "xml2", 
+          "tidyverse", 
+          "dplyr", 
+          "viridis", 
+          "Hmisc", 
+          "ggplot2", 
+          "gridExtra", 
+          # "outliers",
+          "Matrix", 
+          "emmeans")
+
+for(pk in libs) {
+  library(pk, character.only = T)
+}
+
+# source(paste0(MPath,"io_function.R")) # CROOTBOX
+source(paste0(MPath, "Get_SUF.R")) # MARSHAL
+source(paste0(MPath, "SUF.R"))
+source(paste0(MPath, "CRBM_functions.R"))
+
+TRoot_path <- "./src/FUNCTIONS/T-Root/"
+for (i in list.files(TRoot_path, pattern = ".R")) {
+  print(i)
+  source(paste0(TRoot_path, i))
+}
+
+# LOAD DATA TABLES
+Simulations_ID <- read_xlsx(paste0(MPath, "inputs/Simulations_ID.xlsx"))
+Scenarios_ID   <- read_xlsx(paste0(MPath, "inputs/Scenarios_ID.xlsx"))
+RSA.IDs        <- read.csv(paste0(MPath, "inputs/RSA_ID.csv"))
+# RSHA.IDs     <- read.csv(paste0(MPath, "inputs/RSHA_ID.csv"))
+```
+
+# Load conductivities
+
+```{r}
+# Conversion factors of kr and kx
+conv_kr       <- 0.001157407
+conv_kx       <- 1.157407e-09
+
+# List hydraulic Scenarios to load
+list_S <- c("1A", "1B", "2", "3")
+
+Conds.tot <- tibble()
+for(S_id in list_S){
+  conds.temp <- read.csv(paste0("./Data/conds_scenarios/", S_id, ".csv"))
+  conds.temp$Scenario_ID <- S_id
+  Conds.tot <- rbind(Conds.tot, conds.temp)
+}
+```
+
+
+# LOOP MPIPE
+
+```{r, include=F}
+source("./src/MPIPE_function.R")
+tmin      <- 0
+tmax      <- 30
+it_length <- 10 
+
+# LOAD RSA FILES AND CREATE A META FILE
+RSA_list      <- RSA.IDs$RSA_id # Implement a way to select RSA_ids
+RSA.all       <- tibble()
+
+for(RSA_id in RSA_list){
+  RSAi          <- read.csv(paste0(MPath, "inputs/RSA/", RSA_id, ".csv"))
+  RSAi$RSA_id   <- RSA_id
+  RSA.all       <- rbind(RSA.all, RSAi)
+}
+
+for(Sim_ID in c("1A_30", "1B_30", "2_30", "3_30")){
+  # Sim_ID         <- "1A_30" # Example
+  Scenario_ID_i  <- Simulations_ID$Scenario_ID[Simulations_ID$Simulation_ID == Sim_ID]
+  path.out       <- paste0(MPath, "outputs/", Sim_ID, "/")
+  source("./src/MPIPE.R")
+  # MPIPE()
+}
+
+```
+
+# Load and plot a single root system
+
+```{r}
+RSA <- read.csv("src/CRB-MARSHAL/inputs/RSA/Tomato_30_1.csv")
+
+ggplot(RSA) +
+  geom_segment(aes(x = x1, xend = x2, y = z1, yend = z2, size = radius)) +
+  scale_size_continuous(range = c(0.1, 1), 
+                          limits = c(min(RSA$radius), max(RSA$radius))) +
+  coord_fixed()
+```
+
+
+# Run for specific root system
+
+```{r, include = F}
+RSA.all        <- read.csv(paste0(MPath, "inputs/RSA/Tomato_60d_1.csv"))
+RSA.all$RSA_id <- "Tomato_60d_1"
+
+tmin      <- 0
+tmax      <- 60
+it_length <- 20
+
+for(Sim_ID in c("1A_60", "1B_60", "2_60", "3_60")){
+  Scenario_ID_i  <- Simulations_ID$Scenario_ID[Simulations_ID$Simulation_ID == Sim_ID]
+  path.out     <- paste0(MPath, "outputs/", Sim_ID, "/")
+  source("./src/MPIPE.R")
+}
+```
+
+# Check SUF
+
+```{r}
+RSHA.all$type <- as.factor(RSHA.all$type)
+
+data2plot <- RSHA.all %>% filter(age == 30) %>% 
+  mutate(zr = round(z1)) %>% 
+  group_by(RSHA_id, zr, type) %>% 
+  summarise(SUF_sum = sum(SUF)) 
+
+ggplot(data2plot) +
+  geom_bar(aes(x = -zr, y = SUF_sum, fill = type), 
+           stat = "identity", position = position_dodge(width = 0.5),
+           alpha = 1) +
+  facet_wrap(~RSHA_id)
+
+data2plot2 <- data2plot %>% 
+  group_by(zr, type) %>% 
+  summarise(SUF_sum_mean = mean(SUF_sum),
+            SUF_sum_sd   = sd(SUF_sum))
+  
+SUF_plot <- ggplot(data2plot2) +
+  
+  geom_bar(aes(x = -zr, 
+               y = SUF_sum_mean,
+               fill = type), stat = "identity", 
+           alpha = 1
+           ) +
+  
+  geom_point(aes(x = -zr, y = SUF_sum_mean),
+             color = "grey") +
+  
+  geom_errorbar(aes(x = -zr, 
+                    ymax = SUF_sum_mean+SUF_sum_sd, 
+                    ymin = SUF_sum_mean-SUF_sum_sd,
+                    ),
+                color = "grey"
+                ) +
+  
+  facet_wrap(~type, ncol = 1) +
+  xlab("Soil depth [cm]") +
+  ylab("Standart Uptake Fraction [-]") +
+  theme_bw()
+
+ggsave(filename = "SUF_plot.svg", plot = SUF_plot, device = "svg", path = path.out, 
+       width = 4, height = 4)
+```
+
+# Process results of each scenario
+
+```{r}
+Macro_full <- tibble()
+RSHA_full  <- tibble()
+for(si in unique(Scenarios.IDs$Scenario_id)){
+  print(si)
+  
+  temp_path              <- paste0(MPath, "outputs/Scenario_", si, "/")
+  
+  temp_Macro             <- read.csv(paste0(temp_path, "Macro_all.csv"))
+  temp_Macro$Scenario_ID <- si
+  Macro_full <- rbind(Macro_full, temp_Macro)
+  
+  temp_RSHA              <- read.csv(paste0(temp_path, "RSHA_all.csv"))
+  temp_RSHA$Scenario_ID  <- si
+  RSHA_full <- rbind(RSHA_full, temp_RSHA)
+}
+```
+
+## Analyse Krs
+
+```{r}
+ggplot(Macro_full) +
+  geom_boxplot(aes(x = Scenario_ID, y = Krs)) +
+  facet_wrap(~age)
+  
+ggplot(Macro_full) +
+  geom_line(aes(x = age, y = Krs, color = Scenario_ID))
+```
+

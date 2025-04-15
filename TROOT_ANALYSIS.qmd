@@ -1,0 +1,1341 @@
+---
+title: "RESULTS ANALYSIS"
+format: html
+editor: source
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r Load Packages, include=F}
+DIR_path <- getwd()
+options(rstudio.help.showDataPreview = FALSE)
+rm(list = ls())
+
+TRoot_path <- "src/FUNCTIONS/T-Root/"
+for (i in list.files(TRoot_path)) {
+  print(i)
+  source(paste0(TRoot_path, i))
+}
+
+pkg_list <- c("fmsb", 
+              "packcircles", 
+              "pander", 
+              "readxl", 
+              "visreg", 
+              "EnvStats", 
+              "factoextra", 
+              "data.table",
+              "reticulate", 
+              "xml2", 
+              "tidyverse", 
+              "plyr", 
+              "deldir", 
+              "viridis", 
+              "Hmisc", 
+              # "devtools", 
+              "ggplot2",
+              "gridExtra", 
+              "dplyr", 
+              "cowplot", 
+              "stats", 
+              "emmeans", 
+              "corrplot", 
+              "sf", 
+              "SciViews")
+
+load_packages(pkg_list)
+
+simu_path <- "Results/12-01-2023/"
+```
+
+# EXTRACT AND PRE-PROCESS RESULTS 
+
+## Extract Data from jobs 
+
+```{r, eval = F}
+path <- "Results/12-01-2023/Conductivities/"
+l <- list.files(path, pattern = ".csv")
+Conductivities <- data.frame()
+
+for(i in l){
+  # print(i)
+  temp_df <- read.csv(paste0(path, i))
+  Conductivities <- rbind(Conductivities, temp_df)
+}
+# Correct a bug that make Kx weird for b9 (the bug is fixed in scripts, but remains in results files)
+Conductivities$Kx[Conductivities$Barrier == "b9"] <- Conductivities$Kx[Conductivities$Barrier == "b5"]
+
+write.csv(Conductivities, file = "Results/12-01-2023/Conductivities_full.csv", row.names = F)
+```
+
+Plot and count the number of successfull simulations.
+We have basically 20 roots x 31 days = 620 combinations, 
+and for MECHA 10 kAQP x 10 barriers = 100.
+But we filter to have only 30 days and 6 barriers : 
+
+```{r}
+Conductivities         <- read.csv("Results/12-01-2023/Conductivities_full.csv")
+Conductivities         <- Conductivities %>% filter(X > 0 & Barrier %in% c("b1", "b2", "b4", "b6", "b8", "b9"))
+Conductivities$Root_ID <- sapply(Conductivities$Root, function(i) unlist(str_split(string = i, pattern = "root"))[2])
+
+ggplot(data = Conductivities, aes(x = X, y = Root_ID)) + geom_point() + theme_bw()
+```
+
+Create Conductivity_Dico and Conductivity_Mono.
+The function *set_conductivities* process and convert to the right units : 
+
+* kr is converted to $m s^{-1} MPa^{-1}$
+
+* Kx is converted to $m^3 s^{-1} MPa^{-1}$
+
+```{r, eval = F}
+Virtual_Roots  <- read.csv("Data/Virtual Roots/Virtual_Root_2023-07-17_30x20.csv")
+Barriers       <- read_xlsx("Data/Barriers.xlsx")
+Conductivities <- read.csv(file = paste0(simu_path, "Conductivities_full.csv"))
+
+source("src/FUNCTIONS/T-Root/Functions.R")
+#==================================================================================
+# Clean data and create dico and mono
+Conductivities_processed          <- set_conductivities(Conductivities, 
+                                                        conv_kr = 0.001157407,
+                                                        conv_kx = 1.157407e-09,
+                                                        Barriers = c("b1", "b3", "b4", "b6", "b9", "b8"))
+
+#==================================================================================
+# Change maturation stage name :
+Conductivities_processed$Barrier  <- as.factor(Conductivities_processed$Barrier)
+Conductivities_processed          <- left_join(Conductivities_processed, Barriers[c("Barrier", "Barrier_Name")])
+#==================================================================================
+# Check that the data is okey (black points have to be +- homogenous) :
+ggplot(data = Conductivities_processed, aes(x = x, y = root)) +
+  geom_point() +
+  ggtitle("Conductivities") +
+  theme_bw()
+
+# Export
+write.csv(Conductivities_processed, file = paste0("Data/Conductivities_processed.csv"), row.names = F)
+```
+
+Create Data Full
+
+```{r, eval = F, include = F}
+Parameters      <- read.csv("Data/Anatomy/Parameters.csv")
+Virtual_Roots   <- read.csv("Data/Virtual Roots/Virtual_Root_2023-07-17_30x20.csv")
+Virtual_Roots   <- left_join(Virtual_Roots, Parameters[c("name", "type", "param_id")])
+
+data_full1      <- left_join(Conductivities_processed, Virtual_Roots)
+data_full1$kAQP <- as.factor(data_full1$kAQP)
+
+Combinations    <- unique(data_full1[c("root", "x", "kAQP", "Barrier_Name")]) %>% 
+  mutate(Combination_ID = paste0(root, "_", x, "_", kAQP, "_", Barrier_Name))
+
+# Isolate Kr, Kx, kr, radius per COmbination_ID
+data_full2 <- left_join(data_full1, Combinations)
+data_full2 <- unique(data_full2[c("Kr", "Kx", "kr", "radius", "Combination_ID")])
+
+# Isolate parameters per Combination_ID
+data_full3 <- left_join(data_full1, Combinations)
+data_full3 <- unique(data_full3[c("Combination_ID", "param_id", "y")])
+data_full3 <- data_full3 %>% spread(key = param_id, value = y)
+
+# Join both
+data_final <- left_join(data_full2, data_full3)
+data_final <- left_join(data_final, Combinations)
+
+# Export final database
+write.csv(data_final, "Data/DATA_FULL_FINAL.csv", row.names = F)
+```
+
+# LOAD PRE-PROCESSED DATA
+
+```{r Load Data}
+Conductivities_processed <- read.csv("Data/Conductivities_processed.csv")
+Anatomy_Full             <- read.csv("Data/Anatomy/Anatomy_Full.csv")
+Data_Full                <- read.csv("Data/DATA_FULL_FINAL.csv")
+Parameters               <- read.csv("Data/Anatomy/Parameters.csv")
+
+# Remove day zero
+Conductivities_processed <- Conductivities_processed %>% filter(x != 0)
+Data_Full                <- Data_Full %>% filter(x != 0)
+```
+
+# VISUAL ANALYSIS
+
+## Plot pure data
+
+```{r Plot Pure Data}
+# kr vs kAQP
+kAQP_plot1 <- ggplot(data = Conductivities_processed,
+                     aes(x=(kAQP*10000), 
+                         y = kr*1e08,
+                         color = Barrier_Name))+
+  geom_point(aes(x = kAQP*10000),
+             position = "jitter",
+             alpha = 0.05) +
+  # geom_boxplot(aes(x = as.factor(kAQP*10000), y = kr, color = Barrier))+
+  # facet_wrap(~Barrier) +
+  # scale_color_viridis() +
+  geom_smooth(linewidth = 2) +
+  ylab(expression(k[r] ~ 10^{8} ~ "[" * m ~ MPa^{-1} ~ s^{-1}*"]")) +
+  # xlab("kAQP [10e-04 cm hPA-1 d-1]") +
+  xlab(expression(kAQP ~ 10^{-4} ~ "[" * cm ~ hPa^{-1} ~ d^{-1} * "]")) +
+  ylim(2, 12) +
+  theme_test() 
+  # theme(legend.position = "none")
+kAQP_plot1
+# ggsave(filename = "plots/AQP_influence.svg", plot = kAQP_plot1, device = "svg", width = 4, height = 3, units = "in")
+#============================================================================
+# kr
+kr_plot1 <- ggplot(data = Conductivities_processed,
+       aes(x = x, 
+           y = kr*10^8,
+           color = kAQP*1e7)) +
+  geom_point(alpha = 0.5, position = "jitter") +
+  facet_wrap(~Barrier_Name) +
+  scale_color_viridis() +
+  # geom_smooth(aes(x = x, y = radius/5000000), color = "red") +
+  # ylim(0, 3e-08) +
+  ylab(expression(k[r] ~ 10^{-8} ~ "[" ~ m~ s^{-1} ~ MPa^{-1} ~ "]")) +
+  labs(color = expression(kAQP ~  "[" ~ 10^{-7} ~ m ~ s^{-1} ~ MPa^{-1} ~ "]")) +
+  xlab("Age [d]") +
+  # ggtitle("Hydraulic Radial conductivity") +
+  theme_bw()
+kr_plot1
+#============================================================================
+# Kr_plot1 <- ggplot(data = Conductivities_processed,
+#        aes(x = x, 
+#            y = Kr,
+#            color = kAQP*1e7)) +
+#   geom_jitter(alpha = 0.2) +
+#   facet_wrap(~Barrier_Name) +
+#   scale_color_viridis() +
+#   ylab(expression(K[r] ~ "[" ~ m^{3} ~ s^{-1} ~ MPa^{-1} ~ "]")) + 
+#   xlab("Age [d]") +
+#   # ylim(0, 3e-08) +
+#   labs(color = expression(kAQP ~  "[" ~ 10^{-7} ~ m ~ s^{-1} ~ MPa^{-1} ~ "]")) +
+#   theme_dark()
+# Kr_plot1
+#============================================================================
+# Radius
+Radius_plot1 <- ggplot(data = Conductivities_processed,
+                       aes(x = x, y = radius)) +
+  geom_point(alpha = 0.01) +
+  # geom_smooth() +
+  theme_test() +
+  ylab("Radius [mm]") +
+  xlab("Age [d]") 
+
+Radius_plot1
+#============================================================================
+# Perimeter
+Perimeter_plot1 <- ggplot(data = Conductivities_processed,
+                       aes(x = x, y = perimeter)) +
+  geom_point(alpha = 0.01) +
+  # geom_smooth() +
+  theme_test() +
+  ylab("Perimeter [cm]") +
+  xlab("Age [d]") 
+
+Perimeter_plot1
+#============================================================================
+# Kx
+kx_plot1 <- ggplot(data = Conductivities_processed%>%
+                     filter(Barrier_Name == "T1" & kAQP == min(Conductivities_processed$kAQP)),
+       aes(x = x, 
+           y = Kx,
+           color = radius)) +
+  geom_point(alpha = 1) +
+  # geom_smooth(method = "lm") +
+  scale_y_log10() +
+  # geom_smooth(method = "lm", se = T) +
+  scale_color_viridis(option = "magma", direction = 1) +
+  # ylim(0, 3e-08) +
+  ylab(expression(ln(K[x]) ~ "[" ~ m^{4} ~ s^{-1} ~ hPa^{-1} ~ "]")) +
+  xlab("Age [d]") +
+  labs(color = "Radius [cm]") +
+  # ggtitle("Hydraulic axial conductance") +
+  theme_bw()
+kx_plot1
+```
+
+Export plots
+
+```{r Export graphs, eval = F, include=F}
+svg("Plots/kAQP_1.svg", height = 4, width = 6)
+kAQP_plot1
+dev.off()
+
+png("Plots/kr_plot_1.png", height = 5, width = 8, units = "in", res = 300)
+kr_plot1 
+dev.off()
+
+png("Plots/Kx_plot_1.png", height = 3, width = 5, units = "in", res = 300)
+kx_plot1
+dev.off()
+
+svg("Plots/Kr_plot_1.svg", height = 5, width = 8)
+Kr_plot1
+dev.off()
+
+svg("Plots/Radius_plot_1.svg", height = 5, width = 8)
+Radius_plot1
+dev.off()
+
+svg("Plots/Perimeter_plot_1.svg", height = 3, width = 8)
+Perimeter_plot1
+dev.off()
+```
+
+# Statistical Analysis per variable
+
+## 0) Global Correlations
+
+```{r Correlations}
+library(corrplot)
+
+print(colnames(Data_Full))
+
+Data_Full_2cor <- Data_Full %>% 
+  select(-any_of(c("endodermis_n_layers", 
+                   "epidermis_n_layers",
+                   "pericycle_n_layers",
+                   "xylem_n_files", 
+                   "exodermis_n_layers",
+                   "Combination_ID", 
+                   "root", 
+                   "Barrier_Name",
+                   "Barrier")
+  ))
+
+Data_Full_2cor <- as_tibble(scale(Data_Full_2cor))
+                   
+
+# svg(filename = "plots/Results_Correlations.svg", width = 7, height = 7)
+corrplot(cor(Data_Full_2cor), method = 'color')
+# dev.off()
+```
+
+## 1) Effect of Radius
+
+### 1.1) Regression of radius from quantification data
+
+```{r Radius plot}
+radius_df <- Anatomy_Full[c("age", "radius")]
+
+# PLot
+r_plot2 <- ggplot(data = radius_df, aes(x = age, y = radius))+
+  # ylim(0, 0.8) +
+  geom_point() +
+  # geom_smooth(formula = y~x) +
+  theme_bw() +
+  ggtitle("Radius of the data")
+
+# svg(filename = paste0("Plots/Radius_data.svg"), width = 5, height = 5)
+r_plot2
+# dev.off()
+```
+
+To regress that, we split in two half : - If x is \< 25, we consider the radius as constant = 0.188 - If x is \>= 25, we consider exponential function
+
+```{r Radius Regression}
+# FIRST STAGE
+radius_df1 <- radius_df %>% filter(age < 25)
+radius_df2 <- radius_df %>% filter(age >= 25)
+radius_df2$radius_ln <- ln(radius_df2$radius)
+summary(radius_df1$radius)
+
+rlm1 <- lm(data = radius_df1, formula = radius ~ 1)
+summary(rlm1)
+
+# SECOND STAGE
+rlm2 <- lm(data = radius_df2, formula = radius_ln ~ age)
+summary(rlm2)
+plot(rlm2)
+visreg(rlm2)
+```
+
+Okey, so this is nice. With these two regression function, we coded the "radius" function.
+
+### 1.2) Effect of radius on kr
+
+Here we start by looking at the relation between kr, root age and root radius, per Maturation Stage, at fixed kAQP (= 4e-04). We split in two : between 0 and 25 days their is \~linear increase in kr. After 25 days, kr drops linarly.
+
+```{r Effect of radius on kr}
+print(unique(Conductivities_processed$kAQP)[order(unique(Conductivities_processed$kAQP))])
+# =============================================================================
+subset1 <- Conductivities_processed %>% filter(x < 25)
+subset2 <- Conductivities_processed %>% filter(x >= 25)
+
+subset1_1 <- subset1%>%filter(kAQP == 5.787e-7)
+subset2_1 <- subset2%>%filter(kAQP == 5.787e-7)
+
+cor(subset1$kr, subset1$radius)
+cor(subset2$kr, subset2$radius)
+
+#===============================================================================
+# Individual MS
+
+MS_indi <- ggplot(data = Conductivities_processed %>% filter(kAQP == "4e-04")) +
+  geom_point(aes(x = x, y = kr), color = "blue", alpha = 0.3) + 
+  # geom_smooth(aes(x = x, y = kr), color = "blue") +
+  geom_smooth(data = subset1_1, aes(x = x, y = kr), color = "blue", method = "lm") +
+  geom_smooth(data = subset2_1, aes(x = x, y = kr), color = "blue", method = "lm") +
+  
+  geom_point(aes(x = x, y = radius/(1e07)), color = "red",alpha = 0.3) +
+  geom_smooth(aes(x= x , y =radius/(1e07)), color = "red") +
+  facet_wrap(~Barrier) +
+  ggtitle("Full Timeline") +
+  theme_test()
+  
+MS_indi
+
+#===============================================================================
+MS_indi2 <- ggplot(data = subset1_1) +
+  geom_point(aes(x = x, y = kr), color = "blue", alpha = 0.3) +
+  geom_smooth(aes(x = x, y = kr), color = "blue", method = 'lm') +
+  
+  geom_point(aes(x = x, y = radius/(1e07)), color = "red", alpha = 0.3) +
+  geom_smooth(aes(x= x , y =radius/(1e07)), color = "red", method = 'lm') +
+  facet_wrap(~Barrier) +
+  ggtitle("First Stage") +
+  theme_test()
+MS_indi2
+
+#===============================================================================
+MS_indi3 <- ggplot(data = subset2_1) +
+  geom_point(aes(x = x, y = kr), color = "blue", alpha = 0.3) + 
+  geom_smooth(aes(x = x, y = kr), color = "blue", method = 'lm') +
+  
+  geom_point(aes(x = x, y = radius/(1e07)), color = "red", alpha = 0.3) +
+  geom_smooth(aes(x= x , y =radius/(1e07)), color = "red", method = 'lm') +
+  facet_wrap(~Barrier) +
+  ggtitle("Second Stage") +
+  theme_test()
+MS_indi3
+```
+
+Simple linear model ? Just to see in constant kAQP and MS Not efficient
+
+```{r}
+print("FIRST PHASE")
+rad_lm <- lm(data = subset1_1, formula = kr ~ x + radius + Barrier)
+summary(rad_lm)
+anova(rad_lm)
+
+print("SECOND PHASE")
+rad_lm <- lm(data = subset2_1, formula = kr ~ x + radius + Barrier + radius:Barrier)
+summary(rad_lm)
+anova(rad_lm)
+```
+
+## 2) Influence of Aquaporins
+
+```{r}
+ggplot(data = Conductivities_processed) +
+  geom_jitter(aes(x = kAQP*10000, y = kr, color = Barrier), alpha = 0.1) +
+  geom_smooth(aes(x = kAQP*10000, y = kr, color = Barrier)) +
+  # facet_wrap(~Barrier) +
+  
+  theme_test()
+
+kAQP_lm <- lm(data = Conductivities_processed, formula = kr ~ kAQP*Barrier)
+anova(kAQP_lm)
+```
+
+## 3) Influence of Deposition Levels
+
+Globally, we clearly see that all maturation stages are different and significantly.
+
+```{r}
+ggplot(data = Conductivities_processed) +
+  # geom_jitter(aes(x = kAQP, 
+  #                 y = kr*10^8, 
+  #                 color = Barrier_Name),
+  #             alpha = 0.75) +
+  geom_boxplot(aes(x = as.factor(kAQP), y = kr*10^8, fill = Barrier_Name)) +
+  ylab("Kr [10^-8]") +
+  xlab("kAQP") +
+  theme_classic() + theme(axis.text.x     = element_text(size = 8, angle = 90, hjust = 1, vjust = 0.5),) 
+```
+
+
+```{r}
+# MS_subset <- Conductivities %>% filter(kAQP == 5e-04)
+MS_all <- ggplot(data = Conductivities_processed) +
+  
+  geom_jitter(aes(x = Barrier_Name, 
+                  y = kr*10^08, 
+                  color = kAQP), 
+              width = 0.1, 
+              alpha = 0.1) +
+  
+  geom_violin(aes(x = Barrier_Name, 
+                  y = kr*10^08), 
+              alpha = 0.1,
+              draw_quantiles = "0.5") +
+
+  # geom_boxplot(aes(x = Barrier_Name, 
+  #                  y = kr*10^8),
+  #              width = 0.5,
+  #              alpha = 0.5) +
+  
+  xlab("Maturation Stage") +
+  ylab(expression(k[r] ~ "[" ~ 10^{-08} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  
+  # scale_fill_manual(values=c("white","white","white", "grey", "grey", "grey")) +
+  scale_color_viridis() +
+  
+  theme_classic() 
+  # ggtitle("Radial Hydraulic Conductivity per hydrophobic deposition level") 
+  # theme(legend.position = "none") 
+
+MS_all
+# ggsave(filename = "Plots/Maturation_Stages_All.png", plot = MS_all, device = "png", 
+#        width = 5, height = 4, dpi = 300, units = "in")
+
+# svg("Plots/Maturation_Stages_All.svg", height = 4, width = 5)
+# MS_all
+# dev.off()
+```
+
+MS all at fixed kAQP
+
+```{r}
+# MS_subset <- Conductivities %>% filter(kAQP == 5e-04)
+MS_all <- ggplot(data = Conductivities_processed %>% filter(kAQP == 5.7870e-07)) +
+  
+  geom_jitter(aes(x = Barrier_Name, 
+                  y = kr*10^08, 
+                  ), 
+              width = 0.1, 
+              alpha = 0.3) +
+  
+  geom_violin(aes(x = Barrier_Name, 
+                  y = kr*10^08), 
+              alpha = 0.1,
+              draw_quantiles = "0.5") +
+
+  # geom_boxplot(aes(x = Barrier_Name, 
+  #                  y = kr*10^8),
+  #              width = 0.5,
+  #              alpha = 0.5) +
+  
+  xlab("Maturation Stage") +
+  ylab(expression(k[r] ~ "[" ~ 10^{-08} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  
+  # scale_fill_manual(values=c("white","white","white", "grey", "grey", "grey")) +
+  scale_color_viridis() +
+  
+  theme_classic() 
+  # ggtitle("Radial Hydraulic Conductivity per hydrophobic deposition level") 
+  # theme(legend.position = "none") 
+
+MS_all
+# ggsave(filename = "Plots/Maturation_Stages_All.png", plot = MS_all, device = "png", 
+#        width = 5, height = 4, dpi = 300, units = "in")
+
+# svg("Plots/Maturation_Stages_All.svg", height = 4, width = 5)
+# MS_all
+# dev.off()
+```
+
+Stats :
+
+```{r}
+MS_lm <- lm(data = Conductivities_processed, formula = kr ~ Barrier_Name)
+
+summary(MS_lm)
+anova(MS_lm)
+emmeans(MS_lm, specs = pairwise ~ Barrier_Name)
+
+# visreg(MS_lm)
+
+DL_pred <- tibble(DL = c("M1", "M2", "M3", "T1", "T2", "T3"),
+                  Estimate = MS_lm$coefficients)
+
+DL_pred2 <- tibble(DL2 = c("M1", "M2", "M3", "T1", "T2", "T3"),
+                  Estimate2 = MS_lm$coefficients)
+
+EM <- emmeans(MS_lm, specs = pairwise ~ Barrier_Name)
+DL_mean <- as_tibble(EM$emmeans)
+DL_contrast <- as_tibble(EM$contrasts)
+```
+
+Some interesting stats :
+
+```{r}
+mean_M1 <- DL_mean$emmean[DL_mean$Barrier_Name == "M1"]
+mean_M2 <- DL_mean$emmean[DL_mean$Barrier_Name == "M2"]
+mean_M3 <- DL_mean$emmean[DL_mean$Barrier_Name == "M3"]
+mean_T1 <- DL_mean$emmean[DL_mean$Barrier_Name == "T1"]
+mean_T2 <- DL_mean$emmean[DL_mean$Barrier_Name == "T2"]
+mean_T3 <- DL_mean$emmean[DL_mean$Barrier_Name == "T3"]
+
+print(paste0("Difference between T1 and M1 [%] : ", round((mean_M1-mean_T1)*100/mean_M1, digits = 2)))
+print(paste0("Difference between T2 and T1 [%] : ", round((mean_T1-mean_T2)*100/mean_T1, digits = 2)))
+print(paste0("Difference between T3 and T1 [%] : ", round((mean_T1-mean_T3)*100/mean_T1, digits = 2)))
+print(paste0("Difference between M2 and M3 [%] : ", round((mean_M2-mean_M3)*100/mean_M2, digits = 2)))
+```
+
+# COMPLETE STATISTICAL ANALYSIS
+
+## 1) Radial conductivity
+
+```{r}
+# lm_kr0 <- lm(data = Conductivities_processed, formula = kr ~ x + radius + Barrier + kAQP + kAQP:Barrier)
+lm_kr0 <- lm(data = Data_Full 
+             # %>% filter(Barrier_Name %in% c("T1", "T2", "T3"))
+             , 
+             formula = kr ~ 
+               x + 
+               radius + 
+               Barrier_Name + 
+               kAQP + 
+               kAQP:Barrier_Name 
+               # cortex_n_layers + 
+               # endodermis_cell_diameter +
+               # cortex_cell_diameter + 
+               # stele_layer_diameter
+               )
+summary(lm_kr0)
+anova(lm_kr0)
+emmeans(lm_kr0, specs = pairwise ~ Barrier_Name:kAQP)
+```
+
+```{r}
+# IN CASE OF ALL DEPOSITION LEVELS
+coefficients_kr <- tibble(a = lm_kr0$coefficients[1],
+                          x = lm_kr0$coefficients[2],
+                          r = lm_kr0$coefficients[3],
+                          M2 = lm_kr0$coefficients[4],
+                          M3 = lm_kr0$coefficients[5],
+                          T1 = lm_kr0$coefficients[6],
+                          T2 = lm_kr0$coefficients[7],
+                          T3 = lm_kr0$coefficients[8],
+                          kAQP = lm_kr0$coefficients[9],
+                          M2_kAQP = lm_kr0$coefficients[10],
+                          M3_kAQP = lm_kr0$coefficients[11],
+                          T1_kAQP = lm_kr0$coefficients[12],
+                          T2_kAQP = lm_kr0$coefficients[13],
+                          T3_kAQP = lm_kr0$coefficients[14])
+
+# IN CASE OF ONLY TOMATO DL
+# coefficients_kr <- tibble(a = lm_kr0$coefficients[1],
+#                           x = lm_kr0$coefficients[2],
+#                           r = lm_kr0$coefficients[3],
+#                           T2 = lm_kr0$coefficients[4],
+#                           T3 = lm_kr0$coefficients[5],
+#                           kAQP = lm_kr0$coefficients[6],
+#                           T2_kAQP = lm_kr0$coefficients[7],
+#                           T3_kAQP = lm_kr0$coefficients[8])
+                    
+pander(coefficients_kr)
+write.csv(coefficients_kr, "./Data/kr_coefficients.csv", row.names = F)
+```
+
+```{r}
+source("src/FUNCTIONS/T-Root/Functions.R")
+kr_reg_df <- Data_Full[c("kr", "Combination_ID", "x", "radius", "Barrier_Name", "kAQP")] 
+kr_reg_df$kr_reg <- NaN
+
+for(i in 1:nrow(kr_reg_df)){
+  kr_reg_df$kr_reg[i] <- kr_reg(x = kr_reg_df$x[i], 
+                                MS = kr_reg_df$Barrier_Name[i]
+                                , kAQP = kr_reg_df$kAQP[i]
+                                , radius = kr_reg_df$radius[i]
+                                , coef = coefficients_kr)
+}
+
+cor <- cor.test(kr_reg_df$kr, kr_reg_df$kr_reg)
+print(cor)
+kr_test <- lm(data = kr_reg_df, formula = kr_reg~kr)
+summary(kr_test)
+
+ggplot(kr_reg_df) +
+  geom_point(aes(x = kr, y = kr_reg, color = x),
+             alpha = 0.4) +
+  geom_smooth(aes(x = kr, y = kr_reg), method = "lm", color = "red") +
+  coord_fixed() +
+  # xlim(-27, -18) +
+  # ylim(-27, -18) +
+  geom_abline() +
+  scale_color_viridis() +
+  ggtitle(paste0("Correlation : ", round(cor$estimate, digits = 2),
+                 " | R2 = ", 
+                 round(summary(kr_test)$r.squared, digits = 2)
+                 )
+          ) +
+  xlab("kr") + ylab("kr*") +
+  theme_classic()
+
+
+```
+
+Let's compute final coefficients for the regression equation :
+
+$$
+k_r^* \cdot 10^8 = 
+  \begin{cases}
+    \alpha_{T1} + \beta \cdot t + \gamma \cdot r + \delta_{T1} \cdot kAQP & \text{if} & DL = T1 \\
+    \alpha_{T2} + \beta \cdot t + \gamma \cdot r + \delta_{T2} \cdot kAQP & \text{if} & DL = T2  \\
+    \alpha_{T3} + \beta \cdot t + \gamma \cdot r + \delta_{T3} \cdot kAQP & \text{if} & DL = T3
+  \end{cases}
+$$
+
+```{r}
+# T1 :
+cat("alpha_T1 : ", (coefficients_kr$a)*1e8, "(x 10e-8) \n")
+cat("alpha_T2 : ", (coefficients_kr$a + coefficients_kr$T2)*1e8, "(x 10e-8) \n")
+cat("alpha_T3 : ", (coefficients_kr$a + coefficients_kr$T3)*1e8, "(x 10e-8) \n")
+cat("\n")
+cat("beta : ", (coefficients_kr$x)*1e8, "(x 10e-8) \n")
+cat("gamma : ", (coefficients_kr$r)*1e8, "(x 10e-8) \n")
+cat("\n")
+cat("delta_T1 : ", (coefficients_kr$kAQP)*1e8*1e-06, "(x 10e-8 x 10e6) \n")
+cat("delta_T2 : ", (coefficients_kr$kAQP + coefficients_kr$T2_kAQP)*1e8*1e-6, "(x 10e-8 x 10e6) \n")
+cat("delta_T3 : ", (coefficients_kr$kAQP + coefficients_kr$T3_kAQP)*1e8*1e-5, "(x 10e-8 x 10e5) \n")
+```
+This is very nice. So we see different informations : \
+* The whole linear model is significant at R2 = 0.918 \
+* On the ANOVA, all variables are significant \ 
+* The less significant factor is T2 (p = 0.0178).\
+
+Really nice !
+
+## 2) Axial Kr
+
+```{r}
+Kx_lm <- lm(data = Data_Full%>%filter(Barrier_Name == "T1" & kAQP == 1.1570e-07), 
+            formula = ln(Kx) ~ radius + x)
+
+summary(Kx_lm)
+anova(Kx_lm)
+plot(Kx_lm)
+
+coefficients_Kx <- tibble(a   = Kx_lm$coefficients[1],
+                          r   = Kx_lm$coefficients[2],
+                          x   = Kx_lm$coefficients[3],
+                          xms = Kx_lm$coefficients[4])
+write.csv(coefficients_Kx, "./Data/Kx_coefficients.csv", row.names = F)
+```
+
+$$
+ln(K_x^*) = \alpha + \beta \cdot t + \gamma \cdot r
+$$
+
+```{r}
+cat("alpha = ", coefficients_Kx$a, "\n")
+cat("beta = ", coefficients_Kx$x, "\n")
+cat("gamma = ", coefficients_Kx$r, "\n")
+```
+
+```{r}
+Kx_reg <- Data_Full[c("Kx", "Combination_ID", "x", "radius", "xylem_max_size")] %>% 
+  mutate(Kx_reg = exp(coefficients_Kx$a + coefficients_Kx$r*radius + coefficients_Kx$x*x))
+
+ggplot(Kx_reg) +
+  geom_point(aes(x = ln(Kx), y = ln(Kx_reg), color = x)) +
+  geom_smooth(aes(x = ln(Kx), y = ln(Kx_reg)), method = "lm", color = "red") +
+  coord_fixed() +
+  xlim(-26.5, -18) +
+  ylim(-26.5, -18) +
+  xlab("ln(Kx)") + ylab("ln(Kx*)") +
+  geom_abline() +
+  scale_color_viridis() +
+  theme_classic()
+  
+# ==============================================================================
+```
+
+# PREDICTION CURVES
+
+Here we build and plot conductivities curves that we will apply in MARSHAL.
+
+```{r}
+coefficients_kr <- read.csv("./Data/kr_coefficients.csv")
+coefficients_Kx <- read.csv("./Data/Kx_coefficients.csv")
+
+source("./src/FUNCTIONS/T-Root/Functions.R")
+```
+
+## Scenario 1A : SG + LC + sub_exo + kAQP_constant
+
+* Secondary Growth
+
+* LC + Sub in exo
+
+* Fixed kAQP
+
+```{r}
+# Create Reg2
+Reg_1A                     <- tibble(x = seq(1:30))
+Reg_1A$radius              <- radius_reg(Reg_1A$x)
+Reg_1A$radius[Reg_1A$x > 30] <- Reg_1A$radius[Reg_1A$x == 30]
+Reg_1A$MS                  <- 0
+Reg_1A$kAQP                <- mean(unique(Data_Full$kAQP)) 
+
+# Set maturation stages timing
+timing                       <- c(7, 31)
+Reg_1A$MS[Reg_1A$x <= timing[1]] <- "T1"
+Reg_1A$MS[Reg_1A$x>timing[1]&
+          Reg_1A$x<timing[2]]  <- "T2"
+Reg_1A$MS[Reg_1A$x >= timing[2]] <- "T3"
+
+Reg_1A$kr <- 0
+Reg_1A$Kx <- 0
+Reg_1A$Kr <- 0
+
+# Loop for each day
+for(i in 1:nrow(Reg_1A)){
+  Reg_1A$kr[Reg_1A$x == i] <- kr_reg(x = Reg_1A$x[i], 
+                                 MS = Reg_1A$MS[i], 
+                                 kAQP = Reg_1A$kAQP[i], 
+                                 radius = Reg_1A$radius[i], 
+                                 coef = coefficients_kr)
+  Reg_1A$Kx[Reg_1A$x == i] <- Kx_reg(x = Reg_1A$x[i], 
+                                 radius = Reg_1A$radius[i], 
+                                 coef = coefficients_Kx)
+}
+
+Reg_1A$Kr <- Reg_1A$kr * 2 *3.1415 * Reg_1A$radius/1000
+# 
+# Reg_1A$Kx[Reg_1A$x > 30] <- Reg_1A$Kx[Reg_1A$x == 30]
+
+write.csv(Reg_1A, "./Data/conds_scenarios/1A.csv")
+```
+
+```{r}
+Reg_plot <- ggplot(data = Reg_1A) +
+  geom_line(aes(x = x, y = kr*1e8), color = "red", linewidth = 1) +
+  geom_line(aes(x = x, y = Kx*1e9), color = "blue", linewidth = 1) +
+  geom_line(aes(x = x, y = Kr*1e11), color = "green", linewidth = 1) +
+  geom_line(aes(x = x, y = kAQP*1e7), color = "orange", linewidth = 1, linetype = 2) +
+  geom_line(aes(x = x, y = radius*1e1), color = "grey", linewidth = 1, linetype = 2) +
+  xlim(0, 30) +
+  ylim(0, 16) +
+  ylab("") +
+  theme_test()
+Reg_plot
+
+svg("plots/Conds_curves_1A.svg", width = 2, height = 2)
+Reg_plot
+dev.off()
+```
+
+## Scenario 1B : SG + LC + sub_exo + kAQP_decrease
+
+* Secondary Growth
+
+* LC + Sub in exo
+
+* Decreasing kAQP
+
+```{r}
+# Create kAQP function
+kAQP_fun <- function(x, th = 10, delta = 1, max = 1.16e-6,  min = 1.16e-7){
+  if(x < th){
+    kaqp <- max
+  }else{
+    kaqp <- max - delta*(x - th)*max 
+  }
+  
+  if(kaqp < min){
+    kaqp <- min
+    }
+  
+  return(kaqp)
+}
+
+# Create Reg_1B
+Reg_1B <- tibble(x = seq(1:30))
+Reg_1B$radius <- radius_reg(Reg_1B$x)
+Reg_1B$radius[Reg_1B$x > 30] <- Reg_1B$radius[Reg_1B$x == 30]
+Reg_1B$MS <- 0
+
+# Set maturation stages timing
+timing <- c(7, 31)
+Reg_1B$MS[Reg_1B$x <= timing[1]] <- "T1"
+Reg_1B$MS[Reg_1B$x > timing[1]]   <- "T2"
+
+Reg_1B$kr <- 0
+Reg_1B$Kx <- 0
+Reg_1B$Kr <- 0
+
+Reg_1B$kAQP <- sapply(Reg_1B$x, kAQP_fun, th = 10, delta = 0.05, max = 1.16e-6,  min = 0)
+
+# Loop for each day
+for(i in 1:nrow(Reg_1B)){
+  Reg_1B$kr[Reg_1B$x == i] <- kr_reg(x = Reg_1B$x[i], 
+                                 MS = Reg_1B$MS[i], 
+                                 kAQP = Reg_1B$kAQP[i], 
+                                 radius = Reg_1B$radius[i], 
+                                 coef = coefficients_kr)
+  Reg_1B$Kx[Reg_1B$x == i] <- Kx_reg(x = Reg_1B$x[i], 
+                                 radius = Reg_1B$radius[i], 
+                                 coef = coefficients_Kx)
+}
+
+Reg_1B$Kr <- Reg_1B$kr * 2 *3.1415 * Reg_1B$radius/1000
+# Reg_1B$Kx[Reg_1B$x > 30] <- Reg_1B$Kx[Reg_1B$x == 30]
+
+write.csv(Reg_1B, "./Data/conds_scenarios/1B.csv")
+# ==============================================================================
+
+Reg_plot <- ggplot(data = Reg_1B) +
+  geom_line(aes(x = x, y = kr*1e8), color = "red", linewidth = 1) +
+  geom_line(aes(x = x, y = Kx*1e9), color = "blue", linewidth = 1) +
+  geom_line(aes(x = x, y = Kr*5e10), color = "green", linewidth = 1) +
+  geom_line(aes(x = x, y = kAQP*1e7), color = "orange", linewidth = 1, linetype = 2) +
+  geom_line(aes(x = x, y = radius*1e1), color = "grey", linewidth = 1, linetype = 2) +
+  ylab("") +
+  xlim(0, 30) +
+  ylim(0, 16) +
+  theme_test()
+Reg_plot
+
+svg("plots/Conds_curves_1B.svg", width = 2, height = 2)
+Reg_plot
+dev.off()
+```
+
+## Scenario 2 : SG + LC + kAQP_constant
+
+Here we simulate the same root (with secondary growth), but with no exodermal suberization
+
+```{r}
+source("./src/FUNCTIONS/T-Root/Functions.R")
+# Create Reg_2
+Reg_2                     <- tibble(x = seq(1:30))
+Reg_2$radius              <- radius_reg(Reg_2$x)
+Reg_2$radius[Reg_2$x > 30] <- Reg_2$radius[Reg_2$x == 30]
+Reg_2$MS                  <- 0
+Reg_2$kAQP                <- mean(unique(Data_Full$kAQP)) 
+
+# Set maturation stages timing
+timing                       <- c(7, 31)
+Reg_2$MS <- "T1"
+# Reg_2$MS[Reg_2$x > timing[1]]  <- "T2"
+
+Reg_2$kr <- 0
+Reg_2$Kx <- 0
+Reg_2$Kr <- 0
+
+# Loop for each day
+for(i in 1:nrow(Reg_2)){
+  Reg_2$kr[Reg_2$x == i] <- kr_reg(x = Reg_2$x[i], 
+                                 MS = Reg_2$MS[i], 
+                                 kAQP = Reg_2$kAQP[i], 
+                                 radius = Reg_2$radius[i], 
+                                 coef = coefficients_kr)
+  Reg_2$Kx[Reg_2$x == i] <- Kx_reg(x = Reg_2$x[i], 
+                                 radius = Reg_2$radius[i], 
+                                 coef = coefficients_Kx)
+}
+
+Reg_2$Kr <- Reg_2$kr * 2 *3.1415 * Reg_2$radius/1000
+
+write.csv(Reg_2, "./Data/conds_scenarios/2.csv")
+# ==============================================================================
+
+Reg_plot <- ggplot(data = Reg_2) +
+  geom_line(aes(x = x, y = kr*1e8), color = "red", linewidth = 1) +
+  geom_line(aes(x = x, y = Kx*1e9), color = "blue", linewidth = 1) +
+  geom_line(aes(x = x, y = Kr*1e11), color = "green", linewidth = 1) +
+  geom_line(aes(x = x, y = kAQP*1e7), color = "orange", linewidth = 1, linetype = 2) +
+  geom_line(aes(x = x, y = radius*1e1), color = "grey", linewidth = 1, linetype = 2) +
+  xlim(0, 30) +
+  ylim(0, 16) +
+  ylab("") +
+  theme_test()
+Reg_plot
+
+svg("plots/Conds_curves_2.svg", width = 2, height = 2)
+Reg_plot
+dev.off()
+```
+
+## Scenario 3 : No secondary growth
+
+Finally, here we simulate root with NO secondary growth and NO exodermal suberization
+
+```{r}
+source("./src/FUNCTIONS/T-Root/Functions.R")
+# Create Reg_3
+Reg_3                     <- tibble(x = seq(1:30))
+Reg_3$radius              <- radius_reg(Reg_3$x[1]) # Keep radius constant
+Reg_3$MS                  <- 0
+Reg_3$kAQP                <- mean(unique(Data_Full$kAQP)) 
+
+# Set maturation stages timing
+timing                       <- c(7, 31)
+Reg_3$MS <- "T1"
+# Reg_3$MS[Reg_3$x > timing[1]]  <- "T2"
+
+Reg_3$kr <- 0
+Reg_3$Kx <- 0
+Reg_3$Kr <- 0
+
+# Loop for each day
+for(i in 1:nrow(Reg_3)){
+  Reg_3$kr[Reg_3$x == i] <- kr_reg(x = Reg_3$x[i], 
+                                 MS = Reg_3$MS[i], 
+                                 kAQP = Reg_3$kAQP[i], 
+                                 radius = Reg_3$radius[i], 
+                                 coef = coefficients_kr)
+  Reg_3$Kx[Reg_3$x == i] <- Kx_reg(x = Reg_3$x[i], 
+                                 radius = Reg_3$radius[i], 
+                                 coef = coefficients_Kx)
+}
+
+Reg_3$Kr <- Reg_3$kr * 2 *3.1415 * Reg_3$radius/1000
+# 
+# Reg_3$Kx[Reg_3$x > 30] <- Reg_3$Kx[Reg_3$x == 30]
+
+write.csv(Reg_3, "./Data/conds_scenarios/3.csv")
+# ==============================================================================
+
+Reg_plot <- ggplot(data = Reg_3) +
+  geom_line(aes(x = x, y = kr*1e8), color = "red", linewidth = 1) +
+  geom_line(aes(x = x, y = Kx*1e9), color = "blue", linewidth = 1) +
+  geom_line(aes(x = x, y = Kr*1e11), color = "green", linewidth = 1) +
+  geom_line(aes(x = x, y = kAQP*1e7), color = "orange", linewidth = 1, linetype = 2) +
+  geom_line(aes(x = x, y = radius*1e1), color = "grey", linewidth = 1, linetype = 2) +
+  xlim(0, 30) +
+  ylim(0, 16) +
+  ylab("") +
+  theme_test()
+Reg_plot
+
+svg("plots/Conds_curves_3.svg", width = 2, height = 2)
+Reg_plot
+dev.off()
+```
+
+## Plot all scenarios
+
+```{r}
+colors <- c("kAQP"   = "red", 
+            "kr"     = "blue", 
+            "Kx"     = "orange", 
+            "Kr"     = "lightblue4", 
+            "radius" = "grey"
+            )
+
+plot_scenario <- function(df, color.values, to.scale) {
+  # Scale the specified columns and gather them into long format
+  
+  data2plot <- df 
+  for(i in colnames(data2plot)){
+    if(i %in% to.scale){
+      data2plot[i] = scale(data2plot[i])
+    }else{
+      if(i %in% c("x", "MS")){
+        next
+      }else{
+        data2plot[i] = 0
+      }
+    }
+  }
+  
+  data2plot <- data2plot %>% gather(kr, Kr, Kx, kAQP, radius, key = Variable, value = Value)  
+  
+  # Create the plot
+  plot <- ggplot(data2plot) +
+    geom_line(aes(x = x, y = Value, color = Variable), 
+              linewidth = 2) +
+    scale_color_manual(values = color.values) +
+    theme_classic() +
+    ylab("Value [relative]")
+
+  return(plot)
+}
+
+plot_scenario(df = Reg_1A, color.values = colors, to.scale = c("kr", "Kr", "Kx", "radius"))
+plot_scenario(df = Reg_1B, color.values = colors, to.scale = c("kr", "Kr", "Kx", "radius", "kAQP"))
+plot_scenario(df = Reg_2, color.values = colors, to.scale = c("kr", "Kr", "Kx", "radius"))
+plot_scenario(df = Reg_3, color.values = colors, to.scale = c("kr", "Kr", "Kx"))
+```
+
+Plot all together
+
+```{r}
+Scenarios_df <- Reg_1A %>% mutate(Scenario = "S1A") %>% 
+  rbind(Reg_1B %>% mutate(Scenario = "S1B")) %>% 
+  rbind(Reg_2 %>% mutate(Scenario = "S2")) %>% 
+  rbind(Reg_3 %>% mutate(Scenario = "S3")) 
+
+for(i in c("kr", "Kr", "Kx", "kAQP", "radius")){
+  Scenarios_df[i] <- scale(Scenarios_df[i])
+}
+
+Scenarios_df <- Scenarios_df %>% 
+  gather(kr, Kr, Kx, radius, kAQP, key = Variable, value = Value)
+
+rect_data <- expand.grid(start = 0, end = 0, MS = c("T1", "T2"), Scenario = unique(Scenarios_df$Scenario))
+
+rect_data$start[rect_data$Scenario == "S1A" & rect_data$MS == "T1"] <- 1
+rect_data$end[rect_data$Scenario == "S1A" & rect_data$MS == "T1"]   <- 7
+rect_data$start[rect_data$Scenario == "S1A" & rect_data$MS == "T2"] <- 8
+rect_data$end[rect_data$Scenario == "S1A" & rect_data$MS == "T2"]   <- 30
+
+rect_data$start[rect_data$Scenario == "S1B" & rect_data$MS == "T1"] <- 1
+rect_data$end[rect_data$Scenario == "S1B" & rect_data$MS == "T1"]   <- 7
+rect_data$start[rect_data$Scenario == "S1B" & rect_data$MS == "T2"] <- 8
+rect_data$end[rect_data$Scenario == "S1B" & rect_data$MS == "T2"]   <- 30
+
+rect_data$start[rect_data$Scenario == "S2" & rect_data$MS == "T1"] <- 1
+rect_data$end[rect_data$Scenario == "S2" & rect_data$MS == "T1"]   <- 30
+rect_data$start[rect_data$Scenario == "S2" & rect_data$MS == "T2"] <- 0
+rect_data$end[rect_data$Scenario == "S2" & rect_data$MS == "T2"]   <- 0
+
+rect_data$start[rect_data$Scenario == "S3" & rect_data$MS == "T1"] <- 1
+rect_data$end[rect_data$Scenario == "S3" & rect_data$MS == "T1"]   <- 30
+rect_data$start[rect_data$Scenario == "S3" & rect_data$MS == "T2"] <- 0
+rect_data$end[rect_data$Scenario == "S3" & rect_data$MS == "T2"]   <- 0
+
+library(ggthemes)
+S_full_plot <- ggplot(data = Scenarios_df) +
+  
+  # From an idea of Théo M. Degand (UCLouvain, CCMN)
+  geom_rect(data = rect_data, 
+            aes(xmin = start, xmax = end, 
+                ymin = -Inf, ymax = Inf, 
+                fill = MS
+                ),
+    alpha = 0.2
+  ) +
+  
+  # Display curves
+  geom_line(aes(x = x, y = Value, 
+                color = Variable),
+            linewidth = 1) +
+  
+  scale_color_manual(values = colors) +
+  facet_wrap(~Scenario) +
+  ylab("Value [normalised]") +
+  xlab("Root age [d]") +
+  theme_few() 
+
+S_full_plot
+ggsave(plot = S_full_plot, filename = "plots/Scenarios_full.svg", device = "svg", width = 5, height = 5)
+```
+
+# Error bar plots
+
+Define data : In this chunk we
+
+1\) Create a dataframe where we store mean values and errors bars for constant kAQP == 4e-04
+
+2\) Apply Maturation Stages Timings
+
+```{r}
+kAQP_value <- unique(Data_Full$kAQP)[5]
+
+Data_EB <- data.frame()
+for(i in unique(Conductivities_processed$x)){
+  temp_cdt <- Conductivities_processed %>% filter(x == i & kAQP==kAQP_value)
+  for(j in unique(temp_cdt$Barrier_Name)){
+    # cat("x = ", i, " | Barrier_Name = ", j, "\n")
+    temp_df <- data.frame(x = i, 
+                          Barrier_Name = j,
+                          kr_mean = mean(temp_cdt$kr[temp_cdt$Barrier_Name == j]),
+                          kr_sd = sd(temp_cdt$kr[temp_cdt$Barrier_Name == j]),
+                          kr_median = median(temp_cdt$kr[temp_cdt$Barrier_Name == j]),
+                          kr_mad = mad(temp_cdt$kr[temp_cdt$Barrier_Name == j]),
+                          Kx_mean = mean(temp_cdt$Kx[temp_cdt$Barrier_Name == j]),
+                          Kx_sd = sd(temp_cdt$Kx[temp_cdt$Barrier_Name == j]),
+                          Kx_median = median(temp_cdt$Kx[temp_cdt$Barrier_Name == j]),
+                          Kx_mad = mad(temp_cdt$Kx[temp_cdt$Barrier_Name == j]),
+                          Kr_mean = mean(temp_cdt$Kr[temp_cdt$Barrier_Name == j]),
+                          Kr_sd = sd(temp_cdt$Kr[temp_cdt$Barrier_Name == j]),
+                          Kr_median = median(temp_cdt$Kr[temp_cdt$Barrier_Name == j]),
+                          Kr_mad = mad(temp_cdt$Kr[temp_cdt$Barrier_Name == j]))
+    Data_EB <- rbind(Data_EB, temp_df)
+  }
+}
+
+# ================================================================================
+Data_EB_timed = Data_EB %>% filter(Barrier_Name == "T1" & x <= 7)
+Data_EB_timed = rbind(Data_EB_timed, Data_EB%>% filter(Barrier_Name == "T2" & x <= 20 & x > 7))
+Data_EB_timed = rbind(Data_EB_timed, Data_EB%>% filter(Barrier_Name == "T3" & x > 20))
+# ================================================================================
+
+# timings :
+t0 <- c(0, 7)
+t1 <- c(8, 31)
+# t2 <- c(25, 30)
+
+m1 <- subset(Data_EB, 
+             Barrier_Name == "T1" & x >= t0[1] & x <= t0[2])
+m2 <- subset(Data_EB, 
+             Barrier_Name == "T2" & x >= t1[1] & x <= t1[2])
+# m3 <- subset(Data_EB,
+#              Barrier_Name == "T3" & x >= t2[1] & x <= t2[2])
+
+
+
+
+# MERGE
+Data_EB_MS <- rbind(m1, m2)
+# write_csv(m_full, "Data/m_full.csv")
+```
+
+## Fixed kAQP
+
+```{r}
+EB_kr <- ggplot(data = Data_EB_MS) + 
+  geom_point(aes(x = x, y = kr_median, color = Barrier_Name)) +
+  geom_errorbar(mapping=aes(x=x, ymin=kr_median-kr_mad, ymax=kr_median+kr_mad, color = Barrier_Name), 
+                width=0.5, 
+                linewidth=1,
+                alpha = 0.75) + 
+  # geom_line(aes(x = x, y = kr_median, color = Barrier)) +
+  # geom_smooth(aes(x = x, y = kr_median)) +
+  # ylim(2.5e-08, 1.2e-07) +
+  theme_test() +
+  ggtitle(expression(k[r] ~ "[" ~ 10^{8} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  theme_test() +
+  theme(axis.title.x=element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5))
+# ==============================================================================
+EB_Kx <- ggplot(data = Data_EB_MS) + 
+  geom_point(aes(x = x, y = ln(Kx_median), color = Barrier_Name)) +
+  geom_errorbar(mapping=aes(x=x, 
+                            ymin= ln(Kx_median - Kx_mad), 
+                            ymax= ln(Kx_median + Kx_mad), 
+                            color = Barrier_Name),
+                width=0.5,
+                linewidth=1,
+                alpha = 0.75) +
+  ggtitle(expression(ln(K[x]) ~ "[" ~ cm^{4} ~ hPa^{-1} ~ d^{-1} ~ "]")) +
+  theme_test() +
+  theme(axis.title.x=element_blank(),
+        axis.title.y=element_blank(),
+        plot.title = element_text(hjust = 0.5))
+# ==============================================================================
+EB_Kr <- ggplot(data = Data_EB_MS) + 
+  geom_point(aes(x = x, y = Kr_median, color = Barrier_Name)) +
+  geom_errorbar(mapping=aes(x=x, ymin=Kr_median-Kr_mad, ymax=Kr_median+Kr_mad, color = Barrier_Name), 
+                width=0.5, 
+                linewidth=1,
+                alpha = 0.75) + 
+  xlab("Age [d]")+
+  ggtitle(expression(K[r] ~ "[" ~ m^{3} ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  theme_test() +
+  theme(axis.title.x=element_blank(), 
+        legend.position = "bottom",
+        axis.title.y=element_blank(),
+        plot.title = element_text(hjust = 0.5))
+
+# ==============================================================================
+legend <- get_legend(EB_kr + theme(legend.title = element_blank()))
+# ==============================================================================
+
+EB_kr
+EB_Kx
+EB_Kr
+
+# ==============================================================================
+pg1 <- plot_grid(EB_kr + theme(legend.position = "none"),
+                 EB_Kx + theme(legend.position = "none"),
+                 EB_Kr + theme(legend.position = "none"),
+          align = 'v',
+          labels = 'auto',
+          ncol = 1)
+pg2 <- plot_grid(pg1 + 
+                   theme(plot.margin=unit(c(0,0,-4,0), "cm")), 
+                 legend,
+                 ncol = 1)
+```
+
+Export
+
+```{r, eval=F}
+svg("Plots/Error_Bar_Plots2.svg", height = 10, width = 3)
+pg2 
+dev.off()
+```
+
+## Full Plots
+
+```{r}
+treshold <- 31
+
+
+p_kr <- ggplot(data = Data_Full, aes(x = x, y = kr*10^8, color = kAQP*1e7)) +
+  geom_jitter(data = Data_Full%>%filter(Barrier_Name == "T1" & x < 7), 
+              alpha = 0.4, 
+              size = 2) +
+  geom_jitter(data = Data_Full%>%filter(Barrier_Name == "T2" & x >= 7 & x < treshold), 
+              alpha = 0.4,
+              size = 2) +
+  geom_jitter(data = Data_Full%>%filter(Barrier_Name == "T3" & x >= treshold), 
+              alpha = 0.4,
+              size = 2) +
+  scale_color_viridis() +
+  xlab("Age [d]") +
+  ylab("Radial Conductivity [cm d-1 MPa-1]") +
+  labs(color = "kAQP") +
+  theme_test() +
+  ggtitle(expression(k[r] ~ "[" ~ 10^{-8} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  theme(panel.background = element_rect(fill = "gray")) +
+    theme(axis.title.x=element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5))
+p_kr
+#===============================================================================
+p_Kx <- ggplot(data = Data_Full%>%
+                 filter(Barrier_Name == "T1" & kAQP == kAQP_value), aes(x = x, y = ln(Kx), color = radius)) +
+  geom_jitter() +
+  scale_color_viridis(option = "magma") +
+  xlab("Age [d]") +
+  theme_test() +
+  ggtitle(expression(ln(K[x]) ~ "[" ~ cm^{4} ~ hPa^{-1} ~ d^{-1} ~ "]")) +
+  theme(panel.background = element_rect(fill = "gray")) +
+  theme(axis.title.x=element_blank(),
+        axis.title.y=element_blank(),
+        plot.title = element_text(hjust = 0.5))
+p_Kx
+#===============================================================================
+p_Kr <- ggplot(data = Data_Full, 
+               aes(x = x, y = Kr*1e8, color = kAQP*1e7)) +
+  geom_jitter(data = Data_Full%>%filter(Barrier_Name == "T1" & x < 7), 
+              alpha = 0.4, 
+              size = 2) +
+  geom_jitter(data = Data_Full%>%filter(Barrier_Name == "T2" & x >= 7 & x < treshold), 
+              alpha = 0.4,
+              size = 2) +
+  geom_jitter(data = Data_Full%>%filter(Barrier_Name == "T3" & x >= treshold), 
+              alpha = 0.4,
+              size = 2) +
+  scale_color_viridis() +
+  xlab("Age [d]") +
+  labs(color = "kAQP") +
+  theme_test() +
+  ggtitle("Radial Kr with observed maturation timings") +
+  theme(panel.background = element_rect(fill = "gray")) +
+    ggtitle(expression(K[r] ~ "[" ~ 10^{-8} ~ m^{3} ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  theme(legend.position = "right",
+        # axis.title.x=element_blank(), 
+        axis.title.y=element_blank(),
+        plot.title = element_text(hjust = 0.5)) 
+p_Kr
+
+```
+
+```{r, eval = F}
+svg("Plots/Points_Plots_full.svg", height = 3, width = 12)
+plot_grid(p_kr, p_Kx, p_Kr,
+          align = 'h',
+          labels = 'auto',
+          ncol = 3)
+dev.off()
+
+png("Plots/Points_Plots_full.png", height = 3, width = 12, units = "in", res = 300)
+plot_grid(p_kr, p_Kx, p_Kr,
+          align = 'h',
+          labels = 'auto',
+          ncol = 3)
+dev.off()
+```

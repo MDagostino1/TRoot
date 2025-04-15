@@ -588,15 +588,15 @@ extract_conds <- function(output_path = "MECHA/Projects/granar/out/Tomato/Root/P
   Kx_5 <- as.double(strsplit(output_5[7,], " ")[[1]][5])
   Kx_6 <- as.double(strsplit(output_6[7,], " ")[[1]][5])
   #===============================================================================
-  Kr_0 <- as.double(strsplit(output_0[8,], " ")[[1]][4])
-  Kr_1 <- as.double(strsplit(output_1[8,], " ")[[1]][4])
-  Kr_5 <- as.double(strsplit(output_5[8,], " ")[[1]][4])
-  Kr_6 <- as.double(strsplit(output_6[8,], " ")[[1]][4])
+  kr_0 <- as.double(strsplit(output_0[8,], " ")[[1]][4])
+  kr_1 <- as.double(strsplit(output_1[8,], " ")[[1]][4])
+  kr_5 <- as.double(strsplit(output_5[8,], " ")[[1]][4])
+  kr_6 <- as.double(strsplit(output_6[8,], " ")[[1]][4])
   #===============================================================================
   peri <- as.double(strsplit(output_0[6,], " ")[[1]][3])
   #===============================================================================
   Conductivities <- data.frame(Barrier = c("b0", "b1", "b5", "b6"),
-                               Kr = c(Kr_0, Kr_1, Kr_5, Kr_6),
+                               kr = c(kr_0, kr_1, kr_5, kr_6),
                                Kx = c(Kx_0, Kx_1, Kx_5, Kx_6),
                                perimeter = c(peri))
   
@@ -626,19 +626,19 @@ extract_conds2 <- function(output_path = "MECHA/Projects/granar/out/Tomato/Root/
   Kx_6 <- as.double(strsplit(output_6[7,], " ")[[1]][5])
   Kx_7 <- as.double(strsplit(output_7[7,], " ")[[1]][5])
   #===============================================================================
-  Kr_0 <- as.double(strsplit(output_0[8,], " ")[[1]][4])
-  Kr_1 <- as.double(strsplit(output_1[8,], " ")[[1]][4])
-  Kr_2 <- as.double(strsplit(output_2[8,], " ")[[1]][4])
-  Kr_3 <- as.double(strsplit(output_3[8,], " ")[[1]][4])
-  Kr_4 <- as.double(strsplit(output_4[8,], " ")[[1]][4])
-  Kr_5 <- as.double(strsplit(output_5[8,], " ")[[1]][4])
-  Kr_6 <- as.double(strsplit(output_6[8,], " ")[[1]][4])
-  Kr_7 <- as.double(strsplit(output_7[8,], " ")[[1]][4])
+  kr_0 <- as.double(strsplit(output_0[8,], " ")[[1]][4])
+  kr_1 <- as.double(strsplit(output_1[8,], " ")[[1]][4])
+  kr_2 <- as.double(strsplit(output_2[8,], " ")[[1]][4])
+  kr_3 <- as.double(strsplit(output_3[8,], " ")[[1]][4])
+  kr_4 <- as.double(strsplit(output_4[8,], " ")[[1]][4])
+  kr_5 <- as.double(strsplit(output_5[8,], " ")[[1]][4])
+  kr_6 <- as.double(strsplit(output_6[8,], " ")[[1]][4])
+  kr_7 <- as.double(strsplit(output_7[8,], " ")[[1]][4])
   #===============================================================================
   peri <- as.double(strsplit(output_0[6,], " ")[[1]][3])
   #===============================================================================
   Conductivities <- data.frame(Barrier = c("b0", "b1", "b2", "b3", "b4", "b5", "b6", "b7"),
-                               Kr = c(Kr_0, Kr_1, Kr_2, Kr_3, Kr_4, Kr_5, Kr_6, Kr_7),
+                               kr = c(kr_0, kr_1, kr_2, kr_3, kr_4, kr_5, kr_6, kr_7),
                                Kx = c(Kx_0, Kx_1, Kx_2, Kx_3, Kx_4, Kx_5, Kx_6, Kx_7),
                                perimeter = c(peri))
   
@@ -690,6 +690,7 @@ set_conductivities <- function(Conductivities,
   #==========================================================================
   # Convert Kr from cm hPa-1 d to m s-1 Mpa-1
   # cm HPa-1 d-1 = 0.01m * (100 * 10-6 MPa)-1 * (24*60*60 s)-1
+  # m MPa-1 s-1  = 0.01 cm * (1e-4)^-1 * (24*60*60)^-1
   # conv_kr <- 0.01 * (100 * 1e-06)^-1 * (24*60*60)^-1
   Conductivities$kr <- Conductivities$Kr * conv_kr
   
@@ -991,16 +992,16 @@ run_mecha <- function(output_path = "MECHA/Projects/granar/out/Tomato/Root/Proje
       Kx_8 <- as.double(strsplit(output_8[7,], " ")[[1]][5])
       Kx_9 <- as.double(strsplit(output_9[7,], " ")[[1]][5])
       #===============================================================================
-      Kr_0 <- as.double(strsplit(output_0[8,], " ")[[1]][4])
-      Kr_1 <- as.double(strsplit(output_1[8,], " ")[[1]][4])
-      Kr_2 <- as.double(strsplit(output_2[8,], " ")[[1]][4])
-      Kr_3 <- as.double(strsplit(output_3[8,], " ")[[1]][4])
-      Kr_4 <- as.double(strsplit(output_4[8,], " ")[[1]][4])
-      Kr_5 <- as.double(strsplit(output_5[8,], " ")[[1]][4])
-      Kr_6 <- as.double(strsplit(output_6[8,], " ")[[1]][4])
-      Kr_7 <- as.double(strsplit(output_7[8,], " ")[[1]][4])
-      Kr_8 <- as.double(strsplit(output_8[8,], " ")[[1]][4])
-      Kr_9 <- as.double(strsplit(output_9[8,], " ")[[1]][4])
+      kr_0 <- as.double(strsplit(output_0[8,], " ")[[1]][4])
+      kr_1 <- as.double(strsplit(output_1[8,], " ")[[1]][4])
+      kr_2 <- as.double(strsplit(output_2[8,], " ")[[1]][4])
+      kr_3 <- as.double(strsplit(output_3[8,], " ")[[1]][4])
+      kr_4 <- as.double(strsplit(output_4[8,], " ")[[1]][4])
+      kr_5 <- as.double(strsplit(output_5[8,], " ")[[1]][4])
+      kr_6 <- as.double(strsplit(output_6[8,], " ")[[1]][4])
+      kr_7 <- as.double(strsplit(output_7[8,], " ")[[1]][4])
+      kr_8 <- as.double(strsplit(output_8[8,], " ")[[1]][4])
+      kr_9 <- as.double(strsplit(output_9[8,], " ")[[1]][4])
       #===============================================================================
       peri <- as.double(strsplit(output_0[6,], " ")[[1]][3])
       print("     Success of MECHA execution. Saving data...")
@@ -1008,7 +1009,7 @@ run_mecha <- function(output_path = "MECHA/Projects/granar/out/Tomato/Root/Proje
       # Save conductivities
       Conds <- data.frame(Name = temp_name2,
                            Barrier = c("b0", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9"),
-                           Kr = c(Kr_0, Kr_1, Kr_2, Kr_3, Kr_4, Kr_5, Kr_6, Kr_7, Kr_8, Kr_9),
+                           kr = c(kr_0, kr_1, kr_2, kr_3, kr_4, kr_5, kr_6, kr_7, kr_8, kr_9),
                            Kx = c(Kx_0, Kx_1, Kx_2, Kx_3, Kx_4, Kx_5, Kx_6, Kx_7, Kx_8, Kx_9),
                            perimeter = peri)
       
