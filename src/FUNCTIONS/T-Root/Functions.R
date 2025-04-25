@@ -1,6 +1,3 @@
-# update : 21/11/2022 ; update extract parenchyma (diameter = 2x radius), code transform_param
-# Add :    07/01/2023 ; add anatomy_plot()
-
 #===============================================================================
 #===============================================================================
 
@@ -357,77 +354,6 @@ extract_ids <- function(list, i){
 #===============================================================================
 #===============================================================================
 
-nice_boxplot1 <- function(data, X, Y, Z){
-  # @data = a dataframe
-  # @X = variable x        (ex : data$plant_id)
-  # @Y = variable y        (ex : data$length)
-  # @Z = variable to group (ex : data$genotype)
-  
-  g <- data %>% ggplot(aes(x = X, y = Y)) +
-    geom_point() +
-    geom_boxplot() +
-    
-    #facet_wrap(~ Z) +
-    
-    theme_bw()
-  return(g)
-  
-}
-
-
-#===============================================================================
-#===============================================================================
-
-nice_boxplot2 <- function(data = data, X = x, Y = y, Z = z){
-  
-  
-  g <- ggplot(data, aes(x=X, y=Y, fill=Z)) +
-    
-    geom_boxplot() +
-    
-    scale_fill_viridis(discrete = TRUE, alpha=0.6) + # Colors
-    geom_jitter(color="black", size=0.4, alpha=0.9) + # Add points
-    
-    # Theme params
-    theme(
-      legend.position="none",
-      plot.title = element_text(size=11)
-    ) +
-    
-    theme_bw() +
-    theme(axis.line = element_line(color='black'),
-          
-          # Remove grid
-          plot.background = element_blank(),
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          
-          # Change font
-          text = element_text(family = "A"),
-          
-          # Remove x ticks
-          #axis.text.x=element_blank(),
-          #axis.ticks.x=element_blank(),
-          
-          # Remove legend title
-          #legend.title=element_blank()
-          
-          # Remove legend
-          legend.position="none"
-          
-          # Remove panel borders
-          #panel.border = element_blank()
-          
-          
-    )
-  
-  return(g)}
-
-
-
-#===============================================================================
-#===============================================================================
-
 # Make a list of all files names
 Merge_Quantifications <- function(q_path){
   
@@ -676,10 +602,13 @@ remove_outliers <- function(data, threshold = 2) {
 #===============================================================================
 
 set_conductivities <- function(Conductivities, 
-                               conv_kr = 0.001157407,
-                               conv_kx = 1.157407e-09,
-                               threshold = 3, Barriers = NULL){
-  
+                               conv_kr   = 0.001157407,
+                               conv_kx   = 1.157407e-09,
+                               threshold = 3, 
+                               Barriers  = NULL){
+
+  #' Process and transform conductivities extracted from GRANAR-MECHA pipeline.
+    
   if(is.null(Barriers)){
     stop("Please set Barriers.")
   }
@@ -721,234 +650,142 @@ set_conductivities <- function(Conductivities,
 #===============================================================================
 #===============================================================================
 
-# # Set Conductivities for Monocot MS
-# set_conductivities_mono <- function(Conductivities, threshold = 3){
-#   
-#   colnames(Conductivities)[c(1,2)] <- c("root", "x")
-#   # Virtual_Roots <- merge(x = Virtual_Roots, y = Parameters[,c(1,2,3)])
-#   
-#   #==========================================================================
-#   # Convert Kr from cm hPa-1 d to m s-1 Mpa-1
-#   # cm HPa-1 d-1 = 0.01m * (100 * 10-6 MPa)-1 * (24*60*60 s)-1
-#   conv <- 0.01 * (100 * 1e-06)^-1 * (24*60*60)^-1
-#   Conductivities$kr <- Conductivities$Kr * conv
-#  
-#   Conductivities$radius <- 10*Conductivities$perimeter/(2*pi) # cm -> mm
-#   Conductivities$Kr <- Conductivities$kr * Conductivities$perimeter * 1e-3 # because radius is in mm and kr in m...
-#   
-#   # Convert Kx from cm4 hPa-1 d-1 to m4 MPa-1 s-1
-#   Conductivities$Kx <- 1e-8 * 1e4 * (1/86400) * Conductivities$Kx  
-#   
-#   # Convert kAQP from cm hPa-1 d-1 to m MPa-1 s-1
-#   Conductivities$kAQP <- (0.01 / (1e-4 * 24 * 60 * 60)) * Conductivities$kAQP
-#   #==========================================================================
-#   
-#   # Apply remove outliers : change threshold
-#   Conductivities <- remove_outliers(Conductivities,
-#                                     threshold =  threshold)
-#   
-#   # ALL CONDUCTIVITIES
-#   # Conductivities <- Conductivities %>% filter(Barrier == "b1" | Barrier == "b2" | Barrier == "b3" | Barrier == "b4" | Barrier == "b5" | Barrier == "b6" | Barrier == "b7")
-#   # Conductivities2 <- Conductivities
-#   # Conductivities2$x <- as.factor(Conductivities2$x)
-#   
-#   # ONLY TOMATO BARRIERS
-#   Conductivities_mono <- Conductivities %>% filter(Barrier == "b1" | Barrier == "b3" | Barrier == "b4")
-#   # Conductivities_dico2 <- Conductivities_dico
-#   # Conductivities_dico2$x <- as.factor(Conductivities_dico2$x)
-#   
-#   return(Conductivities_mono)
-#   
-# }
-
-#===============================================================================
-#===============================================================================
-
-# Function that return a radius from a age input. Age = value or vector, b1 is the mean of the first part of the curve, b2 and a are parameters of the regression of the second part.
-radius <- function(age,
-                    timing = c(7, 25),
-                    b1 = 0.1887, 
-                    b2 = -7.94, 
-                    a = 0.245){
+radius.lm <- function(x,
+                   timing     = c(7, 25),
+                   radius.min = 0.1887, 
+                   radius.max = 1,
+                   a1         = -7.94, 
+                   a2          = 0.245
+                   ){
   
-  # radiusDF <- data.frame()
+  #' Return radius as linear function of age, timing and linear parameters
+  #' @param x The age of the segment, or a vector of ages
+  #' @param timing A vector containing 2 values of timing : first value is end of T1, second value is the begining of secondary growth
+  #' @param b1 Default value of radius.
+  #' @param b2 Parametric value of the exponential prediction.
+  #' @param a Parametric value of the exponential prediction.
   
-  if(age < timing[2]){
-    temp_radius = b1
-  }else{
-    temp_radius = exp(b2+a*(age + 25-timing[2]))
-    if(temp_radius < b1){
-      temp_radius <- b1
+  radius.vec <- c()
+  for(xi in x){
+    if(xi < timing[2]){
+      temp_radius = radius.min
+    }else{
+      temp_radius = exp(a1 + a2*(xi + 25-timing[2]))
+      
+      # Security Checks
+      if(temp_radius < radius.min){
+        temp_radius <- radius.min
+      }
+      if(temp_radius > radius.max){
+        temp_radius <- radius.max
+      }
     }
+    radius.vec <- c(radius.vec, temp_radius)
   }
   
-  if(temp_radius > 1){
-    temp_radius = 1
-  }
-  return(temp_radius)
+  return(radius.vec)
 }
 
 #===============================================================================
 #===============================================================================
 
-radius_reg <- function(x_vec, timing = c(7, 25)){
-  # x is a vector of absiscis
-  y <- c()
-  for(xi in x_vec){
-    #==============================
-    # yi <- radial_reg(xi, timing = c(7,25), coefficients = kr_coef)
-    yi <- radius(xi, timing = timing)
-    # print(yi)
-    #==============================
-    y <- c(y, yi)
-  }
-  return(y)
-}
-
-#===============================================================================
-#===============================================================================
-
-# Simple computation of the linear regression of kr
-kr_reg <- function(x, MS, kAQP, radius, coef){
+Kx.lm <- function(x, 
+                  radius, 
+                  coefficients,
+                  Kx.min = 1.8e-11,
+                  Kx.max = 1.0e-4
+                  ){
   
-  if(MS == "M1"){
-    kr <- coef$a + coef$x*x + coef$r*radius + (coef$kAQP)*kAQP 
+  Kx <- exp(coefficients$a + coefficients$x*x + coefficients$r*radius)
+  
+  
+  # Security Checks
+  if(Kx > Kx.max){
+    Kx <- Kx.max
+  }
+  if(Kx < Kx.min){
+    Kx <- Kx.min
   }
   
-  else if(MS == "M2"){
-    kr <- coef$a + coef$x*x + coef$r*radius + (coef$kAQP + coef$M2_kAQP)*kAQP + coef$M2
-  }
-  
-  else if(MS == "M3"){
-    kr <- coef$a + coef$x*x + coef$r*radius + (coef$kAQP + coef$M3_kAQP)*kAQP + coef$M3
-  }
-  
-  # First maturation stage : barier = b5
-  else if(MS == "T1"){
-    kr <- coef$a + coef$x*x + coef$r*radius + (coef$kAQP + coef$T1_kAQP)*kAQP + coef$T1
-  }
-  # Second maturation stage : barrier = b6
-  else if (MS == "T2"){
-    kr <- coef$a + coef$x*x + coef$r*radius + (coef$kAQP + coef$T2_kAQP)*kAQP + coef$T2
-  }
-  # Third maturation stage : barrier  = b4
-  else if (MS == "T3"){
-    kr <- coef$a + coef$x*x + coef$r*radius + (coef$kAQP + coef$T3_kAQP)*kAQP + coef$T3
-  }
-  else{print("error in x")}
-  
-  return(kr)
-  
-}
-
-#===============================================================================
-#===============================================================================
-
-Kx_reg <- function(x, radius, xms=0, coef){
-  if(xms==0){
-    coef$xms <- 0
-  }
-  Kx <- exp(coef$a + coef$x*x + coef$r*radius + coef$xms*xms)
   return(Kx)
 }
 
 #===============================================================================
 #===============================================================================
 
-# Same function as kr_reg but take x, kAQP and coefficients into input
-radial_reg <- function(x, 
-                       radius = NULL,
-                       timing = c(7, 25),
-                       kAQP = 1e-04,
-                       coefficients
-                       )
-  {
+kr.lm <- function(x, 
+                  MS,
+                  radius,
+                  timing = c(7, 25),
+                  kAQP   = 1e-04,
+                  coefficients,
+                  kr.min = 1e-16,
+                  kr.max = 1e-3
+                  ){
   
-  # Prerequire radius_reg()
-  if(is.null(radius)){
-    radius <- radius_reg(x, timing = timing)
-  }  
-  # print(radius)
-  # kAQP <- 1e-04
+  #' Compute radial conductivity kr as a linear function of radius, kAQP and Maturation Stages
   
-  a_coef <- coefficients$a
-  x_coef <- coefficients$x
-  r_coef <- coefficients$r
-  T2_coef <- coefficients$T2
-  T3_coef <- coefficients$T3
-  kAQP_coef <- coefficients$kAQP
-  T2kAQP_coef <- coefficients$T2kAQP
-  T3kAQP_coef <- coefficients$T3kAQP
+  if(MS == "M1"){
+    kr <- coefficients$a + coefficients$x*x + coefficients$r*radius + (coefficients$kAQP)*kAQP 
+  }
+  
+  else if(MS == "M2"){
+    kr <- coefficients$a + coefficients$x*x + coefficients$r*radius + (coefficients$kAQP + coefficients$M2_kAQP)*kAQP + coefficients$M2
+  }
+  
+  else if(MS == "M3"){
+    kr <- coefficients$a + coefficients$x*x + coefficients$r*radius + (coefficients$kAQP + coefficients$M3_kAQP)*kAQP + coefficients$M3
+  }
   
   # First maturation stage : barier = b5
-  if(x <= timing[1]){
-    c_i <- a_coef + x_coef*x + r_coef*radius + kAQP_coef*kAQP
+  else if(MS == "T1"){
+    kr <- coefficients$a + coefficients$x*x + coefficients$r*radius + (coefficients$kAQP + coefficients$T1_kAQP)*kAQP + coefficients$T1
   }
   # Second maturation stage : barrier = b6
-  else if (x > timing[1] & x <= timing[2]){
-    c_i <- a_coef + x_coef*x + r_coef*radius + (kAQP_coef+T2kAQP_coef)*kAQP + T2_coef
+  else if (MS == "T2"){
+    kr <- coefficients$a + coefficients$x*x + coefficients$r*radius + (coefficients$kAQP + coefficients$T2_kAQP)*kAQP + coefficients$T2
   }
   # Third maturation stage : barrier  = b4
-  else if (x > timing[2]){
-    c_i <- a_coef + x_coef*x + r_coef*radius + (kAQP_coef+T3kAQP_coef)*kAQP + T3_coef
+  else if (MS == "T3"){
+    kr <- coefficients$a + coefficients$x*x + coefficients$r*radius + (coefficients$kAQP + coefficients$T3_kAQP)*kAQP + coefficients$T3
   }
   else{print("error in x")}
   
-  if(c_i <= 2e-08){
-    c_i <- 2e-08
+  # print(kr)
+  
+  # Security Checks
+  if(kr > kr.max){
+    kr <- kr.max
+  }
+  if(kr < kr.min){
+    kr <- kr.min
   }
   
-  return(c_i)
-  
+  return(kr)
 }
 
 #===============================================================================
 #===============================================================================
-
-axial_reg <- function(x, 
-                      coefficients,
-                      radius= NULL,
-                      timing = c(7, 25)){
-  
-  a <- coefficients$a
-  b <- coefficients$x
-  c <- coefficients$r
-  
-  if(is.null(radius)){
-    radius <- radius_reg(x, timing = timing)
-  }
-  kx <- exp(a + b*(x+25-timing[2]) + c*radius)
-  
-  if(kx > 1){
-    kx <- 1
-  }
-  
-  return(kx)
-}
-
-
-#===============================================================================
-#===============================================================================
-
-radial_conductance_reg <- function(x, MS, kAQP, radius){
-    
-    # First maturation stage : barier = b5
-    if(MS == "T1"){
-      Kr <- 1.722e-09 + 1.481e-10*x - 1.478e-08*radius + 9.561e-06*kAQP
-    }
-    # Second maturation stage : barrier = b6
-    else if (MS == "T2"){
-      Kr <- 1.722e-09 + 1.481e-10*x - 1.478e-08*radius + (9.561e-06 -3.848e-06)*kAQP -4.269e-10
-    }
-    # Third maturation stage : barrier  = b4
-    else if (MS == "T3"){
-      Kr <- 1.722e-09 + 1.481e-10*x - 1.478e-08*radius + (9.561e-06 -7.508e-06)*kAQP -1.595e-09 
-    }
-    else{print("error in x")}
-    
-    return(Kr)
-    
-}
+# 
+# radial_conductance_reg <- function(x, MS, kAQP, radius){
+#     
+#     # First maturation stage : barier = b5
+#     if(MS == "T1"){
+#       Kr <- 1.722e-09 + 1.481e-10*x - 1.478e-08*radius + 9.561e-06*kAQP
+#     }
+#     # Second maturation stage : barrier = b6
+#     else if (MS == "T2"){
+#       Kr <- 1.722e-09 + 1.481e-10*x - 1.478e-08*radius + (9.561e-06 -3.848e-06)*kAQP -4.269e-10
+#     }
+#     # Third maturation stage : barrier  = b4
+#     else if (MS == "T3"){
+#       Kr <- 1.722e-09 + 1.481e-10*x - 1.478e-08*radius + (9.561e-06 -7.508e-06)*kAQP -1.595e-09 
+#     }
+#     else{print("error in x")}
+#     
+#     return(Kr)
+#     
+# }
 
 #===============================================================================
 #===============================================================================

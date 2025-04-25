@@ -9,59 +9,36 @@ if(dir.exists(path.out)){
 # LOAD CONDUCTIVITIES SCENARIOS
 # ==============================================================================
 
-# Convert m[4]*s-1*MPa-1 back to cm[4]*d-1*HPa-1
-df            <- Conds.tot %>% filter(Scenario_ID == Scenario_ID_i) # TO CHANGE ; HERE WE SELECT ONLY THE SCENARIO IN INPUT
-df$kr         <- df$kr/conv_kr
-df$Kx         <- df$Kx/conv_kx
-
-# Define root orders
-orders_df     <- tibble(order_id = c(1,2,3), 
-                        order    = c("Taproot", 
-                                     "Lateral", 
-                                     "LongLateral")
-                        )
-
-# Create Conds.conv
-Conds.conv           <- df[c("x", "kr", "Kx")] 
-colnames(Conds.conv) <- c("x", "kr", "kx")
-Conds.conv           <- Conds.conv %>% gather(kr, kx, key = "type", value = "y")
-Conds.conv           <- merge(Conds.conv, orders_df)
-Conds.conv$id        <- seq(1, nrow(Conds.conv))
-Conds.conv           <- Conds.conv[c("order_id", "order", "x", "type", "y", "id")]
-Conds.conv           <- rbind(Conds.conv, Conds.conv %>% filter(x == 1) %>% mutate(x = 0)) # Add a zero x
-
-# Plot of conductivities
-data2plot <- Conds.conv
-data2plot$y[data2plot$type == "kr"] <- data2plot$y[data2plot$type == "kr"]/max(data2plot$y[data2plot$type == "kr"])
-data2plot$y[data2plot$type == "kx"] <- data2plot$y[data2plot$type == "kx"]/max(data2plot$y[data2plot$type == "kx"])
-
-cond_plot <- ggplot(data2plot) +
-  geom_point(aes(x = x, y = y, color = type)) +
-  geom_line(aes(x = x, y = y, color = type)) +
-  theme_classic()
+cond_plot <- ggplot(Conds, aes(x = x, y = y, color = type, group = order_id)) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(~type, ncol=1, scales = "free_y") +
+  theme_few()
 
 cond_plot
-ggsave(filename = paste0(Sim_ID, "_Conds.svg"), plot = cond_plot, device = "svg", path = path.out, 
-       width = 4, height = 3)
+ggsave(filename = paste0(S_ID, "_Conds.svg"), 
+       plot = cond_plot, device = "svg", 
+       path = path.out, 
+       width = 4, height = 4)
 
 # ==============================================================================
 # LOOP MARSHAL
 # ==============================================================================
 
 # MARSHAL PARAMETERS
-conds          <- Conds.conv
-# conds        <- read.csv("CRB-MARSHAL/inputs/conductivities3.csv")
 soil           <- read.csv(paste0(CRBM.path, "inputs/soil.csv"))
 
 # ============================================================================ #
-results <- run.MARSHAL.loop(RSA_list, 
-                            RSA.all, 
-                            Sim_ID = Sim_ID, 
-                            conds, 
-                            soil, 
-                            tmin = tmin, tmax = tmax, 
-                            step = it_length,            # Decomposition of RSA timing 
-                            timing1 = SG_timing_1, timing2 = SG_timing_2)   # SG timing
+results <- run.MARSHAL.loop(RSA.all    = RSA.all, 
+                            Sim_ID     = S_ID, 
+                            conds      = Conds, 
+                            soil       = soil, 
+                            tmin       = tmin, 
+                            tmax       = tmax, 
+                            step       = it_length,            # Decomposition of RSA timing 
+                            SG_timing  = SG_timing,
+                            radius.min = rmin, 
+                            radius.max = rmax)   # SG timing
 # ============================================================================ #
 
 RSHA.all  <- results$RSHA.all
@@ -72,14 +49,11 @@ write.csv(Macro.all, paste0(path.out, "Macro_all.csv"), row.names = F)
 
 # Check SUF
 # ggplot(RSHA.all %>% filter(RSHA_id == RSHA.all$RSHA_id[-1])) +
-#   geom_point(aes(x = time, y = SUF, color = as.factor(branchID))) 
+#   geom_point(aes(x = time, y = SUF, color = type)) 
 
 # ==============================================================================
 # MAKE PLOTS
 # ==============================================================================
-# Load results by MARSHAL
-# RSHA.all  <- read.csv(paste0(path.out, "RSHA_all.csv"))
-# Macro.all <- read.csv(paste0(path.out, "Macro_all.csv"))
 plot.path <- paste0(path.out, "plots/")
 
 # Create folder for the Scenario
@@ -109,7 +83,7 @@ img_list     <- lapply(paste0(plot.path, img), image_read)
 img_join     <- image_join(img_list)
 img_animated <- image_animate(img_join, delay = gif.delay)
 image_write(image = img_animated,
-            path = paste0(path.out, Sim_ID, "_animation.gif"))
+            path = paste0(path.out, S_ID, "_animation.gif"))
 
 # ==============================================================================
 # ANALYSE SUF
@@ -118,7 +92,7 @@ image_write(image = img_animated,
 RSHA.all$type <- as.factor(RSHA.all$type)
 
 data2plot <- RSHA.all %>% filter(age == tmax) %>% 
-  mutate(zr = round(z1)) %>% 
+  mutate(zr = round(z1))%>% 
   group_by(RSHA_id, zr, type) %>% 
   summarise(SUF_sum = sum(SUF)) 
 
@@ -157,6 +131,6 @@ SUF_plot <- ggplot(data2plot2) +
   ylab("Standart Uptake Fraction [-]") +
   theme_bw()
 
-ggsave(filename = paste0(Sim_ID, "_SUF.svg"), plot = SUF_plot, device = "svg", path = path.out, 
+ggsave(filename = paste0(S_ID, "_SUF.svg"), plot = SUF_plot, device = "svg", path = path.out, 
        width = 4, height = 4)
 

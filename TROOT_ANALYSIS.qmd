@@ -130,17 +130,17 @@ Combinations    <- unique(data_full1[c("root", "x", "kAQP", "Barrier_Name")]) %>
   mutate(Combination_ID = paste0(root, "_", x, "_", kAQP, "_", Barrier_Name))
 
 # Isolate Kr, Kx, kr, radius per COmbination_ID
-data_full2 <- left_join(data_full1, Combinations)
-data_full2 <- unique(data_full2[c("Kr", "Kx", "kr", "radius", "Combination_ID")])
+data_full2      <- left_join(data_full1, Combinations)
+data_full2      <- unique(data_full2[c("Kr", "Kx", "kr", "radius", "Combination_ID")])
 
 # Isolate parameters per Combination_ID
-data_full3 <- left_join(data_full1, Combinations)
-data_full3 <- unique(data_full3[c("Combination_ID", "param_id", "y")])
-data_full3 <- data_full3 %>% spread(key = param_id, value = y)
+data_full3      <- left_join(data_full1, Combinations)
+data_full3      <- unique(data_full3[c("Combination_ID", "param_id", "y")])
+data_full3      <- data_full3 %>% spread(key = param_id, value = y)
 
 # Join both
-data_final <- left_join(data_full2, data_full3)
-data_final <- left_join(data_final, Combinations)
+data_final      <- left_join(data_full2, data_full3)
+data_final      <- left_join(data_final, Combinations)
 
 # Export final database
 write.csv(data_final, "Data/DATA_FULL_FINAL.csv", row.names = F)
@@ -604,15 +604,15 @@ emmeans(lm_kr0, specs = pairwise ~ Barrier_Name:kAQP)
 
 ```{r}
 # IN CASE OF ALL DEPOSITION LEVELS
-coefficients_kr <- tibble(a = lm_kr0$coefficients[1],
-                          x = lm_kr0$coefficients[2],
-                          r = lm_kr0$coefficients[3],
-                          M2 = lm_kr0$coefficients[4],
-                          M3 = lm_kr0$coefficients[5],
-                          T1 = lm_kr0$coefficients[6],
-                          T2 = lm_kr0$coefficients[7],
-                          T3 = lm_kr0$coefficients[8],
-                          kAQP = lm_kr0$coefficients[9],
+coefficients_kr <- tibble(a       = lm_kr0$coefficients[1],
+                          x       = lm_kr0$coefficients[2],
+                          r       = lm_kr0$coefficients[3],
+                          M2      = lm_kr0$coefficients[4],
+                          M3      = lm_kr0$coefficients[5],
+                          T1      = lm_kr0$coefficients[6],
+                          T2      = lm_kr0$coefficients[7],
+                          T3      = lm_kr0$coefficients[8],
+                          kAQP    = lm_kr0$coefficients[9],
                           M2_kAQP = lm_kr0$coefficients[10],
                           M3_kAQP = lm_kr0$coefficients[11],
                           T1_kAQP = lm_kr0$coefficients[12],
@@ -639,11 +639,13 @@ kr_reg_df <- Data_Full[c("kr", "Combination_ID", "x", "radius", "Barrier_Name", 
 kr_reg_df$kr_reg <- NaN
 
 for(i in 1:nrow(kr_reg_df)){
-  kr_reg_df$kr_reg[i] <- kr_reg(x = kr_reg_df$x[i], 
-                                MS = kr_reg_df$Barrier_Name[i]
-                                , kAQP = kr_reg_df$kAQP[i]
-                                , radius = kr_reg_df$radius[i]
-                                , coef = coefficients_kr)
+  
+  kr_reg_df$kr_reg[i] <- kr.lm(x            = kr_reg_df$x[i],
+                               radius       = kr_reg_df$radius[i], 
+                               MS           = kr_reg_df$Barrier_Name[i],
+                               timing       = c(7, 20), 
+                               kAQP         = kr_reg_df$kAQP[i], 
+                               coefficients = coefficients_kr)
 }
 
 cor <- cor.test(kr_reg_df$kr, kr_reg_df$kr_reg)
@@ -688,8 +690,8 @@ cat("alpha_T1 : ", (coefficients_kr$a)*1e8, "(x 10e-8) \n")
 cat("alpha_T2 : ", (coefficients_kr$a + coefficients_kr$T2)*1e8, "(x 10e-8) \n")
 cat("alpha_T3 : ", (coefficients_kr$a + coefficients_kr$T3)*1e8, "(x 10e-8) \n")
 cat("\n")
-cat("beta : ", (coefficients_kr$x)*1e8, "(x 10e-8) \n")
-cat("gamma : ", (coefficients_kr$r)*1e8, "(x 10e-8) \n")
+cat("beta     : ", (coefficients_kr$x)*1e8, "(x 10e-8) \n")
+cat("gamma    : ", (coefficients_kr$r)*1e8, "(x 10e-8) \n")
 cat("\n")
 cat("delta_T1 : ", (coefficients_kr$kAQP)*1e8*1e-06, "(x 10e-8 x 10e6) \n")
 cat("delta_T2 : ", (coefficients_kr$kAQP + coefficients_kr$T2_kAQP)*1e8*1e-6, "(x 10e-8 x 10e6) \n")
@@ -714,8 +716,8 @@ plot(Kx_lm)
 
 coefficients_Kx <- tibble(a   = Kx_lm$coefficients[1],
                           r   = Kx_lm$coefficients[2],
-                          x   = Kx_lm$coefficients[3],
-                          xms = Kx_lm$coefficients[4])
+                          x   = Kx_lm$coefficients[3])
+
 write.csv(coefficients_Kx, "./Data/Kx_coefficients.csv", row.names = F)
 ```
 
@@ -725,15 +727,26 @@ $$
 
 ```{r}
 cat("alpha = ", coefficients_Kx$a, "\n")
-cat("beta = ", coefficients_Kx$x, "\n")
+cat("beta  = ", coefficients_Kx$x, "\n")
 cat("gamma = ", coefficients_Kx$r, "\n")
 ```
 
 ```{r}
-Kx_reg <- Data_Full[c("Kx", "Combination_ID", "x", "radius", "xylem_max_size")] %>% 
-  mutate(Kx_reg = exp(coefficients_Kx$a + coefficients_Kx$r*radius + coefficients_Kx$x*x))
+Kx_reg_df <- Data_Full[c("Kx", "Combination_ID", "x", "radius", "xylem_max_size")] %>% 
+  mutate(Kx_reg = exp(coefficients_Kx$a + coefficients_Kx$r*radius + coefficients_Kx$x*x)) 
 
-ggplot(Kx_reg) +
+for(i in 1:nrow(Kx_reg)){
+  Kx_reg_df$Kx_reg[i] <- Kx.lm(x            = Kx_reg_df$x[i],
+                               radius       = Kx_reg_df$radius[i], 
+                               coefficients = coefficients_Kx)
+}
+
+cor <- cor.test(Kx_reg_df$Kx, Kx_reg_df$Kx_reg)
+print(cor)
+Kx_test <- lm(data = Kx_reg_df, formula = Kx_reg~Kx)
+summary(Kx_test)
+
+ggplot(Kx_reg_df) +
   geom_point(aes(x = ln(Kx), y = ln(Kx_reg), color = x)) +
   geom_smooth(aes(x = ln(Kx), y = ln(Kx_reg)), method = "lm", color = "red") +
   coord_fixed() +
@@ -747,378 +760,7 @@ ggplot(Kx_reg) +
 # ==============================================================================
 ```
 
-# PREDICTION CURVES
 
-Here we build and plot conductivities curves that we will apply in MARSHAL.
-
-```{r}
-coefficients_kr <- read.csv("./Data/kr_coefficients.csv")
-coefficients_Kx <- read.csv("./Data/Kx_coefficients.csv")
-
-source("./src/FUNCTIONS/T-Root/Functions.R")
-```
-
-## Scenario 1A : SG + LC + sub_exo + kAQP_constant
-
-* Secondary Growth
-
-* LC + Sub in exo
-
-* Fixed kAQP
-
-```{r}
-# Create Reg2
-Reg_1A                     <- tibble(x = seq(1:30))
-Reg_1A$radius              <- radius_reg(Reg_1A$x)
-Reg_1A$radius[Reg_1A$x > 30] <- Reg_1A$radius[Reg_1A$x == 30]
-Reg_1A$MS                  <- 0
-Reg_1A$kAQP                <- mean(unique(Data_Full$kAQP)) 
-
-# Set maturation stages timing
-timing                       <- c(7, 31)
-Reg_1A$MS[Reg_1A$x <= timing[1]] <- "T1"
-Reg_1A$MS[Reg_1A$x>timing[1]&
-          Reg_1A$x<timing[2]]  <- "T2"
-Reg_1A$MS[Reg_1A$x >= timing[2]] <- "T3"
-
-Reg_1A$kr <- 0
-Reg_1A$Kx <- 0
-Reg_1A$Kr <- 0
-
-# Loop for each day
-for(i in 1:nrow(Reg_1A)){
-  Reg_1A$kr[Reg_1A$x == i] <- kr_reg(x = Reg_1A$x[i], 
-                                 MS = Reg_1A$MS[i], 
-                                 kAQP = Reg_1A$kAQP[i], 
-                                 radius = Reg_1A$radius[i], 
-                                 coef = coefficients_kr)
-  Reg_1A$Kx[Reg_1A$x == i] <- Kx_reg(x = Reg_1A$x[i], 
-                                 radius = Reg_1A$radius[i], 
-                                 coef = coefficients_Kx)
-}
-
-Reg_1A$Kr <- Reg_1A$kr * 2 *3.1415 * Reg_1A$radius/1000
-# 
-# Reg_1A$Kx[Reg_1A$x > 30] <- Reg_1A$Kx[Reg_1A$x == 30]
-
-write.csv(Reg_1A, "./Data/conds_scenarios/1A.csv")
-```
-
-```{r}
-Reg_plot <- ggplot(data = Reg_1A) +
-  geom_line(aes(x = x, y = kr*1e8), color = "red", linewidth = 1) +
-  geom_line(aes(x = x, y = Kx*1e9), color = "blue", linewidth = 1) +
-  geom_line(aes(x = x, y = Kr*1e11), color = "green", linewidth = 1) +
-  geom_line(aes(x = x, y = kAQP*1e7), color = "orange", linewidth = 1, linetype = 2) +
-  geom_line(aes(x = x, y = radius*1e1), color = "grey", linewidth = 1, linetype = 2) +
-  xlim(0, 30) +
-  ylim(0, 16) +
-  ylab("") +
-  theme_test()
-Reg_plot
-
-svg("plots/Conds_curves_1A.svg", width = 2, height = 2)
-Reg_plot
-dev.off()
-```
-
-## Scenario 1B : SG + LC + sub_exo + kAQP_decrease
-
-* Secondary Growth
-
-* LC + Sub in exo
-
-* Decreasing kAQP
-
-```{r}
-# Create kAQP function
-kAQP_fun <- function(x, th = 10, delta = 1, max = 1.16e-6,  min = 1.16e-7){
-  if(x < th){
-    kaqp <- max
-  }else{
-    kaqp <- max - delta*(x - th)*max 
-  }
-  
-  if(kaqp < min){
-    kaqp <- min
-    }
-  
-  return(kaqp)
-}
-
-# Create Reg_1B
-Reg_1B <- tibble(x = seq(1:30))
-Reg_1B$radius <- radius_reg(Reg_1B$x)
-Reg_1B$radius[Reg_1B$x > 30] <- Reg_1B$radius[Reg_1B$x == 30]
-Reg_1B$MS <- 0
-
-# Set maturation stages timing
-timing <- c(7, 31)
-Reg_1B$MS[Reg_1B$x <= timing[1]] <- "T1"
-Reg_1B$MS[Reg_1B$x > timing[1]]   <- "T2"
-
-Reg_1B$kr <- 0
-Reg_1B$Kx <- 0
-Reg_1B$Kr <- 0
-
-Reg_1B$kAQP <- sapply(Reg_1B$x, kAQP_fun, th = 10, delta = 0.05, max = 1.16e-6,  min = 0)
-
-# Loop for each day
-for(i in 1:nrow(Reg_1B)){
-  Reg_1B$kr[Reg_1B$x == i] <- kr_reg(x = Reg_1B$x[i], 
-                                 MS = Reg_1B$MS[i], 
-                                 kAQP = Reg_1B$kAQP[i], 
-                                 radius = Reg_1B$radius[i], 
-                                 coef = coefficients_kr)
-  Reg_1B$Kx[Reg_1B$x == i] <- Kx_reg(x = Reg_1B$x[i], 
-                                 radius = Reg_1B$radius[i], 
-                                 coef = coefficients_Kx)
-}
-
-Reg_1B$Kr <- Reg_1B$kr * 2 *3.1415 * Reg_1B$radius/1000
-# Reg_1B$Kx[Reg_1B$x > 30] <- Reg_1B$Kx[Reg_1B$x == 30]
-
-write.csv(Reg_1B, "./Data/conds_scenarios/1B.csv")
-# ==============================================================================
-
-Reg_plot <- ggplot(data = Reg_1B) +
-  geom_line(aes(x = x, y = kr*1e8), color = "red", linewidth = 1) +
-  geom_line(aes(x = x, y = Kx*1e9), color = "blue", linewidth = 1) +
-  geom_line(aes(x = x, y = Kr*5e10), color = "green", linewidth = 1) +
-  geom_line(aes(x = x, y = kAQP*1e7), color = "orange", linewidth = 1, linetype = 2) +
-  geom_line(aes(x = x, y = radius*1e1), color = "grey", linewidth = 1, linetype = 2) +
-  ylab("") +
-  xlim(0, 30) +
-  ylim(0, 16) +
-  theme_test()
-Reg_plot
-
-svg("plots/Conds_curves_1B.svg", width = 2, height = 2)
-Reg_plot
-dev.off()
-```
-
-## Scenario 2 : SG + LC + kAQP_constant
-
-Here we simulate the same root (with secondary growth), but with no exodermal suberization
-
-```{r}
-source("./src/FUNCTIONS/T-Root/Functions.R")
-# Create Reg_2
-Reg_2                     <- tibble(x = seq(1:30))
-Reg_2$radius              <- radius_reg(Reg_2$x)
-Reg_2$radius[Reg_2$x > 30] <- Reg_2$radius[Reg_2$x == 30]
-Reg_2$MS                  <- 0
-Reg_2$kAQP                <- mean(unique(Data_Full$kAQP)) 
-
-# Set maturation stages timing
-timing                       <- c(7, 31)
-Reg_2$MS <- "T1"
-# Reg_2$MS[Reg_2$x > timing[1]]  <- "T2"
-
-Reg_2$kr <- 0
-Reg_2$Kx <- 0
-Reg_2$Kr <- 0
-
-# Loop for each day
-for(i in 1:nrow(Reg_2)){
-  Reg_2$kr[Reg_2$x == i] <- kr_reg(x = Reg_2$x[i], 
-                                 MS = Reg_2$MS[i], 
-                                 kAQP = Reg_2$kAQP[i], 
-                                 radius = Reg_2$radius[i], 
-                                 coef = coefficients_kr)
-  Reg_2$Kx[Reg_2$x == i] <- Kx_reg(x = Reg_2$x[i], 
-                                 radius = Reg_2$radius[i], 
-                                 coef = coefficients_Kx)
-}
-
-Reg_2$Kr <- Reg_2$kr * 2 *3.1415 * Reg_2$radius/1000
-
-write.csv(Reg_2, "./Data/conds_scenarios/2.csv")
-# ==============================================================================
-
-Reg_plot <- ggplot(data = Reg_2) +
-  geom_line(aes(x = x, y = kr*1e8), color = "red", linewidth = 1) +
-  geom_line(aes(x = x, y = Kx*1e9), color = "blue", linewidth = 1) +
-  geom_line(aes(x = x, y = Kr*1e11), color = "green", linewidth = 1) +
-  geom_line(aes(x = x, y = kAQP*1e7), color = "orange", linewidth = 1, linetype = 2) +
-  geom_line(aes(x = x, y = radius*1e1), color = "grey", linewidth = 1, linetype = 2) +
-  xlim(0, 30) +
-  ylim(0, 16) +
-  ylab("") +
-  theme_test()
-Reg_plot
-
-svg("plots/Conds_curves_2.svg", width = 2, height = 2)
-Reg_plot
-dev.off()
-```
-
-## Scenario 3 : No secondary growth
-
-Finally, here we simulate root with NO secondary growth and NO exodermal suberization
-
-```{r}
-source("./src/FUNCTIONS/T-Root/Functions.R")
-# Create Reg_3
-Reg_3                     <- tibble(x = seq(1:30))
-Reg_3$radius              <- radius_reg(Reg_3$x[1]) # Keep radius constant
-Reg_3$MS                  <- 0
-Reg_3$kAQP                <- mean(unique(Data_Full$kAQP)) 
-
-# Set maturation stages timing
-timing                       <- c(7, 31)
-Reg_3$MS <- "T1"
-# Reg_3$MS[Reg_3$x > timing[1]]  <- "T2"
-
-Reg_3$kr <- 0
-Reg_3$Kx <- 0
-Reg_3$Kr <- 0
-
-# Loop for each day
-for(i in 1:nrow(Reg_3)){
-  Reg_3$kr[Reg_3$x == i] <- kr_reg(x = Reg_3$x[i], 
-                                 MS = Reg_3$MS[i], 
-                                 kAQP = Reg_3$kAQP[i], 
-                                 radius = Reg_3$radius[i], 
-                                 coef = coefficients_kr)
-  Reg_3$Kx[Reg_3$x == i] <- Kx_reg(x = Reg_3$x[i], 
-                                 radius = Reg_3$radius[i], 
-                                 coef = coefficients_Kx)
-}
-
-Reg_3$Kr <- Reg_3$kr * 2 *3.1415 * Reg_3$radius/1000
-# 
-# Reg_3$Kx[Reg_3$x > 30] <- Reg_3$Kx[Reg_3$x == 30]
-
-write.csv(Reg_3, "./Data/conds_scenarios/3.csv")
-# ==============================================================================
-
-Reg_plot <- ggplot(data = Reg_3) +
-  geom_line(aes(x = x, y = kr*1e8), color = "red", linewidth = 1) +
-  geom_line(aes(x = x, y = Kx*1e9), color = "blue", linewidth = 1) +
-  geom_line(aes(x = x, y = Kr*1e11), color = "green", linewidth = 1) +
-  geom_line(aes(x = x, y = kAQP*1e7), color = "orange", linewidth = 1, linetype = 2) +
-  geom_line(aes(x = x, y = radius*1e1), color = "grey", linewidth = 1, linetype = 2) +
-  xlim(0, 30) +
-  ylim(0, 16) +
-  ylab("") +
-  theme_test()
-Reg_plot
-
-svg("plots/Conds_curves_3.svg", width = 2, height = 2)
-Reg_plot
-dev.off()
-```
-
-## Plot all scenarios
-
-```{r}
-colors <- c("kAQP"   = "red", 
-            "kr"     = "blue", 
-            "Kx"     = "orange", 
-            "Kr"     = "lightblue4", 
-            "radius" = "grey"
-            )
-
-plot_scenario <- function(df, color.values, to.scale) {
-  # Scale the specified columns and gather them into long format
-  
-  data2plot <- df 
-  for(i in colnames(data2plot)){
-    if(i %in% to.scale){
-      data2plot[i] = scale(data2plot[i])
-    }else{
-      if(i %in% c("x", "MS")){
-        next
-      }else{
-        data2plot[i] = 0
-      }
-    }
-  }
-  
-  data2plot <- data2plot %>% gather(kr, Kr, Kx, kAQP, radius, key = Variable, value = Value)  
-  
-  # Create the plot
-  plot <- ggplot(data2plot) +
-    geom_line(aes(x = x, y = Value, color = Variable), 
-              linewidth = 2) +
-    scale_color_manual(values = color.values) +
-    theme_classic() +
-    ylab("Value [relative]")
-
-  return(plot)
-}
-
-plot_scenario(df = Reg_1A, color.values = colors, to.scale = c("kr", "Kr", "Kx", "radius"))
-plot_scenario(df = Reg_1B, color.values = colors, to.scale = c("kr", "Kr", "Kx", "radius", "kAQP"))
-plot_scenario(df = Reg_2, color.values = colors, to.scale = c("kr", "Kr", "Kx", "radius"))
-plot_scenario(df = Reg_3, color.values = colors, to.scale = c("kr", "Kr", "Kx"))
-```
-
-Plot all together
-
-```{r}
-Scenarios_df <- Reg_1A %>% mutate(Scenario = "S1A") %>% 
-  rbind(Reg_1B %>% mutate(Scenario = "S1B")) %>% 
-  rbind(Reg_2 %>% mutate(Scenario = "S2")) %>% 
-  rbind(Reg_3 %>% mutate(Scenario = "S3")) 
-
-for(i in c("kr", "Kr", "Kx", "kAQP", "radius")){
-  Scenarios_df[i] <- scale(Scenarios_df[i])
-}
-
-Scenarios_df <- Scenarios_df %>% 
-  gather(kr, Kr, Kx, radius, kAQP, key = Variable, value = Value)
-
-rect_data <- expand.grid(start = 0, end = 0, MS = c("T1", "T2"), Scenario = unique(Scenarios_df$Scenario))
-
-rect_data$start[rect_data$Scenario == "S1A" & rect_data$MS == "T1"] <- 1
-rect_data$end[rect_data$Scenario == "S1A" & rect_data$MS == "T1"]   <- 7
-rect_data$start[rect_data$Scenario == "S1A" & rect_data$MS == "T2"] <- 8
-rect_data$end[rect_data$Scenario == "S1A" & rect_data$MS == "T2"]   <- 30
-
-rect_data$start[rect_data$Scenario == "S1B" & rect_data$MS == "T1"] <- 1
-rect_data$end[rect_data$Scenario == "S1B" & rect_data$MS == "T1"]   <- 7
-rect_data$start[rect_data$Scenario == "S1B" & rect_data$MS == "T2"] <- 8
-rect_data$end[rect_data$Scenario == "S1B" & rect_data$MS == "T2"]   <- 30
-
-rect_data$start[rect_data$Scenario == "S2" & rect_data$MS == "T1"] <- 1
-rect_data$end[rect_data$Scenario == "S2" & rect_data$MS == "T1"]   <- 30
-rect_data$start[rect_data$Scenario == "S2" & rect_data$MS == "T2"] <- 0
-rect_data$end[rect_data$Scenario == "S2" & rect_data$MS == "T2"]   <- 0
-
-rect_data$start[rect_data$Scenario == "S3" & rect_data$MS == "T1"] <- 1
-rect_data$end[rect_data$Scenario == "S3" & rect_data$MS == "T1"]   <- 30
-rect_data$start[rect_data$Scenario == "S3" & rect_data$MS == "T2"] <- 0
-rect_data$end[rect_data$Scenario == "S3" & rect_data$MS == "T2"]   <- 0
-
-library(ggthemes)
-S_full_plot <- ggplot(data = Scenarios_df) +
-  
-  # From an idea of Théo M. Degand (UCLouvain, CCMN)
-  geom_rect(data = rect_data, 
-            aes(xmin = start, xmax = end, 
-                ymin = -Inf, ymax = Inf, 
-                fill = MS
-                ),
-    alpha = 0.2
-  ) +
-  
-  # Display curves
-  geom_line(aes(x = x, y = Value, 
-                color = Variable),
-            linewidth = 1) +
-  
-  scale_color_manual(values = colors) +
-  facet_wrap(~Scenario) +
-  ylab("Value [normalised]") +
-  xlab("Root age [d]") +
-  theme_few() 
-
-S_full_plot
-ggsave(plot = S_full_plot, filename = "plots/Scenarios_full.svg", device = "svg", width = 5, height = 5)
-```
 
 # Error bar plots
 
