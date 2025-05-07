@@ -346,15 +346,15 @@ source("./src/CRB-MARSHAL/CRBM_functions.R")
 # DEFINE SIMULATIONS MACRO PARAMETERS
 tmin          <- 0
 tmax          <- 60
-it_length     <- 10
-S_list        <- unique(Conds.tot$S_ID)
-gif.delay     <- 50
+it_length     <- 1
+S_list        <- unique(Conds.tot$S_ID)[1]                                      # CHANGE!!!!
+gif.delay     <- 10
 radius.range  <- c(0.75, 2)
 
 # SG_timing     <- c(7, 25)
 
 # LOAD RSA FILES AND CREATE A META FILE
-RSA_list      <- unique(RSA.IDs$RSA_id) 
+RSA_list      <- unique(RSA.IDs$RSA_id)[1]                                      # CHANGE !!!
 RSA.all       <- read.csv("./src/CRB-MARSHAL/inputs/RSA_all.csv") %>% 
   filter(RSA_id %in% RSA_list & time <= tmax)
 
