@@ -41,13 +41,14 @@ for (i in list.files(GRANAR_path, pattern = ".R")) {
 
 # source("Data_preparation.R")
 
-Plants        <- read.csv("Data/Anatomy/Plants.csv")
-Segments      <- read.csv("Data/Anatomy/Segments.csv")
-CrossSections <- read.csv("Data/Anatomy/CrossSections.csv")
-anatomy1      <- read.csv("Data/Anatomy/anatomy1.csv")
-anatomy2      <- read.csv("Data/Anatomy/anatomy2.csv")
-Parameters    <- read.csv("Data/Anatomy/Parameters.csv")[,-1]
-Anatomy_Full  <- read.csv("Data/Anatomy/Anatomy_Full.csv")
+Plants         <- read.csv("Data/Anatomy/Plants.csv")
+Segments       <- read.csv("Data/Anatomy/Segments.csv")
+CrossSections  <- read.csv("Data/Anatomy/CrossSections.csv")
+anatomy1       <- read.csv("Data/Anatomy/anatomy1.csv")
+anatomy2       <- read.csv("Data/Anatomy/anatomy2.csv")
+Parameters     <- read.csv("Data/Anatomy/Parameters.csv")[,-1]
+Anatomy_Full   <- read.csv("Data/Anatomy/Anatomy_Full.csv")
+Barriers_Types <- read_xlsx("Data/Barriers_Types.xlsx")
 
 date          <- Sys.Date()
 
@@ -93,15 +94,81 @@ This part load and analyse the cross section quantifications.
 In addition, we use the function *plot_correlations_data()* to plot correlations.
 
 ```{r}
-anatomy2_2 <- merge(anatomy2, Parameters[c("name", "type", "param_id")])
+data2plot <- anatomy2 %>% 
+  left_join(Parameters[c("name", "type", "param_id")], by = "param_id") %>% 
+  left_join(CrossSections[c("CS_id", "age", "plant_id")])
 
 source("src/FUNCTIONS/T-Root/anatomy_stats_visu.R")
 
-p1 <- anatomy_visual(anatomy2_2, CrossSections)
+p1 <- anatomy_visual(data2plot, CrossSections)
 # svg(filename=paste0("Plots/Anatomy_data_visu_",Sys.Date(),".svg"), width = 12, height = 18)
 p1
 # dev.off()
+
+cols <- c(
+  "cortex_cell_diameter",
+  "cortex_n_layers", 
+  "endodermis_cell_diameter", 
+  "epidermis_cell_diameter",
+  "exodermis_cell_diameter",
+  "pericycle_cell_diameter",
+  "phloem_cell_diameter",
+  "phloem_n_layers",
+  "phloem_proportion",
+  "secondarygrowth_param",
+  "stele_cell_diameter",
+  "stele_layer_diameter",
+  "stele_n_layers",
+  "stele_SD",
+  "xylem_cell_diameter",
+  "xylem_max_size",
+  "xylem_n_cells"
+  )
+
+p <- ggplot(data = data2plot %>% filter(param_id %in% cols)) +
+  geom_point(aes(x = age, y = value, color = plant_id)) +
+  facet_wrap(~param_id, 
+             scales = "free_y",
+             ncol = 4) +
+  theme_few() +
+  theme(
+    legend.position = "right"
+  )
+
+ggsave(filename = "plots/Anatomy_Quantifications.svg", 
+       plot = p, width = 10, height = 8, units = "in",
+       device = "svg")
 ```
+
+Secondary Growth fit
+
+```{r}
+library(plotly)
+
+SG_data <- anatomy2 %>% 
+  filter(param_id == "secondarygrowth_param") %>% 
+  left_join(CrossSections[c("CS_id", "age", "plant_id")], by = "CS_id")
+
+# SG_data$value <- as.factor(SG_data$value)
+
+p <- ggplot(data = SG_data) +
+  geom_jitter(aes(x = age, y = value),
+              color = "grey1",
+              height = 0.01,
+              width = 0,
+              alpha = 0.75) +
+  stat_smooth(aes(x = age, y = value), 
+              color = "red", linetype = 2,
+              method = "glm",
+              method.args=list(family="binomial")) +
+  ylab("SG presence") +
+  theme_few()
+
+ggsave(filename = "plots/SG_probability.svg", 
+       plot = p, width = 3, height = 2, units = "in",
+       device = "svg")
+```
+
 
 All anatomical data in standard table ; Create Anatomy_Full.csv
 
@@ -125,46 +192,78 @@ Anatomy_Full <- anatomy2 %>%
 Here we see that radius can be approximated as constant till 25 days, at 0.199 mm. Then, after 25 days, it can be approximated using : $r = exp(-7.59 + 0.23x)$
 
 ```{r}
+radius_data <- Anatomy_Full[c("radius", "age")]
+
 # Set secondary growth treshold
-treshold <- 25
+treshold    <- 25
 
-# Linear model
-radius_lm1 <- lm(data = Anatomy_Full%>%filter(age < treshold), formula = radius ~ 1)
+# Linear model 1
+radius_lm1  <- lm(data = radius_data %>%
+                    filter(age < treshold), 
+                  formula = radius ~ 1)
+
 summary(radius_lm1)
-mrad <- radius_lm1$coefficients[1]
+mrad        <- radius_lm1$coefficients[1]
 
-radius_lm2 <- lm(data = Anatomy_Full%>%filter(age >= treshold), formula = ln(radius) ~ age)
+# Linear model 2
+radius_lm2  <- lm(data = radius_data %>%
+                    filter(age >= treshold), 
+                  formula = ln(radius) ~ age)
 summary(radius_lm2)
 
-alpha <- radius_lm2$coefficients[1]
-beta <- radius_lm2$coefficients[2]
+# Extract parameters from lm2
+alpha       <- radius_lm2$coefficients[1]
+beta        <- radius_lm2$coefficients[2]
 
-# Create an example dataframe to store the regression
-test <- data.frame(x = seq(1,30))
-test$radius <- 1
-mrad <- 0.2
-for(i in seq(1, length(test$x))){
-  if(test$x[i] < treshold){
-    test$radius[i] <- mrad
-  }else{
-    temp <- exp(alpha +  beta*test$x[i])
-    if(temp <= mrad){test$radius[i] <- mrad}
-    else{test$radius[i] <- temp}
-    
-  }
-}
+# Create an dataframe to store the regression
+pred1 <- predict(object  = radius_lm1, 
+                 newdata = data.frame(age = seq(1, treshold),
+                                      radius = 1), 
+                 interval = "confidence")
 
-# PLot datapoints + regression
+pred1_df <- data.frame(age      = seq(1, treshold),
+                       radius   = pred1[,"fit"],
+                       lower_ci = pred1[, "lwr"],
+                       upper_ci = pred1[, "upr"])
+
+pred2 <- exp(predict(object  = radius_lm2, 
+                 newdata = data.frame(age = seq(treshold, 30),
+                                      radius = 1), 
+                 interval = "confidence")
+             )
+
+pred2_df <- data.frame(age      = seq(treshold, 30),
+                       radius   = pred2[,"fit"],
+                       lower_ci = pred2[, "lwr"],
+                       upper_ci = pred2[, "upr"])
+
+radius_pred <- rbind(pred1_df, pred2_df)
+```
+
+
+```{r}
 radius_plot <- ggplot() +
-  geom_point(data = Anatomy_Full, aes(x = age, y = radius), size = 2) + 
-  geom_line(data = test, aes(x = x, y = radius), linetype = 2, color = "red", linewidth = 1.2) +
+  
+  geom_ribbon(data = radius_pred,
+              aes(x = age, ymin = lower_ci, ymax = upper_ci),
+              fill = "orange", alpha = 0.5
+              ) +
+  
+  geom_point(data = radius_data, 
+             aes(x = age, y = radius), size = 2) + 
+  
+  geom_line(data = radius_pred, 
+            aes(x = age, y = radius), 
+            linetype = 2, 
+            color = "red", linewidth = 1.2) +
+  
   xlab("Age [d]") +
   ylab("Radius [mm]") +
   theme_bw()
 
-# svg("Plots/Radius_Plot.svg", width = 4, height = 3)
+svg("Plots/Radius_Plot.svg", width = 4, height = 3)
 radius_plot
-# dev.off()
+dev.off()
 ```
 
 ## Correlations
@@ -187,10 +286,28 @@ prm <- c("cortex_n_layers",
          "radius",
          "age")
 
-# png(filename = "plots/Correlations.png", width = 10, height = 10, units = "in", res = 100)
-pcor <- corrplot(cor(Anatomy_Full[prm]), method = "number", diag = F, type = "upper")
-# dev.off()
+svg(filename = "plots/Correlations_Data.svg", width = 6, height = 6)
+pcor <- corrplot(cor(Anatomy_Full[prm]), 
+                 method = "color",
+                 # type = "upper"
+                 diag = F,
+                 )
+dev.off()
 ```
+
+## Apoplastic Barriers
+
+```{r}
+Barriers_Timing <- read_xlsx("./Data/Barriers_Timings.xlsx") %>%
+  separate(CS_id, into = c("plant_id", "segment", "coloration", "cut", "zoom", "repetition"), sep = "_") %>% 
+  gather(Endo, Exo, key = "tissue", value = "barrier")
+  
+
+ggplot(Barriers_Timing) +
+  geom_point(aes(x = age, y = barrier, color = tissue)) +
+  theme_few()
+```
+
 
 ## Parameter regressions
 
@@ -213,8 +330,8 @@ param1 <- read_param_xml(xml)
 
 # Modify some parameters
 param1$value[param1$name == "secondarygrowth" & param1$type == "param"] <- 0
-param1$value[param1$name == "phloem" & param1$type == "n_layers"] <- 0
-param1$value[param1$name == "param" & param1$type == "randomness"] <- 0
+param1$value[param1$name == "phloem" & param1$type == "n_layers"]       <- 0
+param1$value[param1$name == "param" & param1$type == "randomness"]      <- 0
 ```
 
 ## Play with GRANAR
@@ -387,6 +504,34 @@ for(file in list_conds){
 colnames(Conds)[1] <- "CS_id"
 Conds_full <- left_join(Conds, Anatomy_Full, by = c("CS_id"))
 ```
+
+```{r}
+ggplot(Conds_full) +
+  # geom_line(aes(x = age, y = Kr, group = plant_id)) +
+  geom_point(aes(x = age, y = Kr, color = phloem_n_layers)) +
+  # geom_smooth(aes(x = age, y = Kr)) +
+  facet_wrap(~Barrier) +
+  theme_few()
+
+
+```
+
+
+```{r}
+kr_lm <- lm(data = Conds_full, formula = Kr ~ 
+              # age * 
+              # cortex_n_layers*
+              I(stele_layer_diameter^2)* 
+              # phloem_n_layers*
+              phloem_proportion*
+              Barrier
+            )
+
+print(summary(kr_lm))
+
+Conds_pred <- predict(object = kr_lm)
+```
+
 
 ```{r}
 prm <- c("Kr", "Kx", 

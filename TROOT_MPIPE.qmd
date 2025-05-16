@@ -4,87 +4,117 @@ format: html
 editor: source
 ---
 
-# Load dependancies
+# SET UP
 
 ```{r, include=F}
 # knitr::opts_chunk$set(echo = FALSE)
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path)) # Set working directory to the current file
 rm(list = ls())
+# options(rstudio.help.showDataPreview = FALSE) # Prevent Bug
 
-options(rstudio.help.showDataPreview = FALSE)
-
-# Define paths
+# ============================================================================ #
+# DEFINE PATHS
 CRBM.path    <- "./src/CRB-MARSHAL/"
-path.results <- "./Results/CRB-MARSHAL/"
+path.results <- "C:/Users/mdagostino/OneDrive - UCL/T-ROOT/ANALYSIS/RESULTS/CRB-MARSHAL/"
 path.plots   <- "./plots/CRB-MARSHAL/"
-
-libs <- c("pander", "readxl", "EnvStats", "FactoMineR", "factoextra", "data.table", "reticulate", "xml2", 
-          "tidyverse", "dplyr", "viridis", "Hmisc", "ggplot2", "gridExtra", "Matrix", "emmeans", "ggthemes")
+# ============================================================================ #
+libs <- c("pander", 
+          "readxl", 
+          "EnvStats", 
+          "FactoMineR", 
+          "factoextra", 
+          "data.table", 
+          "reticulate", 
+          "xml2",
+          "tidyverse", 
+          "dplyr", 
+          "viridis", 
+          "Hmisc", 
+          "ggplot2", 
+          "gridExtra", 
+          "Matrix", 
+          "emmeans", 
+          "ggthemes")
 
 for(pk in libs) {
   library(pk, character.only = T)
 }
-
-# source(paste0(CRBM.path,"io_function.R")) # CROOTBOX
+# ============================================================================ #
+# LOAD CRB-MARSHAL FUNCTIONS
 source(paste0(CRBM.path, "Get_SUF.R")) # MARSHAL
 source(paste0(CRBM.path, "SUF.R"))
 source(paste0(CRBM.path, "CRBM_functions.R"))
-
+# ============================================================================ #
+# LOAD CUSTOM TROOT FUNCTIONS
 TRoot_path <- "./src/FUNCTIONS/T-Root/"
 for (i in list.files(TRoot_path, pattern = ".R")) {
   print(i)
   source(paste0(TRoot_path, i))
 }
-
+# ============================================================================ #
 # LOAD DATA TABLES
 Simulations_ID <- read_xlsx(paste0(CRBM.path, "inputs/Simulations_ID.xlsx"))
 Scenarios_ID   <- read_xlsx(paste0(CRBM.path, "inputs/Scenarios_ID.xlsx"))
 RSA.IDs        <- read.csv(paste0(CRBM.path, "inputs/RSA_id.csv"))
 ```
 
-# Load Root System Architectures
+# LOAD ROOT SYSTEM ARCHITECTURES
 
 We generated raw Root System Architectures (RSA) from CRootBox online interface and stored them in `./src/CRB-MARSHAL/inputs/RSA/raw/ folder`. \ 
 We need to process them, and then we store them in `./src/CRB-MARSHAL/inputs/RSA/` folder. \
 Each RSA is associated with a RSA_id and we create a table `RSA_id`. \
 
+## [ONLY DO IT ONCE!] Load and process raw RSA files
+
 ```{r}
-# RSA.path     <- "./src/CRB-MARSHAL/inputs/RSA/"
-# RSA.path.raw <- paste0(RSA.path, "raw/")
-# 
-# RSA_list <- list.files(RSA.path.raw, pattern = ".txt")
-# 
-# RSA.all <- tibble()
-# RSA.IDs <- tibble()
-# 
-# for(RSA_i in RSA_list){
-# 
-#   # Load and process temp RSA
-#   RSA_id_i        <- unlist(strsplit(RSA_i, split = ".txt"))[1]
-#   RSA_temp        <- read.table(paste0(RSA.path.raw, RSA_i), header = T)
-#   RSA_temp        <- reconnect.nodes(RSA_temp)
-#   RSA_temp$RSA_id <- RSA_id_i
-#   write.csv(x = RSA_temp, file = paste0(RSA.path, RSA_id_i, ".csv"), row.names = F)
-# 
-#   # Update RSA.IDs table
-#   RSA_id_i_df     <- tibble(planttype = unlist(strsplit(RSA_id_i, split = "_"))[1],
-#                             age       = unlist(strsplit(RSA_id_i, split = "_"))[2],
-#                             rep       = unlist(strsplit(RSA_id_i, split = "_"))[3],
-#                             RSA_id    = RSA_id_i)
-#   RSA.IDs <- rbind(RSA.IDs, RSA_id_i_df)
-# 
-#   # Add RSA to global RSA.all table
-#   RSA.all <- rbind(RSA.all, RSA_temp)
-# }
-# 
-# write.csv(x = RSA.all,
-#           file = paste0(CRBM.path, "inputs/RSA_all.csv"),
-#           row.names = F)
-# 
-# write.csv(x = RSA.IDs,
-#           file = paste0(CRBM.path, "inputs/RSA_id.csv"),
-#           row.names = F)
+process.RSA <- F
+
+if(process.RSA){
+  
+  RSA.path     <- "./src/CRB-MARSHAL/inputs/RSA/"
+  RSA.path.raw <- paste0(RSA.path, "raw/")
+  RSA_list     <- list.files(RSA.path.raw, pattern = ".txt")
+  RSA.all      <- tibble()
+  RSA.IDs      <- tibble()
+  
+  for(RSA_i in RSA_list){
+    # Load and process temp RSA
+    RSA_id_i        <- unlist(strsplit(RSA_i, split = ".txt"))[1]
+    RSA_temp        <- read.table(paste0(RSA.path.raw, RSA_i), header = T)
+    RSA_temp        <- reconnect.nodes(RSA_temp)
+    RSA_temp$RSA_id <- RSA_id_i
+    write.csv(x = RSA_temp, 
+              file = paste0(RSA.path, RSA_id_i, ".csv"), 
+              row.names = F)
+  
+    # Update RSA.IDs table
+    RSA_id_i_df     <- tibble(planttype = 
+                                unlist(strsplit(RSA_id_i, split = "_"))[1],
+                              age       = 
+                                unlist(strsplit(RSA_id_i, split = "_"))[2],
+                              rep       = 
+                                unlist(strsplit(RSA_id_i, split = "_"))[3],
+                              RSA_id    = 
+                                RSA_id_i)
+    RSA.IDs         <- rbind(RSA.IDs, RSA_id_i_df)
+  
+    # Add RSA to global RSA.all table
+    RSA.all         <- rbind(RSA.all, RSA_temp)
+  }
+  
+  # Write files
+  write.csv(x = RSA.all,
+            file = paste0(CRBM.path, "inputs/RSA_all.csv"),
+            row.names = F)
+  
+  write.csv(x = RSA.IDs,
+            file = paste0(CRBM.path, "inputs/RSA_id.csv"),
+            row.names = F)
+  
+}
 ```
+
+## Load pre-processed RSA
 
 ```{r}
 RSA.all <- read.csv(paste0(CRBM.path, "inputs/RSA_all.csv"))
@@ -286,10 +316,12 @@ Conds.tot <- merge(Conds.tot, roottypes)
 Plot all together with a rectangle for MS
 
 ```{r}
+# Create rectangles
 rect_data <- expand.grid(start = 0, end = 0, 
                          MS = c("T1", "T2"), 
                          S_ID = unique(Conds.tot$S_ID))
 
+# Define rectangle coordinates
 rect_data$start[rect_data$S_ID == "1A" & rect_data$MS == "T1"] <- 1
 rect_data$end[rect_data$S_ID   == "1A" & rect_data$MS == "T1"] <- 7
 rect_data$start[rect_data$S_ID == "1A" & rect_data$MS == "T2"] <- 8
@@ -310,6 +342,7 @@ rect_data$end[rect_data$S_ID   == "3" & rect_data$MS == "T1"]  <- 60
 rect_data$start[rect_data$S_ID == "3" & rect_data$MS == "T2"]  <- 0
 rect_data$end[rect_data$S_ID   == "3" & rect_data$MS == "T2"]  <- 0
 
+# Create plot
 S_full_plot <- ggplot(data = Conds.tot) +
   
   geom_rect(data = rect_data, 
@@ -343,18 +376,19 @@ So we want to loop MARSHAL for each S_ID of Conds.tot
 ```{r, include = F}
 source("./src/CRB-MARSHAL/CRBM_functions.R")
 
+# ============================================================================ #
 # DEFINE SIMULATIONS MACRO PARAMETERS
 tmin          <- 0
 tmax          <- 60
-it_length     <- 1
-S_list        <- unique(Conds.tot$S_ID)[1]                                      # CHANGE!!!!
+it_length     <- 10
+S_list        <- unique(Conds.tot$S_ID)
 gif.delay     <- 10
 radius.range  <- c(0.75, 2)
-
 # SG_timing     <- c(7, 25)
+# ============================================================================ #
 
 # LOAD RSA FILES AND CREATE A META FILE
-RSA_list      <- unique(RSA.IDs$RSA_id)[1]                                      # CHANGE !!!
+RSA_list      <- unique(RSA.IDs$RSA_id)
 RSA.all       <- read.csv("./src/CRB-MARSHAL/inputs/RSA_all.csv") %>% 
   filter(RSA_id %in% RSA_list & time <= tmax)
 
@@ -370,6 +404,7 @@ RSA_plot <- ggplot(RSA.all) +
 
 RSA_plot
 
+# ============================================================================ #
 # RUN MPIPE FOR EVERY SCENARIO
 for(S_ID_i in S_list){
 
@@ -389,7 +424,9 @@ for(S_ID_i in S_list){
 }
 ```
 
-# Process results of each scenario
+# PROCESS RESULTS
+
+## Load all files and create Macro table
 
 ```{r}
 # ============================================================================ #
@@ -415,8 +452,11 @@ for(si in S_list){
 
 Macro_full <- Macro_full %>% 
   mutate(Sim_ID = paste0(RSA_id, "_", Scenario_ID))
+```
 
+## Analyse Krs
 
+```{r}
 # ============================================================================ #
 # ANALYSE KRS
 # ============================================================================ #
@@ -445,7 +485,11 @@ ggsave(filename = paste0(path.plots, "Krs_full.svg"),
        plot = p
        ,device = "svg"
        ,width = 5, height = 3)
+```
 
+## Analyse SUF
+
+```{r}
 # ============================================================================ #
 # ANALYSE SUF
 # ============================================================================ #
@@ -542,7 +586,7 @@ ggsave(filename = "RSHA_full.png", plot = p
        ,width = 17, height = 10)
 ```
 
-# Select only one for figure
+## Select only one to make a figure
 
 ```{r}
 data2plot <- RSHA_full %>% filter(age == 60 & RSA_id == unique(RSA.IDs$RSA_id[1]))
@@ -588,19 +632,19 @@ ggsave(filename = "RSHA_suf_example.png", plot = p
 ```
 
 
-# Statistical analysis
+# STATISTICAL ANALYSIS
 
 ## Krs
 
 ```{r}
-for(age_i in unique(Macro_full$age)){
+for(age_i in unique(Macro_full$age)[order(unique(Macro_full$age))]){
   cat("================= \n")
   cat("Age = ", age_i, "\n")
   cat("================= \n")
   temp_df <- Macro_full %>% filter(age == age_i)
   temp_lm <- lm(temp_df, formula = Krs ~ Scenario_ID)
   # plot(temp_lm)
-  print(summary(temp_lm))
+  pander(summary(temp_lm))
   print(emmeans(temp_lm, ~Scenario_ID))
 }
 ```
@@ -608,7 +652,7 @@ for(age_i in unique(Macro_full$age)){
 ## SUF
 
 ```{r}
-for(age_i in unique(SUF_df2$age)){
+for(age_i in unique(SUF_df2$age[order(SUF_df2$age)])){
   
   cat("================= \n")
   cat("Age = ", age_i, "\n")
@@ -632,17 +676,5 @@ for(age_i in unique(SUF_df2$age)){
   ks_test    <- ks.test(distrib_1A, distrib_3)
   print(ks_test)
 }
-```
-
-Investigate peaks and plateau in 60 days old
-
-```{r}
-SUF_60 <- SUF_df2 %>% filter(age == 60)
-
-subset_peak    <- SUF_60 %>% filter(zr == -24)
-subset_plateau <- SUF_60 %>% filter(zr >= -10) 
-
-SUF_lm1        <- lm(subset_peak, formula = SUF_sum_mean~Scenario_ID)
-summary(SUF_lm1)
 ```
 

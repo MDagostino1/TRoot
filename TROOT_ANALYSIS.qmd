@@ -41,7 +41,7 @@ pkg_list <- c("fmsb",
               "emmeans", 
               "corrplot", 
               "sf", 
-              "SciViews")
+              "SciViews", "ggthemes")
 
 load_packages(pkg_list)
 
@@ -153,11 +153,40 @@ Conductivities_processed <- read.csv("Data/Conductivities_processed.csv")
 Anatomy_Full             <- read.csv("Data/Anatomy/Anatomy_Full.csv")
 Data_Full                <- read.csv("Data/DATA_FULL_FINAL.csv")
 Parameters               <- read.csv("Data/Anatomy/Parameters.csv")
+Barriers_Types           <- read_xlsx("Data/Barriers_Types.xlsx")
 
 # Remove day zero
 Conductivities_processed <- Conductivities_processed %>% filter(x != 0)
 Data_Full                <- Data_Full %>% filter(x != 0)
 ```
+
+Change M1, M2, M3 etc by explicit names : \
+M1 = .-cs
+M2 = .-Sub
+M3 = CS-Sub
+T1 = LC-CS
+T2 = Sub-CS
+T3 = Sub-Sub
+
+M1 = En.CS
+M2 = En.Sub
+M3 = Ex.CS-En.Sub
+T1 = Ex.LC-En.CS
+T2 = Ex.Sub-En.CS
+T3 = Ex.Sub-En.Sub
+
+```{r}
+Conductivities_processed <- Conductivities_processed %>% 
+  mutate(Barrier_Name = recode(Barrier_Name, 
+                               "M1" = "En.CS", 
+                               "M2" = "En.Sub",
+                               "M3" = "En.Sub-Ex.CS",
+                               "T1" = "En.CS-Ex.LC",
+                               "T2" = "En.CS-Ex.Sub",
+                               "T3" = "En.Sub-Ex.Sub"))
+  
+```
+
 
 # VISUAL ANALYSIS
 
@@ -196,25 +225,25 @@ kr_plot1 <- ggplot(data = Conductivities_processed,
   # geom_smooth(aes(x = x, y = radius/5000000), color = "red") +
   # ylim(0, 3e-08) +
   ylab(expression(k[r] ~ 10^{-8} ~ "[" ~ m~ s^{-1} ~ MPa^{-1} ~ "]")) +
-  labs(color = expression(kAQP ~  "[" ~ 10^{-7} ~ m ~ s^{-1} ~ MPa^{-1} ~ "]")) +
+  labs(color = expression(kAQP ~ "[" ~ 10^{-7} ~ m ~ s^{-1} ~ MPa^{-1} ~ "]")) +
   xlab("Age [d]") +
   # ggtitle("Hydraulic Radial conductivity") +
-  theme_bw()
+  theme_few()
 kr_plot1
 #============================================================================
-# Kr_plot1 <- ggplot(data = Conductivities_processed,
-#        aes(x = x, 
-#            y = Kr,
-#            color = kAQP*1e7)) +
-#   geom_jitter(alpha = 0.2) +
-#   facet_wrap(~Barrier_Name) +
-#   scale_color_viridis() +
-#   ylab(expression(K[r] ~ "[" ~ m^{3} ~ s^{-1} ~ MPa^{-1} ~ "]")) + 
-#   xlab("Age [d]") +
-#   # ylim(0, 3e-08) +
-#   labs(color = expression(kAQP ~  "[" ~ 10^{-7} ~ m ~ s^{-1} ~ MPa^{-1} ~ "]")) +
-#   theme_dark()
-# Kr_plot1
+Kr_plot1 <- ggplot(data = Conductivities_processed,
+       aes(x = x,
+           y = Kr,
+           color = kAQP*1e7)) +
+  geom_jitter(alpha = 0.2) +
+  facet_wrap(~Barrier_Name) +
+  scale_color_viridis() +
+  ylab(expression(K[r] ~ "[" ~ m^{3} ~ s^{-1} ~ MPa^{-1} ~ "]")) +
+  xlab("Age [d]") +
+  # ylim(0, 3e-08) +
+  labs(color = expression(kAQP ~  "[" ~ 10^{-7} ~ m ~ s^{-1} ~ MPa^{-1} ~ "]")) +
+  theme_dark()
+Kr_plot1
 #============================================================================
 # Radius
 Radius_plot1 <- ggplot(data = Conductivities_processed,
@@ -458,86 +487,62 @@ ggplot(data = Conductivities_processed) +
   theme_classic() + theme(axis.text.x     = element_text(size = 8, angle = 90, hjust = 1, vjust = 0.5),) 
 ```
 
-
 ```{r}
-# MS_subset <- Conductivities %>% filter(kAQP == 5e-04)
-MS_all <- ggplot(data = Conductivities_processed) +
-  
-  geom_jitter(aes(x = Barrier_Name, 
-                  y = kr*10^08, 
-                  color = kAQP), 
-              width = 0.1, 
-              alpha = 0.1) +
-  
-  geom_violin(aes(x = Barrier_Name, 
-                  y = kr*10^08), 
-              alpha = 0.1,
-              draw_quantiles = "0.5") +
+Barriers_Types           <- read_xlsx("Data/Barriers_Types.xlsx")
 
-  # geom_boxplot(aes(x = Barrier_Name, 
-  #                  y = kr*10^8),
-  #              width = 0.5,
-  #              alpha = 0.5) +
+data2plot <- Conductivities_processed %>% 
+  left_join(Barriers_Types[c("Endodermis", "Exodermis", "Barrier_Name")], 
+            by = "Barrier_Name") %>% 
+  filter(kAQP == 5.7870e-07)
+
+data2plot$Exodermis <- factor(data2plot$Exodermis, levels = c("none", "CS", "LC", "Sub")) 
+
+# ============================================================================ #
+MS_all <- ggplot(data = data2plot,
+                 aes(x = Exodermis,
+                     y = kr*10^8)) +
   
-  xlab("Maturation Stage") +
+  # ADD POINTS
+  # geom_jitter(aes(x = Barrier_Name, 
+  #                 y = kr*10^08, 
+  #                 color = kAQP), 
+  #             width = 0.1, 
+  #             alpha = 0.1) +
+  
+  # ADD VIOLINS
+  geom_violin(side = "right", 
+              fill = "lightgrey", 
+              color = "lightgrey", 
+              alpha = 1) +
+  
+  # ADD BOXPLOTS
+  geom_boxplot(aes(fill = Exodermis),
+               width = 0.2,
+               alpha = 1) +
+  
+  facet_wrap(~Endodermis, scales = "free_x") +
+  
+  # CUSTOM LABELS
+  xlab("Exodermis apoplastic barrier") +
   ylab(expression(k[r] ~ "[" ~ 10^{-08} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
   
+  # OTHER PARAMS
   # scale_fill_manual(values=c("white","white","white", "grey", "grey", "grey")) +
   scale_color_viridis() +
-  
-  theme_classic() 
+  theme_few() +
+  theme(axis.text.x = element_text(angle = 90))
   # ggtitle("Radial Hydraulic Conductivity per hydrophobic deposition level") 
   # theme(legend.position = "none") 
 
+# ============================================================================ #
 MS_all
-# ggsave(filename = "Plots/Maturation_Stages_All.png", plot = MS_all, device = "png", 
-#        width = 5, height = 4, dpi = 300, units = "in")
 
-# svg("Plots/Maturation_Stages_All.svg", height = 4, width = 5)
-# MS_all
-# dev.off()
+svg("Plots/Maturation_Stages_All.svg", height = 4, width = 5)
+MS_all
+dev.off()
 ```
 
-MS all at fixed kAQP
 
-```{r}
-# MS_subset <- Conductivities %>% filter(kAQP == 5e-04)
-MS_all <- ggplot(data = Conductivities_processed %>% filter(kAQP == 5.7870e-07)) +
-  
-  geom_jitter(aes(x = Barrier_Name, 
-                  y = kr*10^08, 
-                  ), 
-              width = 0.1, 
-              alpha = 0.3) +
-  
-  geom_violin(aes(x = Barrier_Name, 
-                  y = kr*10^08), 
-              alpha = 0.1,
-              draw_quantiles = "0.5") +
-
-  # geom_boxplot(aes(x = Barrier_Name, 
-  #                  y = kr*10^8),
-  #              width = 0.5,
-  #              alpha = 0.5) +
-  
-  xlab("Maturation Stage") +
-  ylab(expression(k[r] ~ "[" ~ 10^{-08} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
-  
-  # scale_fill_manual(values=c("white","white","white", "grey", "grey", "grey")) +
-  scale_color_viridis() +
-  
-  theme_classic() 
-  # ggtitle("Radial Hydraulic Conductivity per hydrophobic deposition level") 
-  # theme(legend.position = "none") 
-
-MS_all
-# ggsave(filename = "Plots/Maturation_Stages_All.png", plot = MS_all, device = "png", 
-#        width = 5, height = 4, dpi = 300, units = "in")
-
-# svg("Plots/Maturation_Stages_All.svg", height = 4, width = 5)
-# MS_all
-# dev.off()
-```
 
 Stats :
 
@@ -564,17 +569,29 @@ DL_contrast <- as_tibble(EM$contrasts)
 Some interesting stats :
 
 ```{r}
-mean_M1 <- DL_mean$emmean[DL_mean$Barrier_Name == "M1"]
-mean_M2 <- DL_mean$emmean[DL_mean$Barrier_Name == "M2"]
-mean_M3 <- DL_mean$emmean[DL_mean$Barrier_Name == "M3"]
-mean_T1 <- DL_mean$emmean[DL_mean$Barrier_Name == "T1"]
-mean_T2 <- DL_mean$emmean[DL_mean$Barrier_Name == "T2"]
-mean_T3 <- DL_mean$emmean[DL_mean$Barrier_Name == "T3"]
+# mean_M1 <- DL_mean$emmean[DL_mean$Barrier_Name == "M1"]
+# mean_M2 <- DL_mean$emmean[DL_mean$Barrier_Name == "M2"]
+# mean_M3 <- DL_mean$emmean[DL_mean$Barrier_Name == "M3"]
+# mean_T1 <- DL_mean$emmean[DL_mean$Barrier_Name == "T1"]
+# mean_T2 <- DL_mean$emmean[DL_mean$Barrier_Name == "T2"]
+# mean_T3 <- DL_mean$emmean[DL_mean$Barrier_Name == "T3"]
+# 
+# print(paste0("Difference between T1 and M1 [%] : ", round((mean_M1-mean_T1)*100/mean_M1, digits = 2)))
+# print(paste0("Difference between T2 and T1 [%] : ", round((mean_T1-mean_T2)*100/mean_T1, digits = 2)))
+# print(paste0("Difference between T3 and T1 [%] : ", round((mean_T1-mean_T3)*100/mean_T1, digits = 2)))
+# print(paste0("Difference between M2 and M3 [%] : ", round((mean_M2-mean_M3)*100/mean_M2, digits = 2)))
 
-print(paste0("Difference between T1 and M1 [%] : ", round((mean_M1-mean_T1)*100/mean_M1, digits = 2)))
-print(paste0("Difference between T2 and T1 [%] : ", round((mean_T1-mean_T2)*100/mean_T1, digits = 2)))
-print(paste0("Difference between T3 and T1 [%] : ", round((mean_T1-mean_T3)*100/mean_T1, digits = 2)))
-print(paste0("Difference between M2 and M3 [%] : ", round((mean_M2-mean_M3)*100/mean_M2, digits = 2)))
+mean_M1 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS"]
+mean_M2 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.Sub"]
+mean_M3 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.Sub-Ex.CS"]
+mean_T1 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS-Ex.LC"]
+mean_T2 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS-Ex.Sub"]
+mean_T3 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.Sub-Ex.Sub"]
+
+print(paste0("Difference between En.CS and En.CS-Ex.LC [%] : ", round((mean_M1-mean_T1)*100/mean_M1, digits = 2)))
+print(paste0("Difference between En.CS-Ex.Sub and En.CS-Ex.LC [%] : ", round((mean_T1-mean_T2)*100/mean_T1, digits = 2)))
+print(paste0("Difference between En.Sub-Ex.Sub and En.CS-Ex.LC [%] : ", round((mean_T1-mean_T3)*100/mean_T1, digits = 2)))
+print(paste0("Difference between En.Sub and En.Sub-Ex.CS [%] : ", round((mean_M2-mean_M3)*100/mean_M2, digits = 2)))
 ```
 
 # COMPLETE STATISTICAL ANALYSIS
@@ -582,23 +599,19 @@ print(paste0("Difference between M2 and M3 [%] : ", round((mean_M2-mean_M3)*100/
 ## 1) Radial conductivity
 
 ```{r}
-# lm_kr0 <- lm(data = Conductivities_processed, formula = kr ~ x + radius + Barrier + kAQP + kAQP:Barrier)
-lm_kr0 <- lm(data = Data_Full 
-             # %>% filter(Barrier_Name %in% c("T1", "T2", "T3"))
-             , 
+lm_kr0 <- lm(data = Conductivities_processed, 
              formula = kr ~ 
                x + 
                radius + 
                Barrier_Name + 
                kAQP + 
                kAQP:Barrier_Name 
-               # cortex_n_layers + 
-               # endodermis_cell_diameter +
-               # cortex_cell_diameter + 
-               # stele_layer_diameter
                )
+cat("================= \n  LINEAR MODEL \n=================\n")
 summary(lm_kr0)
+cat("================= \n  ANOVA \n=================\n")
 anova(lm_kr0)
+cat("================= \n  MEAN COMPARISON \n=================\n")
 emmeans(lm_kr0, specs = pairwise ~ Barrier_Name:kAQP)
 ```
 
@@ -653,6 +666,7 @@ print(cor)
 kr_test <- lm(data = kr_reg_df, formula = kr_reg~kr)
 summary(kr_test)
 
+# ============================================================================ #
 ggplot(kr_reg_df) +
   geom_point(aes(x = kr, y = kr_reg, color = x),
              alpha = 0.4) +
@@ -663,14 +677,13 @@ ggplot(kr_reg_df) +
   geom_abline() +
   scale_color_viridis() +
   ggtitle(paste0("Correlation : ", round(cor$estimate, digits = 2),
-                 " | R2 = ", 
+                 " | R.sq. = ", 
                  round(summary(kr_test)$r.squared, digits = 2)
                  )
           ) +
-  xlab("kr") + ylab("kr*") +
+  xlab("Computed kr") + ylab("Predicted kr") +
   theme_classic()
-
-
+# ============================================================================ #
 ```
 
 Let's compute final coefficients for the regression equation :

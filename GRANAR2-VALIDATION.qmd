@@ -4,10 +4,11 @@ format: html
 editor: source
 ---
 
-```{r}
+```{r, include = F}
 options(rstudio.help.showDataPreview = FALSE)
 rm(list = ls())
 
+# LOAD PACKAGES
 pkg_list <- c("fmsb", "packcircles", "pander", "readxl", "visreg", "EnvStats", "factoextra", "data.table",
               "reticulate", "xml2", "tidyverse", "plyr", "deldir", "viridis", "Hmisc", "devtools", "ggplot2",
               "gridExtra", "dplyr", "cowplot", "stats", "emmeans", "corrplot", "sf", "SciViews")
@@ -15,13 +16,25 @@ pkg_list <- c("fmsb", "packcircles", "pander", "readxl", "visreg", "EnvStats", "
 for(pkg in pkg_list){
   library(pkg, character.only = T)
 }
+
+# LOAD GRANAR FUNCTIONS
+GRANAR_path <- "C:/Users/mdagostino/Desktop/GITHUB/granar/R/" # change with your directory
+for (i in list.files(GRANAR_path, pattern = ".R")) {
+  print(i)
+  source(paste0(GRANAR_path, i))
+}
+
+# SET PATHS
+path_cellset <- "./Data/CellSet/"
+path_data    <- "./Data/"
+path_plot    <- "./plots/"
 ```
 
 ```{r}
-CellSet_full <- read.csv("CellSet/CellSet_full.csv")
-anatomy2 <- read.csv("Data/Anatomy/anatomy2.csv")
+CellSet_full <- read.csv(paste0(path_cellset, "CellSet_full.csv"))
+anatomy2     <- read.csv(paste0(path_data, "/Anatomy/anatomy2.csv"))
 
-test_CS <- CellSet_full %>% filter(CS_id == "B04_B_To_C01_Z20_01")
+test_CS      <- CellSet_full %>% filter(CS_id == "B04_B_To_C01_Z20_01")
 
 CellSet_plot <- ggplot(CellSet_full) +
   geom_polygon(aes(x = x, y = y, group = id_cell, fill = type), color = "white") +
@@ -34,6 +47,30 @@ ggsave(filename = "plots/CellSet.png", plot = CellSet_plot,device = "png", width
 To do : generate GRANAR anatomies corresponding to the CS_ID and compare stats. 
 
 ```{r}
+GRANAR_list <- list()
+GRANAR_df   <- tibble()
+for(CS_id_i in unique(CellSet_full$CS_id)){
+  param_temp <- read_param_xml(paste0("./src/Params/",CS_id_i, ".xml"))
+  try(expr = {
+      sim_temp       <- create_anatomy(parameters = param_temp, verbatim = F)
+      nodes_temp     <- sim_temp$nodes
+      nodes_temp$CS_id <- CS_id_i
+      GRANAR_list[[CS_id_i]] <- sim_temp
+      GRANAR_df              <- rbind(GRANAR_df, nodes_temp)
+    }
+  )
+}
+```
 
+```{r}
+pl <- ggplot(GRANAR_df) +
+  geom_polygon(aes(x = x, y = y, group = id_cell, fill = type), 
+               color = "white") +
+  coord_fixed() +
+  facet_wrap(~CS_id)
+pl
+ggsave(filename = "plots/Validation_GRANAR.png", plot = pl,
+       device = "png", 
+       width = 20, height = 15, dpi = 300, units = "in")
 ```
 
