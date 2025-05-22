@@ -2,55 +2,18 @@ head(anatomy2)
 anatomy2E <- anatomy2 %>% merge(CrossSections[c("CS_id", "age")])
 reg_params <- list()
 
-# Define function to automatically generate plots
-make_reg_plot <- function(data, lm1, lm2 = NULL, transition.age = 25, split, name, error.ratio = 0.25, out.path = "plots/regressions/"){
-  
-  df <- data %>% 
-    mutate(reg = 0,
-           sd = 0)
-  
-  if(split){
-    for(i in seq(1, length(df$age))){
-      if(df$age[i] < transition.age){
-        df$reg[i] <- predict(lm1, data.frame(age = df$age[i]))
-        df$sd[i] <- sd(residuals((lm1)))
-      }
-      else{
-        df$reg[i] <- exp(predict(lm2, data.frame(age = df$age[i])))
-        df$sd[i] <- 0.25*exp(predict(lm2, data.frame(age = transition.age))) # /!\ 
-      }
-    }  
-  }
-  else{
-    for(i in seq(1, length(df$age))){
-      df$reg[i] <- predict(lm1, data.frame(age = df$age[i]))
-      df$sd[i] <- sd(residuals((lm1)))
-    }    
-  }
-  
-  
-  xplot <- df %>% ggplot() +
-    geom_ribbon(aes(x = age, ymin = reg-sd, ymax = reg+sd), fill = "orange", alpha = 0.5) +
-    geom_line(aes(x = age, y = reg), color = "red", linetype = 2, linewidth = 1) +
-    geom_point(aes(x = age, y = value)) +
-    xlab("Age [d]") +
-    ylab(paste0(name)) +
-    theme_bw()
-  
-  plot(xplot)
-  
-  ggsave(filename = paste0(out.path, name, ".svg"), 
-         plot = xplot, device = "svg", width = 4, height = 3)
-  
-  return(xplot)
-  
-}
-
+# ========================================== #
+# ========================================== #
 plot_list <- list()
+reg_data  <- tibble()
+plot.path <- "./plots/regressions/"
+transition1 <- 7
+transition2 <- 20
+transition3 <- 25
+error.fac   <- 1
+# ========================================== #
+# ========================================== #
 
-# ==============================================================================
-# Xylem
-# ==============================================================================
 
 #==============
 ##Xylem n files
@@ -66,14 +29,16 @@ xylem_n_files <- function(x){
 xylem_n_cells_df <- anatomy2E %>% filter(param_id == "xylem_n_cells" & value < 40)
 # xylem_n_cells_df %>% ggplot(aes(x = age, y = value)) + geom_point()
 
-xylem_n_cells_lm1 <- lm(xylem_n_cells_df%>% filter(age < 20), formula = value ~ age)
-xylem_n_cells_lm2 <- lm(xylem_n_cells_df%>% filter(age >= 20), formula = ln(value) ~ age)
+xylem_n_cells_lm1 <- lm(xylem_n_cells_df%>% filter(age < transition2), 
+                        formula = value ~ age)
+xylem_n_cells_lm2 <- lm(xylem_n_cells_df%>% filter(age >= transition2), 
+                        formula = ln(value) ~ age)
 
-summary(xylem_n_cells_lm1)
-summary(xylem_n_cells_lm2)
+print(summary(xylem_n_cells_lm1))
+print(summary(xylem_n_cells_lm2))
 
 xylem_n_cells <- function(x){
-  if(x < 25){
+  if(x < transition3){
     y <- predict(xylem_n_cells_lm1, 
                  newdata = data.frame(age = x)) +
       rnorm(1, mean = 0, sd = sd(residuals(xylem_n_cells_lm1)))
@@ -82,14 +47,24 @@ xylem_n_cells <- function(x){
                      newdata = data.frame(age = x)) +
                rnorm(1, 
                      mean = 0, 
-                     sd = 0.25*exp(predict(xylem_n_cells_lm2, data.frame(age = 25)))))
+                     sd = error.fac*exp(predict(xylem_n_cells_lm2, data.frame(age = transition3)))))
   }
   
   return(round(y))
 }
 
 # BUILD PLOT
-plot_list[["xylem_n_cells"]] <- make_reg_plot(data = xylem_n_cells_df, lm1 = xylem_n_cells_lm1, lm2 = xylem_n_cells_lm2, transition.age = 25, split = T, name = "xylem_n_cells")
+temp <- make_reg_data(data = xylem_n_cells_df, 
+                      lm1 = xylem_n_cells_lm1, 
+                      lm2 = xylem_n_cells_lm2, 
+                      transition.age = transition3, 
+                      split = T
+                      )
+reg_data <- rbind(reg_data, temp)
+plot_list[["xylem_n_cells"]] <- make_reg_plot(df = temp, 
+                                              name = "xylem_n_cells",
+                                              path.out = plot.path
+                                              )
 
 # ===============
 ## Xylem max size
@@ -107,7 +82,12 @@ xylem_max_size <- function(x){
 }
 
 # BUILD PLOT
-plot_list[["xylem_max_size"]] <- make_reg_plot(data = xylem_max_size_df, lm1 = xylem_max_size_lm, split = F, name = "xylem_max_size")
+temp <- make_reg_data(data = xylem_max_size_df, 
+                      lm1 = xylem_max_size_lm, 
+                      split = F)
+reg_data <- rbind(reg_data, temp)
+plot_list[["xylem_max_size"]] <- make_reg_plot(df = temp,
+                                               name = "xylem_max_size")
 
 # ===============
 ## Xylem cell diameter
@@ -126,11 +106,12 @@ xylem_cell_diameter <- function(x){
 }
 
 # BUILD PLOT
-plot_list[["xylem_cell_diameter"]] <- make_reg_plot(data = xylem_cell_diameter_df, lm1 = xylem_cell_diameter_lm, split = F, name = "xylem_cell_diameter")
-
-# ==============================================================================
-# Stele
-# ==============================================================================
+temp <- make_reg_data(data = xylem_cell_diameter_df, 
+                      lm1 = xylem_cell_diameter_lm, 
+                      split = F)
+reg_data <- rbind(reg_data, temp)
+plot_list[["xylem_cell_diameter"]] <- make_reg_plot(df = temp,
+                                                    name = "xylem_cell_diameter")
 
 # =====================
 ## Stele layer diameter
@@ -138,20 +119,25 @@ plot_list[["xylem_cell_diameter"]] <- make_reg_plot(data = xylem_cell_diameter_d
 
 stele_layer_diameter_df <- anatomy2E %>% filter(param_id == "stele_layer_diameter" & value < 1)
 # stele_layer_diameter_df %>% ggplot(aes(x = age, y = value)) + geom_point()
-stele_layer_diameter_lm1 <- lm(stele_layer_diameter_df %>% filter(age < 25), formula = value ~ age)
-stele_layer_diameter_lm2 <- lm(stele_layer_diameter_df %>% filter(age >= 25), formula = ln(value) ~ age)
+stele_layer_diameter_lm1 <- lm(stele_layer_diameter_df %>% 
+                                 filter(age < transition3), 
+                               formula = value ~ age)
+stele_layer_diameter_lm2 <- lm(stele_layer_diameter_df %>% 
+                                 filter(age >= transition3), 
+                               formula = ln(value) ~ age)
 summary(stele_layer_diameter_lm1)
 summary(stele_layer_diameter_lm2)
 
 stele_layer_diameter <- function(x){
-  if(x < 25){
+  if(x < transition3){
     y <- predict(stele_layer_diameter_lm1, 
                  newdata = data.frame(age = x)) + 
       rnorm(1, mean = 0, sd = sd(residuals(stele_layer_diameter_lm1)))
-  }else if(x >= 25){
+  }else if(x >= transition3){
     y <- exp(predict(stele_layer_diameter_lm2, 
                      newdata = data.frame(age = x)) + 
-               rnorm(1, mean = 0, sd = 0.25*exp(predict(stele_layer_diameter_lm2, data.frame(age = 25)))
+               rnorm(1, mean = 0, 
+                     sd = error.fac*exp(predict(stele_layer_diameter_lm2, data.frame(age = transition3)))
                )
     )
     
@@ -164,27 +150,36 @@ stele_layer_diameter <- function(x){
 }
 
 # BUILD PLOT
-plot_list[["stele_layer_diameter"]] <- make_reg_plot(data = stele_layer_diameter_df, lm1 = stele_layer_diameter_lm1, lm2 = stele_layer_diameter_lm2, transition.age = 25, split = T, name = "stele_layer_diameter")
+temp <- make_reg_data(data = stele_layer_diameter_df, 
+                      lm1 = stele_layer_diameter_lm1, 
+                      lm2 = stele_layer_diameter_lm2, 
+                      transition.age = transition3, 
+                      split = T)
+reg_data <- rbind(reg_data, temp)
+plot_list[["stele_layer_diameter"]] <- make_reg_plot(df = temp,
+                                                     name = "stele_layer_diameter")
 
 # =====================
 ## Stele cell diameter
 # =====================
 stele_cell_diameter_df <- anatomy2E %>% filter(param_id == "stele_cell_diameter")
 # stele_cell_diameter_df %>% ggplot(aes(x = age, y = value)) + geom_point()
-stele_cell_diameter_lm1 <- lm(stele_cell_diameter_df %>% filter(age < 25), formula = value ~ age)
-stele_cell_diameter_lm2 <- lm(stele_cell_diameter_df %>% filter(age >= 25), formula = ln(value) ~ age)
+stele_cell_diameter_lm1 <- lm(stele_cell_diameter_df %>% filter(age < transition3), formula = value ~ age)
+stele_cell_diameter_lm2 <- lm(stele_cell_diameter_df %>% filter(age >= transition3), formula = ln(value) ~ age)
 summary(stele_cell_diameter_lm1)
 summary(stele_cell_diameter_lm2)
 
 stele_cell_diameter <- function(x){
-  if(x < 25){
+  if(x < transition3){
     y <- predict(stele_cell_diameter_lm1, 
                  newdata = data.frame(age = x)) + 
       rnorm(1, mean = 0, sd = sd(residuals(stele_cell_diameter_lm1)))
-  }else if(x >= 25){
+  }else if(x >= transition3){
     y <- exp(predict(stele_cell_diameter_lm2, 
                      newdata = data.frame(age = x))) + 
-      rnorm(1, mean = 0, sd = 0.25*exp(predict(stele_cell_diameter_lm2, data.frame(age = 25))))
+      rnorm(1, mean = 0, 
+            sd = error.fac*exp(predict(stele_cell_diameter_lm2, 
+                                       data.frame(age = transition3))))
     
     if(y < 0.01){
       y <- 0.01
@@ -195,12 +190,14 @@ stele_cell_diameter <- function(x){
 }
 
 # BUILD PLOT
-plot_list[["stele_cell_diameter"]] <- make_reg_plot(data = stele_cell_diameter_df, 
-              lm1 = stele_cell_diameter_lm1, 
-              lm2 = stele_cell_diameter_lm2, 
-              transition.age = 25, 
-              split = T, 
-              name = "stele_cell_diameter")
+temp <- make_reg_data(data = stele_cell_diameter_df, 
+                      lm1 = stele_cell_diameter_lm1, 
+                      lm2 = stele_cell_diameter_lm2, 
+                      transition.age = transition3, 
+                      split = T)
+reg_data <- rbind(reg_data, temp)
+plot_list[["stele_cell_diameter"]] <- make_reg_plot(df = temp, 
+                                                    name = "stele_cell_diameter")
 
 # =====================
 ## Stele n layers
@@ -220,30 +217,31 @@ stele_n_layers <- function(x){
 }
 
 # BUILD PLOT
-plot_list[["stele_n_layers"]] <- make_reg_plot(data = stele_n_layers_df, 
-              lm1 = stele_n_layers_lm, lm2 = stele_n_layers_lm, 
-              split = T,transition.age = 0,
-              name = "stele_n_layers")
+temp <- make_reg_data(data = stele_n_layers_df, 
+                      lm1 = stele_n_layers_lm, lm2 = stele_n_layers_lm, 
+                      split = T,transition.age = 0)
+reg_data <- rbind(reg_data, temp)
+plot_list[["stele_n_layers"]] <- make_reg_plot(df = temp, name = "stele_n_layers")
 
 # ===========
 ## Stele SD
 # ===========
 stele_SD_df <- anatomy2E %>% filter(param_id == "stele_SD")
 # stele_SD_df %>% ggplot(aes(x = age, y = value)) + geom_point()
-stele_SD_lm1 <- lm(stele_SD_df %>% filter(age < 25), formula = value ~ age)
-stele_SD_lm2 <- lm(stele_SD_df %>% filter(age >= 25), formula = ln(value) ~ age)
+stele_SD_lm1 <- lm(stele_SD_df %>% filter(age < transition3), formula = value ~ age)
+stele_SD_lm2 <- lm(stele_SD_df %>% filter(age >= transition3), formula = ln(value) ~ age)
 summary(stele_SD_lm1)
 summary(stele_SD_lm2)
 
 stele_SD <- function(x){
-  if(x < 25){
+  if(x < transition3){
     y <- predict(stele_SD_lm1, 
                  newdata = data.frame(age = x)) + 
       rnorm(1, mean = 0, sd = sd(residuals(stele_SD_lm1)))
-  }else if(x >= 25){
+  }else if(x >= transition3){
     y <- exp(predict(stele_SD_lm2, 
                      newdata = data.frame(age = x))) + 
-      rnorm(1, mean = 0, sd = 0.25*exp(predict(stele_SD_lm2, data.frame(age = 25))))
+      rnorm(1, mean = 0, sd = error.fac*exp(predict(stele_SD_lm2, data.frame(age = transition3))))
     
     if(y < 0.001){
       y<- 0.001
@@ -254,12 +252,13 @@ stele_SD <- function(x){
 }
 
 # BUILD PLOT
-plot_list[["stele_cell_diameter"]] <- make_reg_plot(data = stele_cell_diameter_df, 
-              lm1 = stele_cell_diameter_lm1, 
-              lm2 = stele_cell_diameter_lm2, 
-              transition.age = 25, 
-              split = T, 
-              name = "stele_cell_diameter")
+temp <- make_reg_data(data = stele_SD_df, 
+                          lm1 = stele_SD_lm1, 
+                          lm2 = stele_SD_lm2, 
+                          transition.age = transition3, 
+                          split = T)
+reg_data <- rbind(reg_data, temp)
+plot_list[["stele_SD"]] <- make_reg_plot(df = temp, name = "stele_SD")
 
 # ==============================================================================
 # Phloem
@@ -273,36 +272,39 @@ phloem_n_layers_df <- anatomy2E %>% filter(param_id == "phloem_n_layers")
 phloem_n_layers_lm <- lm(phloem_n_layers_df %>% filter(age > 20 & value != 0), formula = ln(abs(value)) ~ age)
 summary(phloem_n_layers_lm)
 
-phloem_n_layers <- function(x){
-  if(x <= 7){
+phloem_n_layers <- function(x, transition1 = 7, transition2 = 20){
+  if(x <= transition1){
     y <- 0.
-  }else if(x > 7 & x < 20){
+  }else if(x > transition1 & x < transition2){
     y <- 1.
-  }else if(x >= 20){
+  }else if(x >= transition2){
     y <- exp(predict(phloem_n_layers_lm, 
                      newdata = data.frame(age = x))) + 
-      rnorm(1, mean = 0, sd = 0.25*exp(predict(phloem_n_layers_lm, data.frame(age = 20))))
+      rnorm(1, mean = 0, 
+            sd = error.fac*exp(predict(phloem_n_layers_lm, 
+                                       data.frame(age = transition2))))
   }
   return(round(abs(y)))
 }
 
 # BUILD PLOT
+rm(df)
 df <- phloem_n_layers_df %>% 
   mutate(reg = 0,
          sd = 0)
 
 for(i in seq(1, length(df$age))){
   if(df$age[i] <= 7){
-    df$reg[i] <- 0.
-    df$sd[i] <- 0.
-  }else if(df$age[i] > 7 & df$age[i] < 20){
-    df$reg[i] <- 1
-    df$sd[i] <- 0
-  }else if(df$age[i] >= 20){
-    df$reg[i] <- exp(predict(phloem_n_layers_lm, 
+    df$reg[i]  <- 0.
+    df$sd[i]   <- 0.
+  }else if(df$age[i] > transition1 & df$age[i] < transition2){
+    df$reg[i]  <- 1
+    df$sd[i]   <- 0
+  }else if(df$age[i] >= transition2){
+    df$reg[i]  <- exp(predict(phloem_n_layers_lm, 
                              newdata = data.frame(age = df$age[i])))
-    df$sd[i] <- round(0.5*exp(predict(phloem_n_layers_lm, 
-                                      newdata = data.frame(age = df$age[25]))))
+    df$sd[i]   <- round(error.fac*exp(predict(phloem_n_layers_lm, 
+                                      newdata = data.frame(age = df$age[transition3]))))
     
   }
 }  
@@ -317,10 +319,10 @@ xplot <- df %>% ggplot() +
   theme_bw()
 
 plot(xplot)
-
 ggsave(filename = "plots/regressions/phloem_n_layers.svg", 
        plot = xplot, device = "svg", width = 4, height = 3)
 
+reg_data <- rbind(reg_data, df)
 plot_list[["phloem_n_layers"]] <- xplot 
 # ================
 ## Phloem cell diameter
@@ -340,10 +342,11 @@ phloem_cell_diameter <- function(x){
 }
 
 # BUILD PLOT
-plot_list[["phloem_cell_diameter"]] <- make_reg_plot(data = phloem_cell_diameter_df, 
-              lm1 = phloem_cell_diameter_lm, 
-              split = F, 
-              name = "phloem_cell_diameter")
+temp <- make_reg_data(data = phloem_cell_diameter_df, 
+                      lm1 = phloem_cell_diameter_lm, 
+                      split = F)
+reg_data <- rbind(reg_data, temp)
+plot_list[["phloem_cell_diameter"]] <- make_reg_plot(df = temp, name = "phloem_cell_diameter")
 
 # ================
 ## Phloem proportion
@@ -365,6 +368,7 @@ phloem_proportion <- function(x){
 }
 
 # BUILD PLOT
+rm(df)
 df <- phloem_proportion_df %>% 
   mutate(reg = 0,
          sd = 0)
@@ -394,6 +398,7 @@ plot(xplot)
 ggsave(filename = "plots/regressions/Phloem_proportion.svg", 
        plot = xplot, device = "svg", width = 4, height = 3)
 
+reg_data <- rbind(reg_data, df)
 plot_list[["phloem_proportion"]] <- xplot 
 # ================
 # Pericycle cell diameter
@@ -410,10 +415,13 @@ pericycle_cell_diameter <- function(x){
   return(y)
 }
 
-plot_list[["pericycle_cell_diameter"]] <- make_reg_plot(data = pericycle_cell_diameter_df, 
-              lm1 = pericycle_cell_diameter_lm, 
-              split = F, 
-              name = "pericycle_cell_diameter")
+
+temp <- make_reg_data(data = pericycle_cell_diameter_df, 
+                      lm1 = pericycle_cell_diameter_lm, 
+                      split = F)
+reg_data <- rbind(reg_data, temp)
+plot_list[["pericycle_cell_diameter"]] <- make_reg_plot(df = temp,
+                                                        name = "pericycle_cell_diameter")
 
 # ================
 # Endodermis cell diameter
@@ -430,13 +438,12 @@ endodermis_cell_diameter <- function(x){
   return(y)
 }
 
-plot_list[["endodermis_cell_diameter"]] <- make_reg_plot(data = endodermis_cell_diameter_df, 
-              lm1 = endodermis_cell_diameter_lm, 
-              split = F, name = "endodermis_cell_diameter")
-
-# ==============================================================================
-# Cortex
-# ==============================================================================
+temp <- make_reg_data(data = endodermis_cell_diameter_df, 
+                      lm1 = endodermis_cell_diameter_lm, 
+                      split = F)
+reg_data <- rbind(reg_data, temp)
+plot_list[["endodermis_cell_diameter"]] <- make_reg_plot(df =temp, 
+                                                         name = "endodermis_cell_diameter")
 
 #=================
 ## Cortex n layers
@@ -457,9 +464,11 @@ cortex_n_layers <- function(x){
   return(round(y))
 }
 
-plot_list[["cortex_n_layers"]] <- make_reg_plot(data = cortex_n_layers_df, 
-              lm1 = cortex_n_layers_lm, 
-              split = F, name = "cortex_n_layers")
+temp <- make_reg_data(data = cortex_n_layers_df, 
+                      lm1 = cortex_n_layers_lm, 
+                      split = F)
+reg_data <- rbind(reg_data, temp)
+plot_list[["cortex_n_layers"]] <- make_reg_plot(df = temp, name = "cortex_n_layers")
 
 #=================
 ## Cortex cell diameter
@@ -477,9 +486,11 @@ cortex_cell_diameter <- function(x){
   return(y)
 }
 
-plot_list[["cortex_cell_diameter"]] <-  make_reg_plot(data = cortex_cell_diameter_df, 
-              lm1 = cortex_cell_diameter_lm, 
-              split = F, name = "cortex_cell_diameter")
+temp <- make_reg_data(data = cortex_cell_diameter_df, 
+                      lm1 = cortex_cell_diameter_lm, 
+                      split = F)
+reg_data <- rbind(reg_data, temp)
+plot_list[["cortex_cell_diameter"]] <-  make_reg_plot(df = temp, name = "cortex_cell_diameter")
 
 #=================
 # Exodermis cell diameter
@@ -497,9 +508,11 @@ exodermis_cell_diameter <- function(x){
   return(y)
 }
 
-plot_list[["exodermis_cell_diameter"]] <- make_reg_plot(data = exodermis_cell_diameter_df, 
-              lm1 = exodermis_cell_diameter_lm, 
-              split = F, name = "exodermis_cell_diameter")
+temp <- make_reg_data(data = exodermis_cell_diameter_df, 
+                      lm1 = exodermis_cell_diameter_lm, 
+                      split = F)
+reg_data <- rbind(reg_data, temp)
+plot_list[["exodermis_cell_diameter"]] <- make_reg_plot(df = temp, name = "exodermis_cell_diameter")
 
 #=================
 # Epidermis cell diameter
@@ -517,8 +530,15 @@ epidermis_cell_diameter <- function(x){
   return(y)
 }
 
-plot_list[["epidermis_cell_diameter"]] <- make_reg_plot(data = epidermis_cell_diameter_df, 
-              lm1 = epidermis_cell_diameter_lm, 
-              split = F, name = "epidermis_cell_diameter")
+temp <- make_reg_data(data = epidermis_cell_diameter_df, 
+                      lm1 = epidermis_cell_diameter_lm, 
+                      split = F)
+reg_data <- rbind(reg_data, temp)
+plot_list[["epidermis_cell_diameter"]] <- make_reg_plot(df = temp, 
+                                                        name = "epidermis_cell_diameter")
 
+
+# ============================================================================ #
+# COMBINE ALL PLOTS
+# ============================================================================ #
 

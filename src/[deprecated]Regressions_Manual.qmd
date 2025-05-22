@@ -6,7 +6,7 @@ editor: source
 
 ```{r}
 head(anatomy2)
-anatomy2E <- anatomy2 %>% merge(CrossSections[c("CS_id", "age")])
+anatomy2E  <- anatomy2 %>% merge(CrossSections[c("CS_id", "age")])
 reg_params <- list()
 
 make_reg_plot <- function(data, lm1, lm2 = NULL, transition.age = 25, split, name, error.ratio = 0.25, out.path = "plots/regressions/"){
@@ -23,7 +23,7 @@ make_reg_plot <- function(data, lm1, lm2 = NULL, transition.age = 25, split, nam
       }
       else{
         df$reg[i] <- exp(predict(lm2, data.frame(age = df$age[i])))
-        df$sd[i] <- 0.25*exp(predict(lm2, data.frame(age = transition.age))) # /!\ 
+        df$sd[i] <- exp(predict(lm2, data.frame(age = transition.age))) # /!\ 
       }
     }  
   }
@@ -45,7 +45,7 @@ make_reg_plot <- function(data, lm1, lm2 = NULL, transition.age = 25, split, nam
   
   plot(xplot)
   
-Z  # ggsave(filename = paste0(out.path, name, ".svg"), 
+  # ggsave(filename = paste0(out.path, name, ".svg"), 
   #        plot = xplot, device = "svg", width = 4, height = 3)
   
 }
@@ -85,7 +85,10 @@ xylem_n_cells <- function(x){
 # ================================================================================
 # BUILD PLOT
 # ================================================================================
-make_reg_plot(data = xylem_n_cells_df, lm1 = xylem_n_cells_lm1, lm2 = xylem_n_cells_lm2, transition.age = 25, split = T, name = "xylem_n_cells")
+make_reg_plot(data = xylem_n_cells_df, 
+              lm1 = xylem_n_cells_lm1, 
+              lm2 = xylem_n_cells_lm2, 
+              transition.age = 25, split = T, name = "xylem_n_cells")
 ```
 
 ## Xylem max size
@@ -329,8 +332,8 @@ xplot <- df %>% ggplot() +
 
 plot(xplot)
 
-ggsave(filename = "plots/regressions/phloem_n_layers.svg", 
-       plot = xplot, device = "svg", width = 4, height = 3)
+# ggsave(filename = "plots/regressions/phloem_n_layers.svg", 
+#        plot = xplot, device = "svg", width = 4, height = 3)
 ```
 
 ## Phloem cell diameter
@@ -407,8 +410,8 @@ xplot <- df %>% ggplot() +
 
 plot(xplot)
 
-ggsave(filename = "plots/regressions/Phloem_proportion.svg", 
-       plot = xplot, device = "svg", width = 4, height = 3)
+# ggsave(filename = "plots/regressions/Phloem_proportion.svg", 
+#        plot = xplot, device = "svg", width = 4, height = 3)
 ```
 
 # Pericycle cell diameter

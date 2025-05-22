@@ -50,7 +50,7 @@ Parameters     <- read.csv("Data/Anatomy/Parameters.csv")[,-1]
 Anatomy_Full   <- read.csv("Data/Anatomy/Anatomy_Full.csv")
 Barriers_Types <- read_xlsx("Data/Barriers_Types.xlsx")
 
-date          <- Sys.Date()
+date           <- Sys.Date()
 
 # Correct units in Parameters
 Parameters$units[Parameters$param_id == "xylem_max_size" | Parameters$param_id == "xylem_cell_diameter"] <- "mm"
@@ -164,11 +164,11 @@ p <- ggplot(data = SG_data) +
   ylab("SG presence") +
   theme_few()
 
+p
 ggsave(filename = "plots/SG_probability.svg", 
        plot = p, width = 3, height = 2, units = "in",
        device = "svg")
 ```
-
 
 All anatomical data in standard table ; Create Anatomy_Full.csv
 
@@ -246,11 +246,13 @@ radius_plot <- ggplot() +
   
   geom_ribbon(data = radius_pred,
               aes(x = age, ymin = lower_ci, ymax = upper_ci),
-              fill = "orange", alpha = 0.5
+              fill = "orange", 
+              alpha = 0.5,
               ) +
   
   geom_point(data = radius_data, 
-             aes(x = age, y = radius), size = 2) + 
+             aes(x = age, y = radius), 
+             size = 1) + 
   
   geom_line(data = radius_pred, 
             aes(x = age, y = radius), 
@@ -261,7 +263,7 @@ radius_plot <- ggplot() +
   ylab("Radius [mm]") +
   theme_bw()
 
-svg("Plots/Radius_Plot.svg", width = 4, height = 3)
+svg("Plots/Radius_Plot.svg", width = 3, height = 2)
 radius_plot
 dev.off()
 ```
@@ -311,7 +313,40 @@ ggplot(Barriers_Timing) +
 
 ## Parameter regressions
 
-See Regressions2.rmd
+Generate individual regressions
+
+```{r}
+source("src/FUNCTIONS/T-Root/Functions.R")
+source("src/Regressions_Auto.R")
+```
+
+```{r}
+data2plot <- reg_data %>% 
+  filter(param_id != "stele_SD") %>% 
+  left_join(Parameters, by = "param_id") %>% 
+  mutate(plot_title = paste(name, "|", type, " [", units, "]"))
+
+p <- ggplot(data2plot) +
+  geom_ribbon(aes(x = age, ymax = reg+sd, ymin = reg-sd),
+              fill = "orange", alpha = 0.5) +
+  geom_point(aes(x = age, y = value)) +
+  geom_line(aes(x = age, y = reg), 
+            color ="red", linetype = 2
+             ) +
+  
+  xlab("Age [d]") +
+  facet_wrap(~plot_title, scales = "free") +
+  theme_few() +
+  theme(strip.text = element_text(size = 9))
+
+ggsave(filename = "./plots/Regressions.svg", plot = p, 
+       device = "svg", width = 10, height = 9)
+
+ggsave(filename = "./plots/Regressions.png", plot = p, 
+       device = "png", width = 10, height = 9)
+
+
+```
 
 # 1) GRANAR
 

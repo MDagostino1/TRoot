@@ -856,3 +856,68 @@ run_mecha <- function(output_path = "MECHA/Projects/granar/out/Tomato/Root/Proje
     }
   )
 }
+
+#===============================================================================
+#===============================================================================
+# Define function to automatically generate plots
+make_reg_data <- function(data, 
+                          lm1, 
+                          lm2 = NULL, 
+                          transition.age = 25, 
+                          split, 
+                          error.ratio = 1,
+                          age.min = 0,
+                          age.max = 30
+){
+  base <- tibble(CS_id    = NaN,
+                 param_id = unique(data$param_id),
+                 value    = NaN,
+                 age      = seq(age.min, age.max)
+                 )
+  df <- rbind(data, base) %>% 
+    mutate(reg = 0,
+           sd = 0)
+  
+  if(split){
+    for(i in seq(1, length(df$age))){
+      if(df$age[i] < transition.age){
+        df$reg[i] <- predict(lm1, data.frame(age = df$age[i]))
+        df$sd[i] <- sd(residuals((lm1)))
+      }
+      else{
+        df$reg[i] <- exp(predict(lm2, data.frame(age = df$age[i])))
+        # df$sd[i] <- error.ratio*exp(predict(lm2, data.frame(age = transition.age))) # /!\ 
+        df$sd[i]  <- sd(residuals(lm2))
+      }
+    }  
+  }
+  else{
+    for(i in seq(1, length(df$age))){
+      df$reg[i] <- predict(lm1, data.frame(age = df$age[i]))
+      df$sd[i] <- sd(residuals((lm1)))
+    }    
+  }
+  return(df)
+}
+#===============================================================================
+#===============================================================================
+make_reg_plot <- function(df, 
+                          name, 
+                          path.out = "plots/regressions/"){
+  
+  xplot <- df %>% ggplot() +
+    geom_ribbon(aes(x = age, ymin = reg-sd, ymax = reg+sd), fill = "orange", alpha = 0.5) +
+    geom_line(aes(x = age, y = reg), color = "red", linetype = 2, linewidth = 1) +
+    geom_point(aes(x = age, y = value)) +
+    xlab("Age [d]") +
+    ylab(paste0(name)) +
+    theme_bw()
+  
+  plot(xplot)
+  
+  ggsave(filename = paste0(path.out, name, ".svg"), 
+         plot = xplot, device = "svg", width = 4, height = 3)
+  
+  return(xplot)
+  
+}
