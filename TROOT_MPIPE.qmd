@@ -56,6 +56,10 @@ for (i in list.files(TRoot_path, pattern = ".R")) {
 Simulations_ID <- read_xlsx(paste0(CRBM.path, "inputs/Simulations_ID.xlsx"))
 Scenarios_ID   <- read_xlsx(paste0(CRBM.path, "inputs/Scenarios_ID.xlsx"))
 RSA.IDs        <- read.csv(paste0(CRBM.path, "inputs/RSA_id.csv"))
+
+# ============================================================================ #
+# define colors 
+S_colors <- c("1A" = 'red', '1B' = 'orange', '2' = 'brown', '3' = 'purple')
 ```
 
 # LOAD ROOT SYSTEM ARCHITECTURES
@@ -302,8 +306,9 @@ ggplot(Conds.tot) +
   geom_line(aes(x = x, y = y, color = S_ID),
             size = 1,
             alpha = 0.5) +
+  scale_color_manual(values = S_colors) +
   facet_grid(type~S_ID, scales = "free") +
-  theme_bw()
+  theme_test()
 
 # ============================================================================ #
 # Add root types
@@ -318,29 +323,29 @@ Plot all together with a rectangle for MS
 ```{r}
 # Create rectangles
 rect_data <- expand.grid(start = 0, end = 0, 
-                         MS = c("T1", "T2"), 
+                         MS = c("En.CS-Ex.LC", "En.CS-Ex.Sub"), 
                          S_ID = unique(Conds.tot$S_ID))
 
 # Define rectangle coordinates
-rect_data$start[rect_data$S_ID == "1A" & rect_data$MS == "T1"] <- 1
-rect_data$end[rect_data$S_ID   == "1A" & rect_data$MS == "T1"] <- 7
-rect_data$start[rect_data$S_ID == "1A" & rect_data$MS == "T2"] <- 8
-rect_data$end[rect_data$S_ID   == "1A" & rect_data$MS == "T2"] <- 60
+rect_data$start[rect_data$S_ID == "1A" & rect_data$MS == "En.CS-Ex.LC"] <- 1
+rect_data$end[rect_data$S_ID   == "1A" & rect_data$MS == "En.CS-Ex.LC"] <- 7
+rect_data$start[rect_data$S_ID == "1A" & rect_data$MS == "En.CS-Ex.Sub"] <- 8
+rect_data$end[rect_data$S_ID   == "1A" & rect_data$MS == "En.CS-Ex.Sub"] <- 60
 
-rect_data$start[rect_data$S_ID == "1B" & rect_data$MS == "T1"] <- 1
-rect_data$end[rect_data$S_ID   == "1B" & rect_data$MS == "T1"] <- 7
-rect_data$start[rect_data$S_ID == "1B" & rect_data$MS == "T2"] <- 8
-rect_data$end[rect_data$S_ID   == "1B" & rect_data$MS == "T2"] <- 60
+rect_data$start[rect_data$S_ID == "1B" & rect_data$MS == "En.CS-Ex.LC"] <- 1
+rect_data$end[rect_data$S_ID   == "1B" & rect_data$MS == "En.CS-Ex.LC"] <- 7
+rect_data$start[rect_data$S_ID == "1B" & rect_data$MS == "En.CS-Ex.Sub"] <- 8
+rect_data$end[rect_data$S_ID   == "1B" & rect_data$MS == "En.CS-Ex.Sub"] <- 60
 
-rect_data$start[rect_data$S_ID == "2" & rect_data$MS == "T1"]  <- 1
-rect_data$end[rect_data$S_ID   == "2" & rect_data$MS == "T1"]  <- 60
-rect_data$start[rect_data$S_ID == "2" & rect_data$MS == "T2"]  <- 0
-rect_data$end[rect_data$S_ID   == "2" & rect_data$MS == "T2"]  <- 0
+rect_data$start[rect_data$S_ID == "2" & rect_data$MS == "En.CS-Ex.LC"]  <- 1
+rect_data$end[rect_data$S_ID   == "2" & rect_data$MS == "En.CS-Ex.LC"]  <- 60
+rect_data$start[rect_data$S_ID == "2" & rect_data$MS == "En.CS-Ex.Sub"]  <- 0
+rect_data$end[rect_data$S_ID   == "2" & rect_data$MS == "En.CS-Ex.Sub"]  <- 0
 
-rect_data$start[rect_data$S_ID == "3" & rect_data$MS == "T1"]  <- 1
-rect_data$end[rect_data$S_ID   == "3" & rect_data$MS == "T1"]  <- 60
-rect_data$start[rect_data$S_ID == "3" & rect_data$MS == "T2"]  <- 0
-rect_data$end[rect_data$S_ID   == "3" & rect_data$MS == "T2"]  <- 0
+rect_data$start[rect_data$S_ID == "3" & rect_data$MS == "En.CS-Ex.LC"]  <- 1
+rect_data$end[rect_data$S_ID   == "3" & rect_data$MS == "En.CS-Ex.LC"]  <- 60
+rect_data$start[rect_data$S_ID == "3" & rect_data$MS == "En.CS-Ex.Sub"]  <- 0
+rect_data$end[rect_data$S_ID   == "3" & rect_data$MS == "En.CS-Ex.Sub"]  <- 0
 
 # Create plot
 S_full_plot <- ggplot(data = Conds.tot) +
@@ -354,11 +359,10 @@ S_full_plot <- ggplot(data = Conds.tot) +
   ) +
   
   # Display curves
-  geom_line(aes(x = x, y = y, 
-                color = type),
+  geom_line(aes(x = x, y = y),
             linewidth = 1) +
   
-  # scale_color_manual(values = colors) +
+  # scale_color_manual(values = S_colors) +
   
   facet_grid(type~S_ID, scales = "free_y") +
   ylab("Value [normalised]") +
@@ -451,7 +455,17 @@ for(si in S_list){
 }
 
 Macro_full <- Macro_full %>% 
-  mutate(Sim_ID = paste0(RSA_id, "_", Scenario_ID))
+  mutate(Sim_ID = paste0(RSA_id, "_", Scenario_ID)) 
+
+write.csv(x = RSHA_full, file = paste0(path.results, "RSHA_full.csv"), row.names = F)
+write.csv(x = Macro_full, file = paste0(path.results, "Macro_full.csv"), row.names = F)
+```
+
+# LOAD AND ANALYSE RESULTS
+
+```{r}
+RSHA_full  <- read.csv(paste0(path.results, "RSHA_full.csv"))
+Macro_full <- read.csv(paste0(path.results, "Macro_full.csv"))
 ```
 
 ## Analyse Krs
@@ -474,9 +488,12 @@ p <- ggplot(Macro_full) +
                ,width = 0.5
                ,outlier.shape = NA)+
   
+  scale_fill_manual(values = S_colors) +
+  scale_color_manual(values = S_colors) +
+  
   xlab("Age [d]") +
   ylab(expr(K[rs] ~ "[" ~ m^{4} ~ MPa^{-1} ~ s^{-1} ~ "]"))     +
-  theme_classic()
+  theme_few()
 
 
 p
@@ -529,8 +546,8 @@ SUF_plot <- ggplot(data = SUF_df2) +
     ylab("Standart Uptake Fractions [-]") +
     xlab("depth [cm]") +
     
-    facet_wrap(~age, ncol = 1, scales = "free_y") +
-    # coord_flip() +
+    facet_wrap(~age, nrow = 1, scales = "free_y") +
+    coord_flip() +
     # ggtitle(paste0("Sum of SUF per scenario")) +
     theme_few() +
     theme(axis.text.x  = element_text(size = 8, angle = 90, hjust = 1, vjust = 0.5))
@@ -538,7 +555,7 @@ SUF_plot <- ggplot(data = SUF_df2) +
 SUF_plot
 ggsave(filename = paste0(path.plots, "SUF_sum_full.svg"), 
        plot = SUF_plot, 
-       device = "svg", width = 5, height = 4)
+       device = "svg", width = 6, height = 3)
 ```
 
 ## Compare all root systems

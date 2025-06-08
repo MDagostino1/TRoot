@@ -66,6 +66,9 @@ Make_Virtual_Roots3 <- function(Parameters = Parameters,
         type_temp <- Params[c("name","type")][c,][,2]
         #===============================================================================
       
+        # cat("Computing root : ", i, " | name : ", name_temp, " | type : ", type_temp, "\n")
+        # flush.console()
+        
         function_temp <- Params["param_id"][c,]
         
         if(function_temp == "endodermis_n_layers" | function_temp == "exodermis_n_layers" | function_temp == "epidermis_n_layers" | function_temp == "pericycle_n_layers"){

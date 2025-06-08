@@ -184,7 +184,6 @@ Conductivities_processed <- Conductivities_processed %>%
                                "T1" = "En.CS-Ex.LC",
                                "T2" = "En.CS-Ex.Sub",
                                "T3" = "En.Sub-Ex.Sub"))
-  
 ```
 
 
@@ -228,14 +227,12 @@ kr_plot1 <- ggplot(data = Conductivities_processed,
   labs(color = expression(kAQP ~ "[" ~ 10^{-7} ~ m ~ s^{-1} ~ MPa^{-1} ~ "]")) +
   xlab("Age [d]") +
   # ggtitle("Hydraulic Radial conductivity") +
-  theme_few()
+  theme_dark()
 kr_plot1
 #============================================================================
-Kr_plot1 <- ggplot(data = Conductivities_processed,
-       aes(x = x,
-           y = Kr,
-           color = kAQP*1e7)) +
-  geom_jitter(alpha = 0.2) +
+Kr_plot1 <- ggplot(data = Conductivities_processed) +
+  geom_point(aes(x = x, y = Kr, color = kAQP*1e7),
+              alpha = 0.2) +
   facet_wrap(~Barrier_Name) +
   scale_color_viridis() +
   ylab(expression(K[r] ~ "[" ~ m^{3} ~ s^{-1} ~ MPa^{-1} ~ "]")) +
@@ -385,84 +382,16 @@ visreg(rlm2)
 
 Okey, so this is nice. With these two regression function, we coded the "radius" function.
 
-### 1.2) Effect of radius on kr
-
-Here we start by looking at the relation between kr, root age and root radius, per Maturation Stage, at fixed kAQP (= 4e-04). We split in two : between 0 and 25 days their is \~linear increase in kr. After 25 days, kr drops linarly.
-
-```{r Effect of radius on kr}
-print(unique(Conductivities_processed$kAQP)[order(unique(Conductivities_processed$kAQP))])
-# =============================================================================
-subset1 <- Conductivities_processed %>% filter(x < 25)
-subset2 <- Conductivities_processed %>% filter(x >= 25)
-
-subset1_1 <- subset1%>%filter(kAQP == 5.787e-7)
-subset2_1 <- subset2%>%filter(kAQP == 5.787e-7)
-
-cor(subset1$kr, subset1$radius)
-cor(subset2$kr, subset2$radius)
-
-#===============================================================================
-# Individual MS
-
-MS_indi <- ggplot(data = Conductivities_processed %>% filter(kAQP == "4e-04")) +
-  geom_point(aes(x = x, y = kr), color = "blue", alpha = 0.3) + 
-  # geom_smooth(aes(x = x, y = kr), color = "blue") +
-  geom_smooth(data = subset1_1, aes(x = x, y = kr), color = "blue", method = "lm") +
-  geom_smooth(data = subset2_1, aes(x = x, y = kr), color = "blue", method = "lm") +
-  
-  geom_point(aes(x = x, y = radius/(1e07)), color = "red",alpha = 0.3) +
-  geom_smooth(aes(x= x , y =radius/(1e07)), color = "red") +
-  facet_wrap(~Barrier) +
-  ggtitle("Full Timeline") +
-  theme_test()
-  
-MS_indi
-
-#===============================================================================
-MS_indi2 <- ggplot(data = subset1_1) +
-  geom_point(aes(x = x, y = kr), color = "blue", alpha = 0.3) +
-  geom_smooth(aes(x = x, y = kr), color = "blue", method = 'lm') +
-  
-  geom_point(aes(x = x, y = radius/(1e07)), color = "red", alpha = 0.3) +
-  geom_smooth(aes(x= x , y =radius/(1e07)), color = "red", method = 'lm') +
-  facet_wrap(~Barrier) +
-  ggtitle("First Stage") +
-  theme_test()
-MS_indi2
-
-#===============================================================================
-MS_indi3 <- ggplot(data = subset2_1) +
-  geom_point(aes(x = x, y = kr), color = "blue", alpha = 0.3) + 
-  geom_smooth(aes(x = x, y = kr), color = "blue", method = 'lm') +
-  
-  geom_point(aes(x = x, y = radius/(1e07)), color = "red", alpha = 0.3) +
-  geom_smooth(aes(x= x , y =radius/(1e07)), color = "red", method = 'lm') +
-  facet_wrap(~Barrier) +
-  ggtitle("Second Stage") +
-  theme_test()
-MS_indi3
-```
-
-Simple linear model ? Just to see in constant kAQP and MS Not efficient
-
-```{r}
-print("FIRST PHASE")
-rad_lm <- lm(data = subset1_1, formula = kr ~ x + radius + Barrier)
-summary(rad_lm)
-anova(rad_lm)
-
-print("SECOND PHASE")
-rad_lm <- lm(data = subset2_1, formula = kr ~ x + radius + Barrier + radius:Barrier)
-summary(rad_lm)
-anova(rad_lm)
-```
-
 ## 2) Influence of Aquaporins
 
 ```{r}
 ggplot(data = Conductivities_processed) +
-  geom_jitter(aes(x = kAQP*10000, y = kr, color = Barrier), alpha = 0.1) +
-  geom_smooth(aes(x = kAQP*10000, y = kr, color = Barrier)) +
+  geom_point(aes(x = kAQP*10000, 
+                  y = kr, 
+                  color = Barrier_Name), alpha = 0.1) +
+  geom_smooth(aes(x = kAQP*10000, 
+                  y = kr, 
+                  color = Barrier_Name)) +
   # facet_wrap(~Barrier) +
   
   theme_test()
@@ -499,7 +428,7 @@ data2plot$Exodermis <- factor(data2plot$Exodermis, levels = c("none", "CS", "LC"
 
 # ============================================================================ #
 MS_all <- ggplot(data = data2plot,
-                 aes(x = Exodermis,
+                 aes(x = Barrier_Name,
                      y = kr*10^8)) +
   
   # ADD POINTS
@@ -516,11 +445,11 @@ MS_all <- ggplot(data = data2plot,
               alpha = 1) +
   
   # ADD BOXPLOTS
-  geom_boxplot(aes(fill = Exodermis),
+  geom_boxplot(aes(fill = Barrier_Name),
                width = 0.2,
                alpha = 1) +
   
-  facet_wrap(~Endodermis, scales = "free_x") +
+  # facet_wrap(~Endodermis, scales = "free_x") +
   
   # CUSTOM LABELS
   xlab("Exodermis apoplastic barrier") +
@@ -588,10 +517,10 @@ mean_T1 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS-Ex.LC"]
 mean_T2 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS-Ex.Sub"]
 mean_T3 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.Sub-Ex.Sub"]
 
-print(paste0("Difference between En.CS and En.CS-Ex.LC [%] : ", round((mean_M1-mean_T1)*100/mean_M1, digits = 2)))
-print(paste0("Difference between En.CS-Ex.Sub and En.CS-Ex.LC [%] : ", round((mean_T1-mean_T2)*100/mean_T1, digits = 2)))
+print(paste0("Difference between En.CS and En.CS-Ex.LC [%]         : ", round((mean_M1-mean_T1)*100/mean_M1, digits = 2)))
+print(paste0("Difference between En.CS-Ex.Sub and En.CS-Ex.LC [%]  : ", round((mean_T1-mean_T2)*100/mean_T1, digits = 2)))
 print(paste0("Difference between En.Sub-Ex.Sub and En.CS-Ex.LC [%] : ", round((mean_T1-mean_T3)*100/mean_T1, digits = 2)))
-print(paste0("Difference between En.Sub and En.Sub-Ex.CS [%] : ", round((mean_M2-mean_M3)*100/mean_M2, digits = 2)))
+print(paste0("Difference between En.Sub and En.Sub-Ex.CS [%]       : ", round((mean_M2-mean_M3)*100/mean_M2, digits = 2)))
 ```
 
 # COMPLETE STATISTICAL ANALYSIS
@@ -612,7 +541,12 @@ summary(lm_kr0)
 cat("================= \n  ANOVA \n=================\n")
 anova(lm_kr0)
 cat("================= \n  MEAN COMPARISON \n=================\n")
-emmeans(lm_kr0, specs = pairwise ~ Barrier_Name:kAQP)
+EM <- emmeans(lm_kr0, specs = pairwise ~ Barrier_Name:kAQP)
+EM
+```
+
+```{r}
+test <- EM$contrasts
 ```
 
 ```{r}

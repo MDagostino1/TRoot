@@ -10,7 +10,7 @@ plot.path <- "./plots/regressions/"
 transition1 <- 7
 transition2 <- 20
 transition3 <- 25
-error.fac   <- 1
+error.fac   <- 0.25
 # ========================================== #
 # ========================================== #
 
@@ -47,7 +47,11 @@ xylem_n_cells <- function(x){
                      newdata = data.frame(age = x)) +
                rnorm(1, 
                      mean = 0, 
-                     sd = error.fac*exp(predict(xylem_n_cells_lm2, data.frame(age = transition3)))))
+                     sd = error.fac*predict(xylem_n_cells_lm2, 
+                                                data.frame(age = x)
+                                            )
+                     )
+             )
   }
   
   return(round(y))
@@ -135,11 +139,15 @@ stele_layer_diameter <- function(x){
       rnorm(1, mean = 0, sd = sd(residuals(stele_layer_diameter_lm1)))
   }else if(x >= transition3){
     y <- exp(predict(stele_layer_diameter_lm2, 
-                     newdata = data.frame(age = x)) + 
-               rnorm(1, mean = 0, 
-                     sd = error.fac*exp(predict(stele_layer_diameter_lm2, data.frame(age = transition3)))
+                     newdata = data.frame(age = x)
+                     )
+             ) + 
+         rnorm(1, mean = 0, 
+               sd = error.fac*exp(predict(stele_layer_diameter_lm2, 
+                                          data.frame(age = x)
+                                          )
+                                  )
                )
-    )
     
     if(y < 0.2){
       y <- 0.2
@@ -176,10 +184,15 @@ stele_cell_diameter <- function(x){
       rnorm(1, mean = 0, sd = sd(residuals(stele_cell_diameter_lm1)))
   }else if(x >= transition3){
     y <- exp(predict(stele_cell_diameter_lm2, 
-                     newdata = data.frame(age = x))) + 
-      rnorm(1, mean = 0, 
-            sd = error.fac*exp(predict(stele_cell_diameter_lm2, 
-                                       data.frame(age = transition3))))
+                     newdata = data.frame(age = x)
+                     )
+             ) +
+          rnorm(1, mean = 0,
+                sd = 0.25*exp(predict(stele_cell_diameter_lm2,
+                                      data.frame(age = 25)
+                                      )
+                              )
+                     )
     
     if(y < 0.01){
       y <- 0.01
@@ -240,8 +253,16 @@ stele_SD <- function(x){
       rnorm(1, mean = 0, sd = sd(residuals(stele_SD_lm1)))
   }else if(x >= transition3){
     y <- exp(predict(stele_SD_lm2, 
-                     newdata = data.frame(age = x))) + 
-      rnorm(1, mean = 0, sd = error.fac*exp(predict(stele_SD_lm2, data.frame(age = transition3))))
+                     newdata = data.frame(age = x)
+                     )
+             ) +
+         rnorm(1,
+               mean = 0,
+               sd = error.fac*exp(predict(stele_SD_lm2, 
+                                          data.frame(age = x)
+                                          )
+                                  )
+                     )
     
     if(y < 0.001){
       y<- 0.001
@@ -279,10 +300,15 @@ phloem_n_layers <- function(x, transition1 = 7, transition2 = 20){
     y <- 1.
   }else if(x >= transition2){
     y <- exp(predict(phloem_n_layers_lm, 
-                     newdata = data.frame(age = x))) + 
-      rnorm(1, mean = 0, 
-            sd = error.fac*exp(predict(phloem_n_layers_lm, 
-                                       data.frame(age = transition2))))
+                     newdata = data.frame(age = x)
+                     ) +
+               rnorm(1, 
+                     mean = 0, 
+                     sd = error.fac*predict(phloem_n_layers_lm, 
+                                            data.frame(age = transition2)
+                                            )
+                     )
+             )
   }
   return(round(abs(y)))
 }

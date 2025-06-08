@@ -921,3 +921,72 @@ make_reg_plot <- function(df,
   return(xplot)
   
 }
+
+#===============================================================================
+#===============================================================================
+# MERGE DISLOCATED CELLS IN CELLSET
+merge_cells <- function(CellSet_sf, cell2merge){
+  
+  # Merge all cells indicated in cell2merge
+  merged_sf_data <- list()
+  for(CS_id_i in unique(CellSet_sf$CS_id)){
+    
+    section_data <- CellSet_sf[CellSet_sf$CS_id == CS_id_i, ]
+    
+    if(CS_id_i %in% names(cell2merge)){
+      for(pair in cell2merge[[CS_id_i]]) {
+        # Extract the polygons to merge
+        polys_to_merge <- section_data[section_data$id_cell %in% pair, ]
+        
+        # Merge the polygons
+        merged_poly <- st_union(polys_to_merge)
+        
+        # Replace the original polygons with the merged polygon
+        new_row <- data.frame(
+          CS_id    = CS_id_i,
+          id_cell  = pair[1],
+          geometry = list(merged_poly),
+          stringsAsFactors = FALSE
+        )
+        
+        # Replace the original polygons with the merged polygon
+        section_data <- section_data %>%
+          filter(!id_cell %in% pair) %>% 
+          bind_rows(new_row)
+      }
+    }
+    
+    merged_sf_data[[CS_id_i]] <- section_data
+  }
+  
+  # Combine the merged data
+  CellSet_clean <- do.call(rbind, merged_sf_data)
+  return(CellSet_clean)
+}
+#===============================================================================
+#===============================================================================
+sf_to_df <- function(CellSet_clean){
+  CellSet_clean_df <- tibble(CS_id = character(),
+                             id_cell = character(),
+                             x = numeric(),
+                             y = numeric()
+  )
+  
+  for(i in seq(1, nrow(CellSet_clean))){
+    
+    cat("\r Iteration : ", sprintf("%04d", i), "/", nrow(CellSet_clean))
+    flush.console()
+    
+    temp_coords <- as_tibble(st_coordinates(CellSet_clean$geometry[i]))
+    
+    temp_df <- tibble(CS_id = CellSet_clean$CS_id[i],
+                      id_cell = CellSet_clean$id_cell[i],
+                      x = temp_coords$X,
+                      y = temp_coords$Y
+    )
+    
+    CellSet_clean_df <- rbind(CellSet_clean_df, temp_df)
+    
+  }
+  return(CellSet_clean_df)
+}
