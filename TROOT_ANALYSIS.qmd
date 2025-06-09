@@ -161,19 +161,18 @@ Data_Full                <- Data_Full %>% filter(x != 0)
 ```
 
 Change M1, M2, M3 etc by explicit names : \
-M1 = .-cs
-M2 = .-Sub
-M3 = CS-Sub
-T1 = LC-CS
-T2 = Sub-CS
-T3 = Sub-Sub
 
-M1 = En.CS
-M2 = En.Sub
-M3 = Ex.CS-En.Sub
-T1 = Ex.LC-En.CS
-T2 = Ex.Sub-En.CS
-T3 = Ex.Sub-En.Sub
+* M1 = En.CS 
+
+* M2 = En.Sub 
+
+* M3 = Ex.CS-En.Sub
+
+* T1 = Ex.LC-En.CS 
+
+* T2 = Ex.Sub-En.CS 
+
+* T3 = Ex.Sub-En.Sub 
 
 ```{r}
 Conductivities_processed <- Conductivities_processed %>% 
@@ -386,17 +385,18 @@ Okey, so this is nice. With these two regression function, we coded the "radius"
 
 ```{r}
 ggplot(data = Conductivities_processed) +
-  geom_point(aes(x = kAQP*10000, 
+  geom_point(aes(x = kAQP*1e7, 
                   y = kr, 
                   color = Barrier_Name), alpha = 0.1) +
-  geom_smooth(aes(x = kAQP*10000, 
+  geom_smooth(aes(x = kAQP*1e7, 
                   y = kr, 
                   color = Barrier_Name)) +
   # facet_wrap(~Barrier) +
   
   theme_test()
 
-kAQP_lm <- lm(data = Conductivities_processed, formula = kr ~ kAQP*Barrier)
+kAQP_lm <- lm(data = Conductivities_processed, 
+              formula = kr ~ kAQP*Barrier)
 anova(kAQP_lm)
 ```
 
@@ -928,3 +928,34 @@ plot_grid(p_kr, p_Kx, p_Kr,
           ncol = 3)
 dev.off()
 ```
+
+# DEV
+
+```{r}
+data2plot <- Anatomy_Full
+```
+
+```{r}
+data2plot <- Conductivities_processed %>% 
+  mutate(kAQP_scaled = 1e7*kAQP,
+         kr_scaled = 1e8*kr) 
+
+ggplot(data = data2plot) +
+  geom_jitter(aes(x = radius, y = kr_scaled, color = kAQP_scaled)) + 
+  scale_color_viridis() +
+  facet_wrap(~Barrier_Name) +
+  theme_test()
+```
+
+```{r}
+data2plot <- Conductivities_processed %>% 
+  mutate(kAQP_scaled = 1e7*kAQP,
+         kr_scaled = 1e8*kr) 
+
+test_lm <- lm(data = data2plot, 
+              formula = kr_scaled ~ Barrier_Name*I(kAQP_scaled^0.5))
+
+summary(test_lm)
+visreg(test_lm, by = "kAQP_scaled")
+```
+

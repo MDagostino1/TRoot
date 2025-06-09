@@ -648,6 +648,53 @@ ggsave(filename = "RSHA_suf_example.png", plot = p
        ,width = 6, height = 4)
 ```
 
+## Plot only one
+
+```{r}
+## Select only one to make a figure
+data2plot <- RSHA_full %>% filter(RSHA_id == "Tomato_60_1_60_1A")
+
+data2plot_main <- data2plot %>% filter(type == 1)
+data2plot_lat <- data2plot %>% filter(type == 2)
+
+p <- ggplot() +
+  
+  geom_segment(data = data2plot_main,
+               aes(x = x1, xend = x2,
+                   y = z1, yend = z2,
+                   size = radius),
+               color = "black") +  
+  
+  geom_segment(data = data2plot_lat,
+               aes(x = x1, xend = x2,
+                   y = z1, yend = z2,
+                   # color = SUF, 
+                   size = radius)) +
+  
+  scale_size_continuous(range = c(0.5, 1), 
+                        limits = c(min(data2plot$radius), 
+                                   max(data2plot$radius))) +
+  
+  # scale_color_viridis_c(option = "magma",
+  #                         breaks = c(min(data2plot_lat$SUF), 
+  #                                    max(data2plot_lat$SUF)),
+  #                         labels = c("low", "high"),
+  #                         direction = 1
+  #                         # , limits = c(0, max(RSHA.all$SUF[RSHA.all$RSA_id == RSA_id_i]))
+  #                         ) +
+  
+  # facet_wrap(~ Scenario_ID, nrow = 1) +
+  coord_fixed() +
+  theme_void() +
+  theme(legend.position = "none")
+
+p
+
+ggsave(filename = "RSA_visu_example.png", plot = p
+       ,device = "png"
+       ,path = path.plots
+       ,width = 4, height = 8)
+```
 
 # STATISTICAL ANALYSIS
 
@@ -694,4 +741,6 @@ for(age_i in unique(SUF_df2$age[order(SUF_df2$age)])){
   print(ks_test)
 }
 ```
+
+
 
