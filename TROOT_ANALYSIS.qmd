@@ -193,31 +193,49 @@ Conductivities_processed <- Conductivities_processed %>%
 ```{r Plot Pure Data}
 # kr vs kAQP
 kAQP_plot1 <- ggplot(data = Conductivities_processed,
-                     aes(x=(kAQP*10000), 
+                     aes(x=(kAQP*10^7), 
                          y = kr*1e08,
-                         color = Barrier_Name))+
-  geom_point(aes(x = kAQP*10000),
-             position = "jitter",
-             alpha = 0.05) +
+                         # color = Barrier_Name,
+                         group = Barrier_Name),
+                     color = "black")+
+  
+  # geom_jitter(aes(x = kAQP*10000),
+  #            alpha = 0.05,
+  #            width = 1e-4) +
+  
   # geom_boxplot(aes(x = as.factor(kAQP*10000), y = kr, color = Barrier))+
   # facet_wrap(~Barrier) +
   # scale_color_viridis() +
-  geom_smooth(linewidth = 2) +
-  ylab(expression(k[r] ~ 10^{8} ~ "[" * m ~ MPa^{-1} ~ s^{-1}*"]")) +
+  
+  geom_smooth(linewidth = 2, color = "black") +
+  
+  ylab(expression(k[r] ~ 10^{-8} ~ "[" * m ~ MPa^{-1} ~ s^{-1}*"]")) +
   # xlab("kAQP [10e-04 cm hPA-1 d-1]") +
-  xlab(expression(kAQP ~ 10^{-4} ~ "[" * cm ~ hPa^{-1} ~ d^{-1} * "]")) +
+  xlab(expression(kAQP ~ 10^{-7} ~ "[" * cm ~ hPa^{-1} ~ d^{-1} * "]")) +
   ylim(2, 12) +
   theme_test() 
   # theme(legend.position = "none")
 kAQP_plot1
-# ggsave(filename = "plots/AQP_influence.svg", plot = kAQP_plot1, device = "svg", width = 4, height = 3, units = "in")
+
+ggsave(filename = "plots/AQP_influence.svg", 
+       plot = kAQP_plot1, 
+       device = "svg", units = "in",
+       width = 4, height = 3)
+```
+
+
+```{r Plot Pure Data}
 #============================================================================
 # kr
-kr_plot1 <- ggplot(data = Conductivities_processed,
+kr_plot1 <- ggplot(data = Conductivities_processed %>% 
+                     filter(Barrier_Name %in% c("En.CS", 
+                                                "En.CS-Ex.LC", 
+                                                "En.CS-Ex.Sub")
+                            ),
        aes(x = x, 
            y = kr*10^8,
            color = kAQP*1e7)) +
-  geom_point(alpha = 0.5, position = "jitter") +
+  geom_point(alpha = 0.75, position = "jitter") +
   facet_wrap(~Barrier_Name) +
   scale_color_viridis() +
   # geom_smooth(aes(x = x, y = radius/5000000), color = "red") +
@@ -229,9 +247,12 @@ kr_plot1 <- ggplot(data = Conductivities_processed,
   theme_dark()
 kr_plot1
 #============================================================================
-Kr_plot1 <- ggplot(data = Conductivities_processed) +
+Kr_plot1 <- ggplot(data = Conductivities_processed%>% 
+                     filter(Barrier_Name %in% c("En.CS", 
+                                                "En.CS-Ex.LC", 
+                                                "En.CS-Ex.Sub"))) +
   geom_point(aes(x = x, y = Kr, color = kAQP*1e7),
-              alpha = 0.2) +
+              alpha = 0.75) +
   facet_wrap(~Barrier_Name) +
   scale_color_viridis() +
   ylab(expression(K[r] ~ "[" ~ m^{3} ~ s^{-1} ~ MPa^{-1} ~ "]")) +
@@ -257,6 +278,7 @@ Perimeter_plot1 <- ggplot(data = Conductivities_processed,
                        aes(x = x, y = perimeter)) +
   geom_point(alpha = 0.01) +
   # geom_smooth() +
+  
   theme_test() +
   ylab("Perimeter [cm]") +
   xlab("Age [d]") 
@@ -264,22 +286,24 @@ Perimeter_plot1 <- ggplot(data = Conductivities_processed,
 Perimeter_plot1
 #============================================================================
 # Kx
-kx_plot1 <- ggplot(data = Conductivities_processed%>%
-                     filter(Barrier_Name == "T1" & kAQP == min(Conductivities_processed$kAQP)),
+data2plot_kx <- Conductivities_processed %>%
+  filter(Barrier_Name == "En.CS-Ex.LC" & kAQP == min(Conductivities_processed$kAQP))
+kx_plot1 <- ggplot(data = data2plot_kx,
        aes(x = x, 
            y = Kx,
            color = radius)) +
-  geom_point(alpha = 1) +
+  geom_point(alpha = 1, size = 2) +
   # geom_smooth(method = "lm") +
   scale_y_log10() +
   # geom_smooth(method = "lm", se = T) +
-  scale_color_viridis(option = "magma", direction = 1) +
+  scale_color_viridis(option = "magma", direction = -1, breaks = c(0.2, 0.3, 0.4)) +
+  # scale_color_gradient(breaks = c(0.2, 0.3, 0.4)) +
   # ylim(0, 3e-08) +
-  ylab(expression(ln(K[x]) ~ "[" ~ m^{4} ~ s^{-1} ~ hPa^{-1} ~ "]")) +
+  ylab(expression(K[x] ~ "[" ~ m^{4} ~ s^{-1} ~ hPa^{-1} ~ "]")) +
   xlab("Age [d]") +
-  labs(color = "Radius [cm]") +
+  labs(color = "Radius [mm]") +
   # ggtitle("Hydraulic axial conductance") +
-  theme_bw()
+  theme_test()
 kx_plot1
 ```
 
@@ -294,11 +318,11 @@ png("Plots/kr_plot_1.png", height = 5, width = 8, units = "in", res = 300)
 kr_plot1 
 dev.off()
 
-png("Plots/Kx_plot_1.png", height = 3, width = 5, units = "in", res = 300)
+svg("Plots/Kx_plot_1.svg", height = 3, width = 5)
 kx_plot1
 dev.off()
 
-svg("Plots/Kr_plot_1.svg", height = 5, width = 8)
+png("Plots/RadialConductance_plot_1.png", height = 5, width = 8, units = "in", res = 200)
 Kr_plot1
 dev.off()
 
@@ -310,6 +334,32 @@ svg("Plots/Perimeter_plot_1.svg", height = 3, width = 8)
 Perimeter_plot1
 dev.off()
 ```
+
+### kr Plot with fixed kAQP
+
+```{r}
+unique(Conductivities_processed$kAQP)
+
+data2plot <- Conductivities_processed #%>% filter(kAQP == 1.1574e-06)
+
+ggplot(data2plot) +
+  geom_point(aes(x = x, y = kr, color = as.factor(kAQP))) +
+  geom_smooth(aes(x = x, y = kr, color = as.factor(kAQP))) +
+  facet_wrap(~Barrier_Name)
+```
+
+```{r}
+data2plot <- Conductivities_processed %>% 
+  group_by(Barrier_Name) %>% 
+  summarise(kr_mean = mean(kr),
+         kr_sd = sd(kr)
+         )
+
+ggplot() +
+  geom_point(data = data2plot,
+             aes(x = kAQP, y = kr_mean))
+```
+
 
 # Statistical Analysis per variable
 
@@ -445,7 +495,7 @@ MS_all <- ggplot(data = data2plot,
               alpha = 1) +
   
   # ADD BOXPLOTS
-  geom_boxplot(aes(fill = Barrier_Name),
+  geom_boxplot(aes(fill = Endodermis),
                width = 0.2,
                alpha = 1) +
   
@@ -466,7 +516,7 @@ MS_all <- ggplot(data = data2plot,
 # ============================================================================ #
 MS_all
 
-svg("Plots/Maturation_Stages_All.svg", height = 4, width = 5)
+svg("Plots/kr_Maturation_Stages.svg", height = 4, width = 5)
 MS_all
 dev.off()
 ```
@@ -478,6 +528,7 @@ Stats :
 ```{r}
 MS_lm <- lm(data = Conductivities_processed, formula = kr ~ Barrier_Name)
 
+plot(MS_lm)
 summary(MS_lm)
 anova(MS_lm)
 emmeans(MS_lm, specs = pairwise ~ Barrier_Name)
@@ -651,15 +702,16 @@ This is very nice. So we see different informations : \
 
 Really nice !
 
-## 2) Axial Kr
+## 2) Axial Kx
 
 ```{r}
 Kx_lm <- lm(data = Data_Full%>%filter(Barrier_Name == "T1" & kAQP == 1.1570e-07), 
-            formula = ln(Kx) ~ radius + x)
+            formula = ln(Kx) ~ radius+x)
 
+plot(Kx_lm)
 summary(Kx_lm)
 anova(Kx_lm)
-plot(Kx_lm)
+
 
 coefficients_Kx <- tibble(a   = Kx_lm$coefficients[1],
                           r   = Kx_lm$coefficients[2],

@@ -59,7 +59,7 @@ RSA.IDs        <- read.csv(paste0(CRBM.path, "inputs/RSA_id.csv"))
 
 # ============================================================================ #
 # define colors 
-S_colors <- c("1A" = 'red', '1B' = 'orange', '2' = 'brown', '3' = 'purple')
+S_colors <- c("WT" = '#0070C0', 'AQP' = '#0070C0', 'Sub' = '#0070C0', 'Sub+SG' = '#0070C0')
 ```
 
 # LOAD ROOT SYSTEM ARCHITECTURES
@@ -135,10 +135,32 @@ RSA_plot <- ggplot(RSA.all) +
 
 RSA_plot
 
-ggsave(filename = paste0(path.plots, "RSA_raw.png"), 
-       plot = RSA_plot, device = "png", 
-       width = 10, height = 5, dpi = 300)
+# ggsave(filename = paste0(path.plots, "RSA_raw.png"), 
+#        plot = RSA_plot, device = "png", 
+#        width = 10, height = 5, dpi = 300)
 ```
+
+## Only plot 1
+
+```{r}
+RSA_plot_solo <- ggplot(RSA.all %>% filter(RSA_id == "Tomato_60_1")) +
+  geom_segment(aes(x = x1, xend = x2, 
+                   y = z1, yend = z2
+                   # color = branchID
+                   )
+               ) +
+  # facet_wrap(~RSA_id, nrow = 2) +
+  scale_color_viridis(option = "plasma") +
+  coord_fixed() +
+  theme_void()
+
+RSA_plot_solo
+
+ggsave(filename = paste0(path.plots, "RSA_raw_solo.png"),
+       plot = RSA_plot_solo, device = "png",
+       width = 4 , height = 5, dpi = 300)
+```
+
 
 # Define conductivities
 
@@ -157,26 +179,26 @@ conv_kx   <-  1.157407e-09
 
 Let's define 3 scenarios :
 
--   1A : \
-    -   SG   = T \
-    -   LC   = T \
-    -   SE   = T \
-    -   kAQP = constant \
--   1B : \
-    -   SG   = T \
-    -   LC   = T \
-    -   SE   = T \
-    -   kAQP = decreasing \
--   2 : \
-    -   SG   = T \
-    -   LC   = T \
-    -   SE   = F \
-    -   kAQP = constant \
--   3 : \
-    -   SG   = F \
-    -   LC   = T \
-    -   SE   = F \
-    -   kAQP = constant \
+-   WT : \
+    -   SG     = T \
+    -   Ex.LC  = T \
+    -   Ex.Sub = T \
+    -   kAQP   = constant \
+-   -AQP : \
+    -   SG     = T \
+    -   Ex.LC  = T \
+    -   Ex.Sub = T \
+    -   kAQP   = decreasing \
+-   -Sub : \
+    -   SG     = T \
+    -   Ex.LC  = T \
+    -   Ex.Sub = F \
+    -   kAQP   = constant \
+-   -SG-Sub : \
+    -   SG     = F \
+    -   Ex.LC  = T \
+    -   Ex.Sub = F \
+    -   kAQP   = constant \
 
 ## General parameters
 
@@ -206,7 +228,7 @@ kAQP_end     <- 6.35e-7    #
 Kx.max       <- 1e-8
 
 # ============================================================================ #
-# SCENARIO 1A
+# SCENARIO WT
 Conds_S1A <- create.conds(S_ID = "1A"
                           ,nmin       = nmin
                           ,nmax       = nmax
@@ -226,7 +248,7 @@ mparam_1A <- tibble(SG_timing = SG_timing1A,
                     rmw       = rmax,
                     S_ID      = "1A")
 # ============================================================================ #
-# SCENARIO 1B
+# SCENARIO -AQP
 Conds_S1B <- create.conds(S_ID = "1B"
                           ,nmin        = nmin
                           ,nmax        = nmax
@@ -464,8 +486,22 @@ write.csv(x = Macro_full, file = paste0(path.results, "Macro_full.csv"), row.nam
 # LOAD AND ANALYSE RESULTS
 
 ```{r}
-RSHA_full  <- read.csv(paste0(path.results, "RSHA_full.csv"))
-Macro_full <- read.csv(paste0(path.results, "Macro_full.csv"))
+RSHA_full  <- read.csv(paste0(path.results, "RSHA_full.csv")) %>% 
+  mutate(Mutant_Name = case_when(
+    Scenario_ID == "1A" ~ "WT",
+    Scenario_ID == "1B" ~ "AQP",
+    Scenario_ID == "2" ~ "Sub",
+    Scenario_ID == "3" ~ "Sub+SG",
+  ))
+
+Macro_full <- read.csv(paste0(path.results, "Macro_full.csv"))%>% 
+  mutate(Mutant_Name = case_when(
+    Scenario_ID == "1A" ~ "WT",
+    Scenario_ID == "1B" ~ "AQP",
+    Scenario_ID == "2" ~ "Sub",
+    Scenario_ID == "3" ~ "Sub+SG",
+  ))
+
 ```
 
 ## Analyse Krs
@@ -479,14 +515,19 @@ p <- ggplot(Macro_full) +
   geom_line(aes(x = as.factor(age), 
                 y = Krs, 
                 group = Sim_ID, 
-                color = Scenario_ID), 
+                # color = Mutant_Name,
+                # linetype = Mutant_Name
+                ),
+            color = "#0070C0",
             alpha = 0.2) +
   
   geom_boxplot(aes(x = as.factor(age),
                    y = Krs,
-                   fill = Scenario_ID)
-               ,width = 0.5
-               ,outlier.shape = NA)+
+                   fill = Mutant_Name
+                   ),
+               # fill = "#0070C0",
+               width = 0.5,
+               outlier.shape = NA)+
   
   scale_fill_manual(values = S_colors) +
   scale_color_manual(values = S_colors) +
@@ -511,7 +552,8 @@ ggsave(filename = paste0(path.plots, "Krs_full.svg"),
 # ANALYSE SUF
 # ============================================================================ #
 
-SUF_df2 <- RSHA_full %>% filter(age %in% c(30, 60)) %>% 
+SUF_df2 <- RSHA_full %>% 
+  filter(age >= 30) %>%
   select(c("SUF", "RSHA_id", "age", "Scenario_ID", "z1", "type")) %>% 
   mutate(zr = round(z1/2, digits = 0)*2) %>% 
   group_by(RSHA_id, zr, Scenario_ID, age) %>% 
@@ -524,38 +566,56 @@ SUF_df2 <- RSHA_full %>% filter(age %in% c(30, 60)) %>%
 
 SUF_plot <- ggplot(data = SUF_df2) +
     
-    # geom_bar(aes(x = zr, y = SUF_sum_mean, fill = Scenario_ID),
-    #          stat = "identity", 
-    #          position = "dodge", 
-    #          alpha = 0.75) +
+  # geom_bar(aes(x = zr, y = SUF_sum_mean, fill = Scenario_ID),
+  #          stat = "identity", 
+  #          position = "dodge", 
+  #          alpha = 0.75) +
+
+  # geom_point(aes(x = zr, 
+  #                y = SUF_sum_mean, 
+  #                color = Scenario_ID)
+  #            # ,position = position_dodge(2)
+  #            ) +
+  # 
+  # geom_errorbar(aes(x = zr, 
+  #                   ymin = SUF_sum_mean-SUF_sum_sd, 
+  #                   ymax = SUF_sum_mean+SUF_sum_sd,
+  #                   color = Scenario_ID),
+  #               width = 0.5
+  #               # ,position = position_dodge(2)
+  #               ) +
   
-    geom_point(aes(x = zr, 
-                   y = SUF_sum_mean, 
-                   color = Scenario_ID)
-               # ,position = position_dodge(2)
-               ) +
-    
-    geom_errorbar(aes(x = zr, 
-                      ymin = SUF_sum_mean-SUF_sum_sd, 
-                      ymax = SUF_sum_mean+SUF_sum_sd,
-                      color = Scenario_ID),
-                  width = 0.5
-                  # ,position = position_dodge(2)
-                  ) +
+  geom_line(aes(x = zr, 
+                y = SUF_sum_mean, 
+                # color = Scenario_ID
+                linetype = Scenario_ID),
+            size = 1) +
   
-    ylab("Standart Uptake Fractions [-]") +
-    xlab("depth [cm]") +
-    
-    facet_wrap(~age, nrow = 1, scales = "free_y") +
-    coord_flip() +
-    # ggtitle(paste0("Sum of SUF per scenario")) +
-    theme_few() +
-    theme(axis.text.x  = element_text(size = 8, angle = 90, hjust = 1, vjust = 0.5))
+  geom_ribbon(aes(x = zr, 
+                    ymin = SUF_sum_mean-SUF_sum_sd, 
+                    ymax = SUF_sum_mean+SUF_sum_sd,
+                    fill = Scenario_ID),
+              alpha = 0.2
+                ) +
+
+  scale_color_manual(values = S_colors) +
+  scale_fill_manual(values = S_colors) +
+
+  ylab("Standart Uptake Fractions [-]") +
+  xlab("depth [cm]") +
+  
+  facet_wrap(~age, 
+             scales = "free_x",
+             nrow = 1) +
+  coord_flip() +
+  # ggtitle(paste0("Sum of SUF per scenario")) +
+  theme_few() +
+  theme(axis.text.x  = element_text(size = 8, angle = 90, hjust = 1, vjust = 0.5))
   
 SUF_plot
 ggsave(filename = paste0(path.plots, "SUF_sum_full.svg"), 
        plot = SUF_plot, 
-       device = "svg", width = 6, height = 3)
+       device = "svg", width = 7, height = 4)
 ```
 
 ## Compare all root systems
@@ -605,6 +665,8 @@ ggsave(filename = "RSHA_full.png", plot = p
 
 ## Select only one to make a figure
 
+### Plot SUF
+
 ```{r}
 data2plot <- RSHA_full %>% filter(age == 60 & RSA_id == unique(RSA.IDs$RSA_id[1]))
 
@@ -648,6 +710,78 @@ ggsave(filename = "RSHA_suf_example.png", plot = p
        ,width = 6, height = 4)
 ```
 
+### Plot kr
+
+```{r}
+data2plot <- RSHA_full %>% 
+  filter(age == 60 & RSA_id == unique(RSA.IDs$RSA_id[1]))
+
+p <- ggplot() +
+  
+  geom_segment(data = data2plot,
+               aes(x = x1, xend = x2,
+                   y = z1, yend = z2,
+                   color = kr, 
+                   size = radius)) +
+  
+  scale_size_continuous(range = c(0.5, 1), 
+                        limits = c(min(data2plot$radius), 
+                                   max(data2plot$radius))) +
+  
+  scale_color_viridis_c(breaks = c(min(data2plot$kr),max(data2plot$kr)),
+                        labels = c("low", "high"),
+                        direction = 1
+                        # , limits = c(0, max(RSHA.all$SUF[RSHA.all$RSA_id == RSA_id_i]))
+                        ) +
+  
+  facet_wrap(~ Scenario_ID, nrow = 1) +
+  coord_fixed() +
+  theme_void() 
+
+p
+
+ggsave(filename = "RSHA_kr_example.png", plot = p
+       ,device = "png"
+       ,path = path.plots
+       ,width = 6, height = 4)
+```
+
+### Kx
+
+```{r}
+data2plot <- RSHA_full %>% 
+  filter(age == 60 & RSA_id == unique(RSA.IDs$RSA_id[1]))
+
+p <- ggplot() +
+  
+  geom_segment(data = data2plot,
+               aes(x = x1, xend = x2,
+                   y = z1, yend = z2,
+                   color = Kx, 
+                   size = radius)) +
+  
+  scale_size_continuous(range = c(0.5, 1), 
+                        limits = c(min(data2plot$radius), 
+                                   max(data2plot$radius))) +
+  
+  scale_color_viridis_c(breaks = c(min(data2plot$Kx),max(data2plot$Kx)),
+                        labels = c("low", "high"),
+                        direction = 1
+                        # , limits = c(0, max(RSHA.all$SUF[RSHA.all$RSA_id == RSA_id_i]))
+                        ) +
+  
+  facet_wrap(~ Scenario_ID, nrow = 1) +
+  coord_fixed() +
+  theme_void() 
+
+p
+
+ggsave(filename = "RSHA_Kx_example.png", plot = p
+       ,device = "png"
+       ,path = path.plots
+       ,width = 6, height = 4)
+```
+
 ## Plot only one
 
 ```{r}
@@ -662,26 +796,27 @@ p <- ggplot() +
   geom_segment(data = data2plot_main,
                aes(x = x1, xend = x2,
                    y = z1, yend = z2,
-                   size = radius),
-               color = "black") +  
+                   size = radius,
+                   color = SUF),
+               ) +  
   
   geom_segment(data = data2plot_lat,
                aes(x = x1, xend = x2,
                    y = z1, yend = z2,
-                   # color = SUF, 
+                   color = SUF,
                    size = radius)) +
   
-  scale_size_continuous(range = c(0.5, 1), 
+  scale_size_continuous(range = c(0.5, 2), 
                         limits = c(min(data2plot$radius), 
                                    max(data2plot$radius))) +
   
-  # scale_color_viridis_c(option = "magma",
-  #                         breaks = c(min(data2plot_lat$SUF), 
-  #                                    max(data2plot_lat$SUF)),
-  #                         labels = c("low", "high"),
-  #                         direction = 1
-  #                         # , limits = c(0, max(RSHA.all$SUF[RSHA.all$RSA_id == RSA_id_i]))
-  #                         ) +
+  scale_color_viridis_c(option = "magma",
+                          breaks = c(min(data2plot_lat$SUF),
+                                     max(data2plot_lat$SUF)),
+                          labels = c("low", "high"),
+                          direction = 1
+                          # , limits = c(0, max(RSHA.all$SUF[RSHA.all$RSA_id == RSA_id_i]))
+                          ) +
   
   # facet_wrap(~ Scenario_ID, nrow = 1) +
   coord_fixed() +
@@ -690,8 +825,13 @@ p <- ggplot() +
 
 p
 
-ggsave(filename = "RSA_visu_example.png", plot = p
+ggsave(filename = "RSA_visu_example_SUF.png", plot = p
        ,device = "png"
+       ,path = path.plots
+       ,width = 4, height = 8, dpi = 400)
+
+ggsave(filename = "RSA_visu_example_suf.svg", plot = p
+       ,device = "svg"
        ,path = path.plots
        ,width = 4, height = 8)
 ```
@@ -710,7 +850,23 @@ for(age_i in unique(Macro_full$age)[order(unique(Macro_full$age))]){
   # plot(temp_lm)
   pander(summary(temp_lm))
   print(emmeans(temp_lm, ~Scenario_ID))
+  # anova(temp_lm)
 }
+```
+
+
+```{r}
+age_i <- 60
+cat("================= \n")
+cat("Age = ", age_i, "\n")
+cat("================= \n")
+temp_df <- Macro_full %>% filter(age == age_i)
+temp_lm <- lm(temp_df, formula = Krs ~ Scenario_ID)
+# plot(temp_lm)
+pander(summary(temp_lm))
+print(emmeans(temp_lm, ~Scenario_ID))
+# anova(temp_lm)
+
 ```
 
 ## SUF
