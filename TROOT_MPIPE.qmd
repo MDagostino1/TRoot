@@ -501,8 +501,46 @@ Macro_full <- read.csv(paste0(path.results, "Macro_full.csv"))%>%
     Scenario_ID == "2" ~ "Sub",
     Scenario_ID == "3" ~ "Sub+SG",
   ))
-
 ```
+
+```{r}
+data2export <- RSHA_full %>% 
+  filter(age == 30 & Mutant_Name == "WT")
+
+data2export <- data2export[c("node1ID",
+                             "node2ID",
+                             "branchID",
+                             "x1","y1","z1","x2","y2","z2",
+                             "radius","length","R","G","B",
+                             "time","type","RSA_id","kr","Kx","SUF")]
+
+p <- ggplot(data2export) +
+  
+  geom_segment(aes(x = x1, xend = x2,
+                   y = z1, yend = z2,
+                   color = kr, 
+                   size = radius)) +
+  
+  scale_size_continuous(range = c(0.5, 1), 
+                        limits = c(min(data2export$radius), 
+                                   max(data2export$radius))) +
+  
+  scale_color_viridis_c(breaks = c(min(data2export$kr),max(data2export$kr)),
+                        labels = c("low", "high"),
+                        direction = 1
+                        # , limits = c(0, max(RSHA.all$SUF[RSHA.all$RSA_id == RSA_id_i]))
+                        ) +
+  
+  facet_wrap(~ RSA_id, nrow = 2) +
+  coord_fixed() +
+  theme_test() 
+
+p
+
+ggsave(filename = paste0(path.plots, "data2export_plot.png"),
+       device = "png", plot = p, dpi = 300, width = 10, height = 7)
+```
+
 
 ## Analyse Krs
 
@@ -518,7 +556,7 @@ p <- ggplot(Macro_full) +
                 # color = Mutant_Name,
                 # linetype = Mutant_Name
                 ),
-            color = "#0070C0",
+            color = "black",
             alpha = 0.2) +
   
   geom_boxplot(aes(x = as.factor(age),
@@ -554,12 +592,12 @@ ggsave(filename = paste0(path.plots, "Krs_full.svg"),
 
 SUF_df2 <- RSHA_full %>% 
   filter(age >= 30) %>%
-  select(c("SUF", "RSHA_id", "age", "Scenario_ID", "z1", "type")) %>% 
+  select(c("SUF", "RSHA_id", "age", "Mutant_Name", "z1", "type")) %>% 
   mutate(zr = round(z1/2, digits = 0)*2) %>% 
-  group_by(RSHA_id, zr, Scenario_ID, age) %>% 
+  group_by(RSHA_id, zr, Mutant_Name, age) %>% 
   summarise(SUF_sum = sum(SUF)) %>% 
   ungroup() %>% 
-  group_by(zr, Scenario_ID, age) %>% 
+  group_by(zr, Mutant_Name, age) %>% 
   summarise(SUF_sum_mean = mean(SUF_sum),
             SUF_sum_sd   = sd(SUF_sum)
             )
@@ -571,11 +609,19 @@ SUF_plot <- ggplot(data = SUF_df2) +
   #          position = "dodge", 
   #          alpha = 0.75) +
 
-  # geom_point(aes(x = zr, 
-  #                y = SUF_sum_mean, 
-  #                color = Scenario_ID)
-  #            # ,position = position_dodge(2)
-  #            ) +
+  geom_ribbon(aes(x = zr, 
+                    ymin = SUF_sum_mean-SUF_sum_sd, 
+                    ymax = SUF_sum_mean+SUF_sum_sd,
+                    fill = Mutant_Name),
+              alpha = 0.5
+                ) +
+  
+  geom_point(aes(x = zr,
+                 y = SUF_sum_mean,
+                 # color = Mutant_name,
+                 shape = Mutant_Name)
+             # ,position = position_dodge(2)
+             ) +
   # 
   # geom_errorbar(aes(x = zr, 
   #                   ymin = SUF_sum_mean-SUF_sum_sd, 
@@ -585,21 +631,15 @@ SUF_plot <- ggplot(data = SUF_df2) +
   #               # ,position = position_dodge(2)
   #               ) +
   
-  geom_line(aes(x = zr, 
-                y = SUF_sum_mean, 
-                # color = Scenario_ID
-                linetype = Scenario_ID),
-            size = 1) +
+  # geom_line(aes(x = zr, 
+  #               y = SUF_sum_mean, 
+  #               # color = Scenario_ID
+  #               linetype = Scenario_ID),
+  #           size = 1) +
   
-  geom_ribbon(aes(x = zr, 
-                    ymin = SUF_sum_mean-SUF_sum_sd, 
-                    ymax = SUF_sum_mean+SUF_sum_sd,
-                    fill = Scenario_ID),
-              alpha = 0.2
-                ) +
-
-  scale_color_manual(values = S_colors) +
-  scale_fill_manual(values = S_colors) +
+  # scale_color_manual(values = S_colors) +
+  # scale_fill_manual(values = S_colors) +
+  scale_fill_viridis(discrete = T) +
 
   ylab("Standart Uptake Fractions [-]") +
   xlab("depth [cm]") +

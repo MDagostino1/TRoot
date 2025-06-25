@@ -17,33 +17,56 @@ for (i in list.files(TRoot_path)) {
   source(paste0(TRoot_path, i))
 }
 
-pkg_list <- c("fmsb", 
-              "packcircles", 
-              "pander", 
-              "readxl", 
-              "visreg", 
-              "EnvStats", 
-              "factoextra", 
-              "data.table",
-              "reticulate", 
-              "xml2", 
-              "tidyverse", 
-              "plyr", 
-              "deldir", 
-              "viridis", 
-              "Hmisc", 
-              # "devtools", 
-              "ggplot2",
-              "gridExtra", 
-              "dplyr", 
-              "cowplot", 
-              "stats", 
-              "emmeans", 
-              "corrplot", 
-              "sf", 
-              "SciViews", "ggthemes")
+# pkg_list <- c("fmsb", 
+#               "packcircles", 
+#               "pander", 
+#               "readxl", 
+#               "visreg", 
+#               "EnvStats", 
+#               "factoextra", 
+#               "data.table",
+#               "reticulate", 
+#               "xml2", 
+#               "tidyverse", 
+#               "plyr", 
+#               "deldir", 
+#               "viridis", 
+#               "Hmisc", 
+#               # "devtools", 
+#               "ggplot2",
+#               "gridExtra", 
+#               "dplyr", 
+#               "cowplot", 
+#               "stats", 
+#               "emmeans", 
+#               "corrplot", 
+#               "sf", 
+#               "SciViews", 
+#               "ggthemes")
+# 
+# load_packages(pkg_list)
 
-load_packages(pkg_list)
+libs <- c("pander", 
+          "readxl", 
+          "EnvStats", 
+          "FactoMineR", 
+          "factoextra", 
+          "data.table", 
+          "reticulate", 
+          "xml2",
+          "dplyr",
+          "tidyverse", 
+          "viridis", 
+          "Hmisc", 
+          "ggplot2", 
+          "gridExtra", 
+          "Matrix", 
+          "emmeans", 
+          "ggthemes")
+
+for(pk in libs) {
+  library(pk, character.only = T)
+}
 
 simu_path <- "Results/12-01-2023/"
 ```
@@ -335,29 +358,44 @@ Perimeter_plot1
 dev.off()
 ```
 
-### kr Plot with fixed kAQP
-
-```{r}
-unique(Conductivities_processed$kAQP)
-
-data2plot <- Conductivities_processed #%>% filter(kAQP == 1.1574e-06)
-
-ggplot(data2plot) +
-  geom_point(aes(x = x, y = kr, color = as.factor(kAQP))) +
-  geom_smooth(aes(x = x, y = kr, color = as.factor(kAQP))) +
-  facet_wrap(~Barrier_Name)
-```
+### kr Plot
 
 ```{r}
 data2plot <- Conductivities_processed %>% 
-  group_by(Barrier_Name) %>% 
+  mutate(age_bin = cut(x, breaks = seq(0, 30, by = 2), 
+                       right = F,
+                       include.lowest = T)) %>% 
+  
+  filter(Barrier_Name %in% c("En.CS", "En.CS-Ex.LC", "En.CS-Ex.Sub")) %>% 
+  group_by(Barrier_Name, age_bin, kAQP) %>% 
   summarise(kr_mean = mean(kr),
-         kr_sd = sd(kr)
-         )
+            kr_sd   = sd(kr),
+            radius_mean = mean(radius)) %>% 
+  
+  mutate(x1 = as.character(age_bin),
+         x2 = as.numeric(as.character(age_bin)) + 2 - 1)
 
-ggplot() +
-  geom_point(data = data2plot,
-             aes(x = kAQP, y = kr_mean))
+p <- ggplot(data = data2plot) +
+  geom_point(aes(x = age_bin, 
+                 y = kAQP, 
+                 # fill = kr_mean,
+                 color = kr_mean,
+                 size = radius_mean),
+             shape = "square") +
+  facet_wrap(~Barrier_Name) +
+  # coord_equal() +
+  scale_fill_viridis() +
+  scale_color_viridis() +
+  theme_test() +
+  theme(
+    axis.text.x  = element_text(size = 8, angle = 90, hjust = 1, vjust = 0.5)
+  )
+
+p
+
+svg("Plots/kr_full_dev.svg", height = 4, width = 6)
+p
+dev.off()
 ```
 
 
