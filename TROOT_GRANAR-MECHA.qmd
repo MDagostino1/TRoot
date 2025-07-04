@@ -179,6 +179,34 @@ ggsave(filename = "plots/Anatomy_Quantifications.svg",
        device = "svg")
 ```
 
+Plot individual traits 
+
+```{r}
+# param_id_i <- cols[5]
+
+for(i in seq(1, length(cols))){
+  
+  param_id_i <- cols[i]
+  title_i <- unique(data2plot$Title[data2plot$param_id == param_id_i])
+  
+  p_temp <- ggplot(data = data2plot %>% filter(param_id == param_id_i)) +
+    geom_point(aes(x = age, y = value)) +
+    # facet_wrap(~Title, scales = "free", ncol = 4) +
+    ggtitle(title_i) +
+      
+    theme_few() +
+    theme(
+      legend.position = "right"
+    ) +
+    theme(plot.title = element_text(size=9))
+
+  ggsave(filename = paste0("plots/anatomical_measurements/", param_id_i, ".svg"), 
+         plot = p_temp, width = 2.5, height = 2.5, units = "in",
+         device = "svg")
+}
+```
+
+
 ## Secondary Growth
 
 Secondary Growth was monitored as binary (0 = primary growth, 1 = secondary growth).
@@ -436,6 +464,8 @@ for(param_i in param_list){
 
 # 2) MECHA
 
+## Presentation and Installation
+
 MECHA is the solver of local conductivities (Couvreur 2018)
 
 Set up steps to run it in local :
@@ -540,7 +570,7 @@ plot_water_flux(Flux8, apobar = 3)
 plot_water_flux(Flux9, apobar = 3)
 ```
 
-Run MECHA for all quantified anatomies
+## Run MECHA for all quantified anatomies
 
 ```{r, eval= F}
 # anat_path   <- "Virtual Anatomies/data 14-12-2023/"
@@ -599,7 +629,7 @@ cols <- c(
 library(ggpmisc)
 data2plot <- Conds %>% 
   filter(Barrier %in% c("b1", "b8", "b6")) %>% 
-  join(anatomy2, by = "CS_id") %>% 
+  left_join(anatomy2, by = "CS_id") %>% 
   filter(param_id %in% cols) 
 
 p <- ggplot(data2plot,
@@ -618,6 +648,76 @@ p <- ggplot(data2plot,
 p
 ggsave(filename = "plots/kr_vs_anatomy.png", plot = p,
        device = "png", width = 15, height = 8, dpi = 200)
+```
+
+```{r}
+conv_kr   <-  0.001157407
+color_scale <- c("b1" = "black", "b9" = "#C71AB7", "b6" = "#4E3CA5")
+
+data2plot <- Conds_full %>% 
+  filter(Barrier %in% c("b1", "b9", "b6")) %>% 
+  mutate(kr_conv = Kr*conv_kr*1e8) %>% 
+  mutate(Kr_conv = kr_conv*perimeter) %>% 
+  filter(
+    (Barrier == "b1" & age <= 1) |
+    (Barrier == "b9" & age > 1 & age <= 7) |
+    (Barrier == "b6" & age > 7)
+  )
+
+# ============================================================================ #
+kr_plot <- ggplot(data2plot) +
+  
+  geom_point(aes(x = age, 
+                 y = kr_conv,
+                 color = Barrier)) +
+  
+  geom_smooth(aes(x = age, 
+                  y = kr_conv
+                  # color = Barrier,
+                  # fill = Barrier
+                  ), 
+              color = "black",
+              alpha = 0.1,
+              span = 0.5) +
+  
+  scale_color_manual(values = color_scale) +
+  scale_fill_manual(values = color_scale) +
+  
+  xlab("Age [d]") +
+  ylab(expression(k[r] ~ "[" ~ 10^{-8} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  
+  theme_few()
+
+kr_plot
+ggsave(filename = "plots/data_kry_plot_cropped.svg", plot = kr_plot, device = "svg", 
+       width = 5, height = 4)
+# ============================================================================ #
+Kr_plot <- ggplot(data2plot) +
+  
+  geom_point(aes(x = age, 
+                 y = Kr_conv,
+                 color = Barrier)) +
+  
+  geom_smooth(aes(x = age, 
+                  y = Kr_conv
+                  # color = Barrier,
+                  # fill = Barrier
+                  ), 
+              color = "black",
+              alpha = 0.1,
+              span = 0.5) +
+  
+  scale_color_manual(values = color_scale) +
+  scale_fill_manual(values = color_scale) +
+  
+  xlab("Age [d]") +
+  ylab(expression(K[r] ~ "[" ~ m^{3} ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  
+  theme_few()
+
+Kr_plot
+ggsave(filename = "plots/data_kre_plot_cropped.svg", plot = Kr_plot, device = "svg", 
+       width = 5, height = 4)
 ```
 
 
@@ -792,6 +892,27 @@ ggsave(filename=paste0("plots/Virtual_Root_2023-07-31_30x50.png"),
        plot = p,
        width = 8, height = 12, device = "png", units = "in", dpi = 300)
 
+```
+
+Plot individually
+
+```{r}
+for(i in seq(1, length(pl))){
+  
+  param_id_i <- pl[i]
+  title_i <- data2plot$Title[data2plot$param_id == param_id_i]
+  
+  p_temp <- ggplot(data = data2plot %>% filter(param_id == param_id_i)) +
+    geom_point(aes(x = x, y = y, group = root), alpha = 0.4) +
+    # facet_wrap(~Title, scales = "free", ncol = 3) +
+    ggtitle(title_i) + 
+    theme_few() +
+    theme(plot.title = element_text(size=9))
+    
+  ggsave(filename=paste0("plots/GRANAR_measurements/", param_id_i, ".svg"), 
+     plot = p_temp,
+     width = 2.5, height = 2.5, device = "svg", units = "in", dpi = 300)
+}
 ```
 
 

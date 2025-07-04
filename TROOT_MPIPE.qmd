@@ -143,7 +143,7 @@ RSA_plot
 ## Only plot 1
 
 ```{r}
-RSA_plot_solo <- ggplot(RSA.all %>% filter(RSA_id == "Tomato_60_1")) +
+RSA_plot_solo <- ggplot(RSA.all %>% filter(RSA_id == "Tomato_60_1" & time <= 30)) +
   geom_segment(aes(x = x1, xend = x2, 
                    y = z1, yend = z2
                    # color = branchID
@@ -514,6 +514,10 @@ data2export <- data2export[c("node1ID",
                              "radius","length","R","G","B",
                              "time","type","RSA_id","kr","Kx","SUF")]
 
+write.csv(x = data2export, file = "src/CRB-MARSHAL/RSHA_WT_30d_export.csv", row.names = F)
+
+data2export <- read.csv("src/CRB-MARSHAL/RSHA_WT_30d_export.csv")
+
 p <- ggplot(data2export) +
   
   geom_segment(aes(x = x1, xend = x2,
@@ -871,6 +875,59 @@ ggsave(filename = "RSA_visu_example_SUF.png", plot = p
        ,width = 4, height = 8, dpi = 400)
 
 ggsave(filename = "RSA_visu_example_suf.svg", plot = p
+       ,device = "svg"
+       ,path = path.plots
+       ,width = 4, height = 8)
+```
+
+## Plot only one as infography
+
+```{r}
+## Select only one to make a figure
+data2plot <- RSHA_full %>% filter(RSHA_id == "Tomato_60_1_30_1A" & time <= 20)
+
+data2plot_main <- data2plot %>% filter(type == 1)
+data2plot_lat <- data2plot %>% filter(type == 2)
+
+p <- ggplot() +
+  
+  geom_segment(data = data2plot_main,
+               aes(x = x1, xend = x2,
+                   y = z1, yend = z2,
+                   size = radius
+                   ),
+               ) +  
+  
+  geom_segment(data = data2plot_lat,
+               aes(x = x1, xend = x2,
+                   y = z1, yend = z2,
+                   size = radius)) +
+  
+  scale_size_continuous(range = c(0.5, 2), 
+                        limits = c(min(data2plot$radius), 
+                                   max(data2plot$radius))) +
+  
+  scale_color_viridis_c(option = "magma",
+                          breaks = c(min(data2plot_lat$SUF),
+                                     max(data2plot_lat$SUF)),
+                          labels = c("low", "high"),
+                          direction = 1
+                          # , limits = c(0, max(RSHA.all$SUF[RSHA.all$RSA_id == RSA_id_i]))
+                          ) +
+  
+  # facet_wrap(~ Scenario_ID, nrow = 1) +
+  coord_fixed() +
+  theme_void() +
+  theme(legend.position = "none")
+
+p
+
+ggsave(filename = "RSA_solo.png", plot = p
+       ,device = "png"
+       ,path = path.plots
+       ,width = 4, height = 8, dpi = 400)
+
+ggsave(filename = "RSA_solo.svg", plot = p
        ,device = "svg"
        ,path = path.plots
        ,width = 4, height = 8)
