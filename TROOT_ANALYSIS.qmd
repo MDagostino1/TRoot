@@ -333,7 +333,7 @@ data2plot2 <- data2plot1 %>%
   group_by(Barrier_Name, x, kAQP) %>% 
   summarise(kr_mean = median(kr),
             kr_sd   = mad(kr),
-            radius_mean = mean(radius)) 
+            radius_mean = median(radius)) 
 
 # =========================================================================== #
 # PLOT
@@ -399,21 +399,21 @@ ggsave(filename = "./plots/kr_full_dev2.png", plot = p2, device = "png", width =
 
 ```{r}
 data2plot <- Conductivities_processed %>% 
-  filter(Barrier_Name %in% c("En.CS", "En.CS-Ex.LC", "En.CS-Ex.Sub")) %>% 
+  filter(Barrier_Name %in% c("En.CS", 
+                             "En.CS-Ex.LC", 
+                             "En.CS-Ex.Sub")
+         ) %>% 
   filter(kAQP == unique(Conductivities_processed$kAQP)[5])
 
 color_scale <- c("En.CS" = "black", "En.CS-Ex.LC" = "#C71AB7", "En.CS-Ex.Sub" = "#4E3CA5")
 
-ggplot(data2plot) +
+p <- ggplot(data2plot) +
   
-  # geom_point(aes(x = x,
-  #                y = kr,
-  #                color = Barrier_Name
-  #                ),
-  #            alpha = 0.1
-  #            ) +
+  geom_jitter(aes(x = x, y = kr),
+             alpha = 0.1, width = 0.5
+             ) +
   
-  geom_smooth(data = data2plot %>% filter(x <= 25),
+  geom_smooth(data = data2plot,
               aes(x = x,
                   y = kr,
                   color = Barrier_Name,
@@ -421,16 +421,22 @@ ggplot(data2plot) +
               span = 0.5,
               alpha = 0.1) +
   
-  geom_smooth(data = data2plot %>% filter(x >= 25),
-              aes(x = x,
-                  y = kr,
-                  color = Barrier_Name,
-                  fill = Barrier_Name), 
-              method = "lm",
-              alpha = 0.1) +
+  # geom_smooth(data = data2plot %>% filter(x >= 25),
+  #             aes(x = x,
+  #                 y = kr,
+  #                 color = Barrier_Name,
+  #                 fill = Barrier_Name), 
+  #             method = "lm",
+  #             alpha = 0.1) +
+  
+  # facet_wrap(~Barrier_Name) +
   
   scale_color_manual(values = color_scale) +
-  scale_fill_manual(values = color_scale)
+  scale_fill_manual(values = color_scale) +
+  
+  theme_few()
+
+p
 ```
 
 
