@@ -765,16 +765,6 @@ prm <- c("Kr", "Kx",
          "age")
 ```
 
-
-```{r}
-b_i <- "b9"
-data2plot <- Conds_full %>% filter(Barrier == b_i)
-png(filename = paste0("plots/correlations/Correlations_Conds_", b_i, ".png"), 
-    width = 10, height = 10, units = "in", res = 100)
-pcor <- corrplot(cor(data2plot[prm]), method = "number", diag = F, type = "upper")
-dev.off()
-```
-
 ## Axial conductance
 
 ```{r}
@@ -818,6 +808,82 @@ data_x_ncells <-ggplot(data2plot) +
 ggsave(filename = "plots/data_x_ncells.svg", plot = data_x_ncells, device = "svg", 
        width = 3, height = 3)
 ```
+
+## Barrier Comparison
+
+```{r}
+b <- c("b1", "b3", "b4", "b6", "b9", "b8")
+
+data2plot <- Conds %>% 
+  filter(Barrier %in% c("b1", "b3", "b4", "b6", "b9", "b8")) %>% 
+  mutate(Barrier_Name = recode(Barrier, 
+                               "b1" = "En.CS", 
+                               "b3" = "En.Sub",
+                               "b4" = "En.Sub-Ex.CS",
+                               "b6" = "En.CS-Ex.Sub",
+                               "b8" = "En.Sub-Ex.Sub",
+                               "b9" = "En.CS-Ex.LC"))
+
+data2plot$Barrier_Name <- factor(data2plot$Barrier_Name, levels = c("En.CS", "En.CS-Ex.LC", "En.CS-Ex.Sub", "En.Sub", "En.Sub-Ex.CS", "En.Sub-Ex.Sub"))
+data2plot <- data2plot[order(data2plot$Barrier_Name),]
+
+ggplot(data = data2plot, aes(x = Barrier_Name, y = Kr)) +
+  
+  # ADD VIOLINS
+  geom_violin(side = "right", 
+              fill = "lightgrey", 
+              color = "lightgrey", 
+              alpha = 1) +
+  
+  # ADD BOXPLOTS
+  geom_boxplot(width = 0.2,
+               alpha = 1) +
+  
+  # facet_wrap(~Endodermis, scales = "free_x") +
+  
+  # CUSTOM LABELS
+  xlab("Exodermis apoplastic barrier") +
+  ylab(expression(k[r] ~ "[" ~ 10^{-08} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  
+  # OTHER PARAMS
+  # scale_fill_manual(values=c("white","white","white", "grey", "grey", "grey")) +
+  scale_color_viridis() +
+  theme_few() +
+  theme(axis.text.x = element_text(angle = 90))
+
+# =========================================================================== #
+MS_lm <- lm(data = data2plot, formula = Kr ~ Barrier_Name)
+
+plot(MS_lm)
+summary(MS_lm)
+anova(MS_lm)
+emmeans(MS_lm, specs = pairwise ~ Barrier_Name)
+
+# visreg(MS_lm)
+
+DL_pred <- tibble(DL = c("M1", "M2", "M3", "T1", "T2", "T3"),
+                  Estimate = MS_lm$coefficients)
+
+DL_pred2 <- tibble(DL2 = c("M1", "M2", "M3", "T1", "T2", "T3"),
+                  Estimate2 = MS_lm$coefficients)
+
+EM <- emmeans(MS_lm, specs = pairwise ~ Barrier_Name)
+DL_mean <- as_tibble(EM$emmeans)
+DL_contrast <- as_tibble(EM$contrasts)
+
+mean_M1 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS"]
+mean_M2 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.Sub"]
+mean_M3 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.Sub-Ex.CS"]
+mean_T1 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS-Ex.LC"]
+mean_T2 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS-Ex.Sub"]
+mean_T3 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.Sub-Ex.Sub"]
+
+print(paste0("Difference between En.CS and En.CS-Ex.LC [%]         : ", round((mean_M1-mean_T1)*100/mean_M1, digits = 2)))
+print(paste0("Difference between En.CS-Ex.Sub and En.CS-Ex.LC [%]  : ", round((mean_T1-mean_T2)*100/mean_T1, digits = 2)))
+print(paste0("Difference between En.Sub-Ex.Sub and En.CS-Ex.LC [%] : ", round((mean_T1-mean_T3)*100/mean_T1, digits = 2)))
+print(paste0("Difference between En.Sub and En.Sub-Ex.CS [%]       : ", round((mean_M2-mean_M3)*100/mean_M2, digits = 2)))
+```
+
 
 
 # 3) VIRTUAL ROOTS
