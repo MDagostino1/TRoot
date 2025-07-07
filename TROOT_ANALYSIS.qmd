@@ -171,7 +171,7 @@ Change M1, M2, M3 etc by explicit names : \
 
 # VISUAL ANALYSIS
 
-## Plot pure data
+### Aquaporins
 
 ```{r Plot Pure Data}
 # kr vs kAQP
@@ -206,7 +206,7 @@ ggsave(filename = "plots/AQP_influence.svg",
        width = 4, height = 3)
 ```
 
-##
+### Radial conductivity
 
 ```{r Plot Pure Data}
 #============================================================================
@@ -230,6 +230,11 @@ kr_plot1 <- ggplot(data = Conductivities_processed %>%
   # ggtitle("Hydraulic Radial conductivity") +
   theme_dark()
 kr_plot1
+```
+
+### Radial Conductance
+
+```{r Plot Pure Data}
 #============================================================================
 Kr_plot1 <- ggplot(data = Conductivities_processed %>% 
                      filter(Barrier_Name %in% c("En.CS", 
@@ -246,6 +251,11 @@ Kr_plot1 <- ggplot(data = Conductivities_processed %>%
   theme_dark()
 Kr_plot1
 #============================================================================
+```
+
+### Radius
+
+```{r Plot Pure Data}
 # Radius
 Radius_plot1 <- ggplot(data = Conductivities_processed %>% 
                          filter(Barrier_Name == "En.CS" & kAQP == 1.157e-7),
@@ -260,7 +270,11 @@ Radius_plot1
 svg("Plots/Radius_plot_1.svg", height = 2.5, width = 2.5)
 Radius_plot1
 dev.off()
+```
 
+### Axial conductance
+
+```{r Plot Pure Data}
 #============================================================================
 # Kx
 data2plot_kx <- Conductivities_processed %>%
@@ -306,21 +320,9 @@ kx_plot1
 
 ```
 
-### Additional Plots 
+## Additional Plots 
 
-```{r}
-data2plot <- Conductivities_processed %>% filter(kAQP == unique(Conductivities_processed$kAQP)[5])
-
-ggplot(data = data2plot) +
-  geom_point(aes(x = x, 
-                 y = kr,
-                 color = Barrier_Name)) +
-  facet_wrap(~Barrier_Name)
-  theme_few()
-```
-
-
-Summarise kr per day, per condition.
+### Radial conductivity - Error Bars
 
 ```{r}
 data2plot1 <- Conductivities_processed 
@@ -397,6 +399,8 @@ p2
 ggsave(filename = "./plots/kr_full_dev2.png", plot = p2, device = "png", width = 7, height = 5, dpi = 300)
 ```
 
+### Radial Conductivity - Loess
+
 ```{r}
 data2plot <- Conductivities_processed %>% 
   filter(Barrier_Name %in% c("En.CS", 
@@ -409,13 +413,14 @@ color_scale <- c("En.CS" = "black", "En.CS-Ex.LC" = "#C71AB7", "En.CS-Ex.Sub" = 
 
 p <- ggplot(data2plot) +
   
-  geom_jitter(aes(x = x, y = kr),
-             alpha = 0.1, width = 0.5
+  geom_jitter(aes(x = x, y = kr*1e8, color = Barrier_Name),
+             alpha = 0.6, 
+             width = 0.2
              ) +
   
   geom_smooth(data = data2plot,
               aes(x = x,
-                  y = kr,
+                  y = kr*1e8,
                   color = Barrier_Name,
                   fill = Barrier_Name), 
               span = 0.5,

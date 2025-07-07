@@ -76,7 +76,10 @@ pkg_list <- c("fmsb",
               "sf", 
               "SciViews")
 
-load_packages(pkg_list)
+for(pk in pkg_list) {
+  try(library(pk, character.only = T))
+}
+
 library(ggthemes)
 
 # LOAD GRANAR FUNCTIONS
@@ -605,6 +608,8 @@ colnames(Conds)[1] <- "CS_id"
 Conds_full <- left_join(Conds, Anatomy_Full, by = c("CS_id"))
 ```
 
+## Plot kr vs each anatomical trait
+
 ```{r}
 cols <- c(
   "cortex_cell_diameter",
@@ -626,7 +631,7 @@ cols <- c(
   "xylem_n_cells"
   )
 
-library(ggpmisc)
+# library(ggpmisc)
 data2plot <- Conds %>% 
   filter(Barrier %in% c("b1", "b8", "b6")) %>% 
   left_join(anatomy2, by = "CS_id") %>% 
@@ -637,9 +642,9 @@ p <- ggplot(data2plot,
   # geom_line(aes(x = age, y = Kr, group = plant_id)) +
   geom_jitter(alpha = 0.5) +
   geom_smooth(method = "lm") +
-  stat_poly_eq(formula = y ~ x,
-               aes(label = paste(..rr.label.., sep = "~~~")),
-               parse = TRUE) +
+  # stat_poly_eq(formula = y ~ x,
+  #              aes(label = paste(..rr.label.., sep = "~~~")),
+  #              parse = TRUE) +
   facet_wrap(~param_id, scales = "free", nrow = 3) +
   theme_few() +
   theme(axis.text.x = 
@@ -650,6 +655,8 @@ ggsave(filename = "plots/kr_vs_anatomy.png", plot = p,
        device = "png", width = 15, height = 8, dpi = 200)
 ```
 
+## Plot kr and Kr along age
+
 ```{r}
 conv_kr   <-  0.001157407
 color_scale <- c("b1" = "black", "b9" = "#C71AB7", "b6" = "#4E3CA5")
@@ -657,12 +664,13 @@ color_scale <- c("b1" = "black", "b9" = "#C71AB7", "b6" = "#4E3CA5")
 data2plot <- Conds_full %>% 
   filter(Barrier %in% c("b1", "b9", "b6")) %>% 
   mutate(kr_conv = Kr*conv_kr*1e8) %>% 
-  mutate(Kr_conv = kr_conv*perimeter) %>% 
-  filter(
-    (Barrier == "b1" & age <= 1) |
-    (Barrier == "b9" & age > 1 & age <= 7) |
-    (Barrier == "b6" & age > 7)
-  )
+  mutate(Kr_conv = kr_conv*perimeter) 
+# %>% 
+#   filter(
+#     (Barrier == "b1" & age <= 1) |
+#     (Barrier == "b9" & age > 1 & age <= 7) |
+#     (Barrier == "b6" & age > 7)
+#   )
 
 # ============================================================================ #
 kr_plot <- ggplot(data2plot) +
@@ -672,13 +680,13 @@ kr_plot <- ggplot(data2plot) +
                  color = Barrier)) +
   
   geom_smooth(aes(x = age, 
-                  y = kr_conv
-                  # color = Barrier,
-                  # fill = Barrier
+                  y = kr_conv,
+                  color = Barrier,
+                  fill = Barrier
                   ), 
-              color = "black",
+              # color = "black",
               alpha = 0.1,
-              span = 0.5) +
+              span = 1) +
   
   scale_color_manual(values = color_scale) +
   scale_fill_manual(values = color_scale) +
@@ -699,13 +707,13 @@ Kr_plot <- ggplot(data2plot) +
                  color = Barrier)) +
   
   geom_smooth(aes(x = age, 
-                  y = Kr_conv
-                  # color = Barrier,
-                  # fill = Barrier
+                  y = Kr_conv,
+                  color = Barrier,
+                  fill = Barrier
                   ), 
-              color = "black",
+              # color = "black",
               alpha = 0.1,
-              span = 0.5) +
+              span = 1) +
   
   scale_color_manual(values = color_scale) +
   scale_fill_manual(values = color_scale) +
@@ -766,6 +774,51 @@ png(filename = paste0("plots/correlations/Correlations_Conds_", b_i, ".png"),
 pcor <- corrplot(cor(data2plot[prm]), method = "number", diag = F, type = "upper")
 dev.off()
 ```
+
+## Axial conductance
+
+```{r}
+data2plot <- Conds_full %>% filter(Barrier == "b0")
+
+Kx_plot <- ggplot(data2plot) +
+  geom_point(aes(x = age,
+                 y = Kx)) +
+  
+  geom_smooth(aes(x = age, y = Kx),
+              span = 0.6, , se = F) +
+  
+  theme_few()
+
+Kx_plot
+ggsave(filename = "plots/data_kx_plot.svg", plot = Kx_plot, device = "svg", 
+       width = 3, height = 3)
+```
+
+
+## Xylem  number and size 
+
+```{r}
+data2plot <- Conds_full
+
+data_x_diameter <- ggplot(data2plot) +
+  geom_point(aes(x = age, y = xylem_cell_diameter)) +
+  geom_smooth(aes(x = age, y = xylem_cell_diameter),
+              method = "lm", se = F) +
+  theme_few()
+
+ggsave(filename = "plots/data_x_diameter.svg", plot = data_x_diameter, device = "svg", 
+       width = 3, height = 3)
+
+data_x_ncells <-ggplot(data2plot) +
+  geom_point(aes(x = age, y = xylem_n_cells)) +
+  geom_smooth(aes(x = age, y = xylem_n_cells),
+              span = 1, se = F) +
+  theme_few()
+
+ggsave(filename = "plots/data_x_ncells.svg", plot = data_x_ncells, device = "svg", 
+       width = 3, height = 3)
+```
+
 
 # 3) VIRTUAL ROOTS
 
