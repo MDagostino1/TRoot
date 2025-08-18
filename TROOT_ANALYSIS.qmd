@@ -38,19 +38,19 @@ simu_path <- "Results/12-01-2023/"
 ## Extract Data from jobs 
 
 ```{r, eval = F}
-path <- "Results/12-01-2023/Conductivities/"
-l <- list.files(path, pattern = ".csv")
-Conductivities <- data.frame()
-
-for(i in l){
-  # print(i)
-  temp_df <- read.csv(paste0(path, i))
-  Conductivities <- rbind(Conductivities, temp_df)
-}
-# Correct a bug that make Kx weird for b9 (the bug is fixed in scripts, but remains in results files)
-Conductivities$Kx[Conductivities$Barrier == "b9"] <- Conductivities$Kx[Conductivities$Barrier == "b5"]
-
-write.csv(Conductivities, file = "Results/12-01-2023/Conductivities_full.csv", row.names = F)
+# path <- "Results/12-01-2023/Conductivities/"
+# l <- list.files(path, pattern = ".csv")
+# Conductivities <- data.frame()
+# 
+# for(i in l){
+#   # print(i)
+#   temp_df <- read.csv(paste0(path, i))
+#   Conductivities <- rbind(Conductivities, temp_df)
+# }
+# # Correct a bug that make Kx weird for b9 (the bug is fixed in scripts, but remains in results files)
+# Conductivities$Kx[Conductivities$Barrier == "b9"] <- Conductivities$Kx[Conductivities$Barrier == "b5"]
+# 
+# write.csv(Conductivities, file = "Results/12-01-2023/Conductivities_full.csv", row.names = F)
 ```
 
 Plot and count the number of successfull simulations.
@@ -129,6 +129,379 @@ data_final      <- left_join(data_final, Combinations)
 
 # Export final database
 write.csv(data_final, "Data/DATA_FULL_FINAL.csv", row.names = F)
+```
+
+# ANALYSE QUANTIFIED DATA
+
+Here we analyse the results of conductivities computed on quantified cross-sections.
+
+```{r}
+Anatomy_Full   <- read.csv("Data/Anatomy/Anatomy_Full.csv")
+anatomy2       <- read.csv("Data/Anatomy/anatomy2.csv")
+
+# Loading results
+path_results <- "Results/Quantified_Anatomies/"
+list_conds <- list.files(path_results, pattern = ".csv")
+Conds <- tibble()
+for(file in list_conds){
+  temp_cond <- read.csv(paste0(path_results, file))
+  Conds <- rbind(Conds, temp_cond)
+}
+
+colnames(Conds)[1] <- "CS_id"
+
+Conds <- Conds %>%
+  filter(Barrier %in% c("b1", "b3", "b4", "b6", "b8", "b9")) %>% 
+  mutate(Barrier_Name = recode(Barrier, 
+                               "b1" = "En.CS", 
+                               "b3" = "En.Sub",
+                               "b4" = "En.Sub-Ex.CS",
+                               "b6" = "En.CS-Ex.Sub",
+                               "b8" = "En.Sub-Ex.Sub",
+                               "b9" = "En.CS-Ex.LC")
+         )
+
+# Creating a big table by merging with anatomical data
+Conds_full <- left_join(Conds, Anatomy_Full, by = c("CS_id"))
+```
+
+## Plot kr vs each anatomical trait
+
+```{r}
+cols <- c(
+  "cortex_cell_diameter",
+  "cortex_n_layers", 
+  "endodermis_cell_diameter", 
+  "epidermis_cell_diameter",
+  "exodermis_cell_diameter",
+  "pericycle_cell_diameter",
+  "phloem_cell_diameter",
+  "phloem_n_layers",
+  "phloem_proportion",
+  "secondarygrowth_param",
+  "stele_cell_diameter",
+  "stele_layer_diameter",
+  "stele_n_layers",
+  "stele_SD",
+  "xylem_cell_diameter",
+  "xylem_max_size",
+  "xylem_n_cells"
+  )
+
+# library(ggpmisc)
+data2plot <- Conds %>% 
+  filter(Barrier %in% c("b1", "b8", "b6")) 
+
+data2plot$Barrier_Name <- NaN
+data2plot$Barrier_Name[data2plot$Barrier == "b1"] <- "En.CS"
+data2plot$Barrier_Name[data2plot$Barrier == "b6"] <- "En.CS-Ex.LC"
+data2plot$Barrier_Name[data2plot$Barrier == "b8"] <- "En.CS-Ex.Sub"
+
+data2plot <- data2plot %>% 
+  left_join(anatomy2, by = "CS_id") %>% 
+  filter(param_id %in% cols) 
+
+color_scale <- c("En.CS" = "black", 
+                 "En.CS-Ex.LC" = "#C71AB7", 
+                 "En.CS-Ex.Sub" = "#4E3CA5")
+
+p <- ggplot(data2plot,
+       aes(x = value, y = Kr, color = Barrier_Name)) +
+  # geom_line(aes(x = age, y = Kr, group = plant_id)) +
+  geom_jitter(alpha = 0.5) +
+  geom_smooth(method = "lm") +
+  # stat_poly_eq(formula = y ~ x,
+  #              aes(label = paste(..rr.label.., sep = "~~~")),
+  #              parse = TRUE) +
+  scale_color_manual(values = color_scale) +
+  facet_wrap(~param_id, scales = "free", nrow = 3) +
+  theme_few() +
+  theme(axis.text.x = 
+          element_text(angle = 90, hjust = 1, vjust = 0.5))
+
+p
+ggsave(filename = "plots/kr_vs_anatomy.png", plot = p,
+       device = "png", width = 15, height = 8, dpi = 200)
+```
+
+## Plot kr and Kr along age
+
+```{r}
+conv_kr   <-  0.001157407
+color_scale <- c("En.CS"        = "black", 
+                 "En.CS-Ex.LC"  = "#C71AB7", 
+                 "En.CS-Ex.Sub" = "#4E3CA5")
+
+data2plot <- Conds_full %>% 
+  filter(Barrier %in% c("b1", "b9", "b6")) %>% 
+  mutate(kr_conv = Kr*conv_kr*1e8) %>% 
+  mutate(Kr_conv = kr_conv*perimeter) %>% 
+  select(c("Barrier", "kr_conv", "Kr_conv", "Barrier_Name", "age")) %>% 
+  rename("kr" = "kr_conv") %>% 
+  rename("Kr" = "Kr_conv") %>% 
+  gather(kr, Kr, key = "Variable", value = "Value") 
+  
+# ============================================================================ #
+
+p_RadialConds <- ggplot(data2plot) +
+  geom_point(aes(x = age, 
+                 y = Value,
+                 color = Barrier_Name)) +
+  
+  geom_smooth(aes(x = age, 
+                  y = Value,
+                  color = Barrier_Name,
+                  fill = Barrier_Name
+                  ), 
+              # color = "black",
+              alpha = 0.1,
+              span = 1) +
+  
+  scale_color_manual(values = color_scale) +
+  scale_fill_manual(values = color_scale) +
+  
+  xlab("Age [d]") +
+  # ylab(expression(K[r] ~ "[" ~ m^{3} ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  
+  facet_wrap(~Variable, scales = "free") +
+  
+  theme_few() +
+  theme(legend.position = "right") 
+
+# ============================================================================ #
+svg(filename = "plots/Conds_Radial.svg", width = 7, height = 3)
+p_RadialConds
+dev.off()
+```
+
+
+try some linear regression
+
+```{r}
+kr_lm <- lm(data = Conds_full, formula = Kr ~ 
+              # age * 
+              # cortex_n_layers*
+              I(stele_layer_diameter^2)* 
+              # phloem_n_layers*
+              phloem_proportion*
+              Barrier
+            )
+
+print(summary(kr_lm))
+
+Conds_pred <- predict(object = kr_lm)
+```
+
+
+```{r}
+prm <- c("Kr", "Kx", 
+         "cortex_n_layers", 
+         "endodermis_cell_diameter", 
+         "exodermis_cell_diameter",
+         "pericycle_cell_diameter",
+         "phloem_cell_diameter",
+         "phloem_n_layers",
+         "phloem_proportion",
+         "stele_cell_diameter",
+         "stele_layer_diameter",
+         "stele_n_layers",
+         "stele_SD",
+         "xylem_cell_diameter",
+         "xylem_max_size",
+         "xylem_n_cells",
+         "radius",
+         "age")
+```
+
+## Axial conductance
+
+```{r}
+# Select data for only one Barrier (they all have the same values anyway)
+data2plot <- Conds_full %>% filter(Barrier == "b1")
+
+Kx_plot <- ggplot(data2plot) +
+
+  geom_point(aes(x = age,
+                 y = Kx)) +
+  
+  geom_smooth(aes(x = age, y = Kx),
+              span = 0.6,se = F) +
+  
+  xlab("Age [d]") +
+  ylab(expression(k[x] ~ "[" ~ m^{4} ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  
+  theme_few()
+
+# =========================================================================== #
+svg(filename = "plots/data_kx_plot.svg", width = 3, height = 3)
+Kx_plot
+dev.off()
+
+# ggsave(filename = "plots/data_kx_plot.svg", plot = Kx_plot, device = "svg", width = 3, height = 3)
+```
+
+
+## Xylem  number and size 
+
+```{r}
+data2plot <- Conds_full %>% 
+  select(c("age", "xylem_cell_diameter", "xylem_n_cells")) %>% 
+  gather(xylem_cell_diameter, )
+
+data_x_diameter <- ggplot(data2plot) +
+  geom_point(aes(x = age, y = xylem_cell_diameter)) +
+  geom_smooth(aes(x = age, y = xylem_cell_diameter),
+              method = "lm", se = F) +
+  theme_few()
+
+ggsave(filename = "plots/data_x_diameter.svg", plot = data_x_diameter, device = "svg", 
+       width = 3, height = 3)
+
+data_x_ncells <-ggplot(data2plot) +
+  geom_point(aes(x = age, y = xylem_n_cells)) +
+  geom_smooth(aes(x = age, y = xylem_n_cells),
+              span = 1, se = F) +
+  theme_few()
+
+ggsave(filename = "plots/data_x_ncells.svg", plot = data_x_ncells, device = "svg", 
+       width = 3, height = 3)
+```
+
+## Barrier Comparison
+
+```{r}
+b <- c("b1", "b3", "b4", "b6", "b9", "b8")
+
+color_scale2 <- c("En.CS"        = "black", 
+                  "En.CS-Ex.LC"  = "#C71AB7", 
+                  "En.CS-Ex.Sub" = "#4E3CA5",
+                  "En.Sub"       = "lightblue4",
+                  "En.Sub-Ex.CS" = "lightblue4",
+                  "En.Sub-Ex.Sub"= "lightblue4"
+                  )
+
+# 
+data2plot <- Conds %>% 
+  filter(Barrier %in% c("b1", "b3", "b4", "b6", "b9", "b8")) %>% 
+  mutate(Barrier_Name = recode(Barrier, 
+                               "b1" = "En.CS", 
+                               "b3" = "En.Sub",
+                               "b4" = "En.Sub-Ex.CS",
+                               "b6" = "En.CS-Ex.Sub",
+                               "b8" = "En.Sub-Ex.Sub",
+                               "b9" = "En.CS-Ex.LC")
+         ) %>% 
+  mutate(Endodermis = recode(Barrier_Name,
+                             "En.CS"         = "Endodermal CS",
+                             "En.CS-Ex.LC"   = "Endodermal CS",
+                             "En.CS-Ex.Sub"  = "Endodermal CS",
+                             "En.Sub"        = "Endodermal Sub",
+                             "En.Sub-Ex.CS"  = "Endodermal Sub",
+                             "En.Sub-Ex.Sub" = "Endodermal Sub")
+         ) %>% 
+  mutate(Exodermis = recode(Barrier_Name,
+                             "En.CS"         = "none",
+                             "En.CS-Ex.LC"   = "LC",
+                             "En.CS-Ex.Sub"  = "Sub",
+                             "En.Sub"        = "none",
+                             "En.Sub-Ex.CS"  = "LC",
+                             "En.Sub-Ex.Sub" = "Sub")
+         )
+
+# Custom order
+data2plot$Barrier_Name <- factor(data2plot$Barrier_Name, 
+                                 levels = c("En.CS", 
+                                            "En.CS-Ex.LC", 
+                                            "En.CS-Ex.Sub", 
+                                            "En.Sub", 
+                                            "En.Sub-Ex.CS", 
+                                            "En.Sub-Ex.Sub")
+                                 )
+
+data2plot$Exodermis <- factor(data2plot$Exodermis, 
+                                 levels = c("none", 
+                                            "LC", 
+                                            "Sub")
+                                 )
+
+data2plot <- data2plot[order(data2plot$Barrier_Name),]
+
+p_Barriers <- ggplot(data = data2plot, 
+                     aes(x = Exodermis, 
+                         y = Kr)) +
+  
+  # ADD VIOLINS
+  geom_violin(aes(fill  = Barrier_Name),
+              # fill  = "lightgrey", 
+              color = "white",
+              alpha = 0.2) +
+  
+  # ADD BOXPLOTS
+  geom_boxplot(width = 0.5,
+               alpha = 1) +
+  
+  # ADD POINTS
+  geom_jitter(aes(color = Barrier_Name),
+              width = 0.1
+              , size = 0.5
+              ) +
+  
+  facet_wrap(~Endodermis, scales = "free_x") +
+  
+  # CUSTOM LABELS
+  xlab("Exodermis") +
+  ylab(expression(k[r] ~ "[" ~ 10^{-08} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  
+  # OTHER PARAMS
+  # scale_fill_manual(values=c("white","white","white", "grey", "grey", "grey")) +
+  # scale_color_viridis() +
+  scale_color_manual(values = color_scale2) +
+  scale_fill_manual(values = color_scale2) +
+  
+  theme_few() +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle = 90))
+
+# =========================================================================== #
+
+svg(filename = "plots/Conds_Barriers.svg", width = 3, height = 3)
+p_Barriers
+dev.off()
+```
+
+Stats
+
+```{r}
+MS_lm <- lm(data = data2plot, formula = Kr ~ Barrier_Name)
+
+plot(MS_lm)
+# summary(MS_lm)
+anova(MS_lm)
+emmeans(MS_lm, specs = pairwise ~ Barrier_Name)
+
+# visreg(MS_lm)
+
+DL_pred <- tibble(DL = c("M1", "M2", "M3", "T1", "T2", "T3"),
+                  Estimate = MS_lm$coefficients)
+
+DL_pred2 <- tibble(DL2 = c("M1", "M2", "M3", "T1", "T2", "T3"),
+                  Estimate2 = MS_lm$coefficients)
+
+EM <- emmeans(MS_lm, specs = pairwise ~ Barrier_Name)
+DL_mean <- as_tibble(EM$emmeans)
+DL_contrast <- as_tibble(EM$contrasts)
+
+mean_M1 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS"]
+mean_M2 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.Sub"]
+mean_M3 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.Sub-Ex.CS"]
+mean_T1 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS-Ex.LC"]
+mean_T2 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS-Ex.Sub"]
+mean_T3 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.Sub-Ex.Sub"]
+
+print(paste0("Difference between En.CS and En.CS-Ex.LC [%]         : ", round((mean_M1-mean_T1)*100/mean_M1, digits = 2)))
+print(paste0("Difference between En.CS-Ex.Sub and En.CS-Ex.LC [%]  : ", round((mean_T1-mean_T2)*100/mean_T1, digits = 2)))
+print(paste0("Difference between En.Sub-Ex.Sub and En.CS-Ex.LC [%] : ", round((mean_T1-mean_T3)*100/mean_T1, digits = 2)))
+print(paste0("Difference between En.Sub and En.Sub-Ex.CS [%]       : ", round((mean_M2-mean_M3)*100/mean_M2, digits = 2)))
 ```
 
 # LOAD PRE-PROCESSED DATA
@@ -305,19 +678,6 @@ kx_plot1
 # dev.off()
 # 
 # png("Plots/kr_plot_1.png", height = 5, width = 8, units = "in", res = 300)
-# kr_plot1 
-# dev.off()
-# 
-# svg("Plots/Kx_plot_1.svg", height = 3, width = 5)
-# kx_plot1
-# dev.off()
-# 
-# png("Plots/RadialConductance_plot_1.png", height = 5, width = 8, units = "in", res = 200)
-# Kr_plot1
-# dev.off()
-# 
-
-
 ```
 
 ## Additional Plots 
@@ -406,15 +766,15 @@ data2plot <- Conductivities_processed %>%
   filter(Barrier_Name %in% c("En.CS", 
                              "En.CS-Ex.LC", 
                              "En.CS-Ex.Sub")
-         ) %>% 
-  filter(kAQP == unique(Conductivities_processed$kAQP)[5])
+         ) 
+# %>% filter(kAQP == unique(Conductivities_processed$kAQP)[5])
 
 color_scale <- c("En.CS" = "black", "En.CS-Ex.LC" = "#C71AB7", "En.CS-Ex.Sub" = "#4E3CA5")
 
 p <- ggplot(data2plot) +
   
   geom_jitter(aes(x = x, y = kr*1e8, color = Barrier_Name),
-             alpha = 0.6, 
+             alpha = 0.4, 
              width = 0.2
              ) +
   
@@ -434,7 +794,7 @@ p <- ggplot(data2plot) +
   #             method = "lm",
   #             alpha = 0.1) +
   
-  # facet_wrap(~Barrier_Name) +
+  facet_wrap(~kAQP) +
   
   scale_color_manual(values = color_scale) +
   scale_fill_manual(values = color_scale) +
