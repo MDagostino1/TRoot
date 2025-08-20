@@ -269,6 +269,7 @@ p_RadialConds <- ggplot(data2plot) +
   theme(legend.position = "right") 
 
 # ============================================================================ #
+p_RadialConds
 svg(filename = "plots/Conds_Radial.svg", width = 7, height = 3)
 p_RadialConds
 dev.off()
@@ -280,37 +281,16 @@ try some linear regression
 ```{r}
 kr_lm <- lm(data = Conds_full, formula = Kr ~ 
               # age * 
-              # cortex_n_layers*
-              I(stele_layer_diameter^2)* 
+              cortex_n_layers +
+              I(stele_layer_diameter^2) +
               # phloem_n_layers*
-              phloem_proportion*
+              phloem_proportion +
               Barrier
             )
 
 print(summary(kr_lm))
 
-Conds_pred <- predict(object = kr_lm)
-```
-
-
-```{r}
-prm <- c("Kr", "Kx", 
-         "cortex_n_layers", 
-         "endodermis_cell_diameter", 
-         "exodermis_cell_diameter",
-         "pericycle_cell_diameter",
-         "phloem_cell_diameter",
-         "phloem_n_layers",
-         "phloem_proportion",
-         "stele_cell_diameter",
-         "stele_layer_diameter",
-         "stele_n_layers",
-         "stele_SD",
-         "xylem_cell_diameter",
-         "xylem_max_size",
-         "xylem_n_cells",
-         "radius",
-         "age")
+# Conds_pred <- predict(object = kr_lm)
 ```
 
 ## Axial conductance
@@ -333,6 +313,7 @@ Kx_plot <- ggplot(data2plot) +
   theme_few()
 
 # =========================================================================== #
+Kx_plot
 svg(filename = "plots/data_kx_plot.svg", width = 3, height = 3)
 Kx_plot
 dev.off()
@@ -346,26 +327,44 @@ dev.off()
 ```{r}
 data2plot <- Conds_full %>% 
   select(c("age", "xylem_cell_diameter", "xylem_n_cells")) %>% 
-  gather(xylem_cell_diameter, )
+  gather(xylem_cell_diameter, xylem_n_cells, key = "Variable", value = "Value")
 
-data_x_diameter <- ggplot(data2plot) +
-  geom_point(aes(x = age, y = xylem_cell_diameter)) +
-  geom_smooth(aes(x = age, y = xylem_cell_diameter),
-              method = "lm", se = F) +
-  theme_few()
-
-ggsave(filename = "plots/data_x_diameter.svg", plot = data_x_diameter, device = "svg", 
-       width = 3, height = 3)
-
-data_x_ncells <-ggplot(data2plot) +
-  geom_point(aes(x = age, y = xylem_n_cells)) +
-  geom_smooth(aes(x = age, y = xylem_n_cells),
+data_xylem <- ggplot(data2plot) +
+  geom_point(aes(x = age, y = Value)) +
+  geom_smooth(aes(x = age, y = Value),
               span = 1, se = F) +
+  facet_wrap(~Variable, scales = "free") +
   theme_few()
+data_xylem
 
-ggsave(filename = "plots/data_x_ncells.svg", plot = data_x_ncells, device = "svg", 
-       width = 3, height = 3)
+ggsave(filename = "plots/data_xylem.svg", plot = data_xylem, 
+       device = "svg", width = 6, height = 3)
 ```
+
+## Other anatomical parameters
+
+```{r}
+cols <- c("stele_layer_diameter", 
+           "phloem_n_layers",
+           "cortex_n_layers")
+data2plot <- Conds_full %>% 
+  select(c("age", 
+           cols)
+         ) %>% 
+  gather(cols, key = "Variable", value = "Value")
+
+data_anat <- ggplot(data2plot) +
+  geom_point(aes(x = age, y = Value)) +
+  geom_smooth(aes(x = age, y = Value),
+              span = 1, se = F) +
+  facet_wrap(~Variable, scales = "free") +
+  theme_few()
+data_anat
+
+ggsave(filename = "plots/data_xylem.svg", plot = data_xylem, 
+       device = "svg", width = 6, height = 3)
+```
+
 
 ## Barrier Comparison
 
@@ -380,7 +379,7 @@ color_scale2 <- c("En.CS"        = "black",
                   "En.Sub-Ex.Sub"= "lightblue4"
                   )
 
-# 
+# ============================================================================ #
 data2plot <- Conds %>% 
   filter(Barrier %in% c("b1", "b3", "b4", "b6", "b9", "b8")) %>% 
   mutate(Barrier_Name = recode(Barrier, 
@@ -425,7 +424,11 @@ data2plot$Exodermis <- factor(data2plot$Exodermis,
                                  )
 
 data2plot <- data2plot[order(data2plot$Barrier_Name),]
+```
 
+
+```{r}
+# ============================================================================ #
 p_Barriers <- ggplot(data = data2plot, 
                      aes(x = Exodermis, 
                          y = Kr)) +
@@ -448,9 +451,21 @@ p_Barriers <- ggplot(data = data2plot,
   
   facet_wrap(~Endodermis, scales = "free_x") +
   
+  # ADD SIGNIFICANTS
+  geom_signif(comparisons = list(c("none", "LC"),
+                                 c("none", "Sub"),
+                                 c("LC", "Sub")
+                                 ),
+              map_signif_level = F,
+              test = "anova",
+              test.args = list(formula = "Kr ~ Barrier_Name"),
+              y_position = c(1.1e-4, 1.1e-4 + 0.12e-4, 1.1e-4 +0.24e-4) 
+              ) +
+  
   # CUSTOM LABELS
   xlab("Exodermis") +
   ylab(expression(k[r] ~ "[" ~ 10^{-08} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  ylim(1e-5, 1.5e-4) +
   
   # OTHER PARAMS
   # scale_fill_manual(values=c("white","white","white", "grey", "grey", "grey")) +
@@ -459,12 +474,15 @@ p_Barriers <- ggplot(data = data2plot,
   scale_fill_manual(values = color_scale2) +
   
   theme_few() +
-  theme(legend.position = "none") +
+  theme(legend.position = "none"
+        ,axis.line = element_line()
+        # ,panel.border = element_blank()
+        ) +
   theme(axis.text.x = element_text(angle = 90))
 
 # =========================================================================== #
-
-svg(filename = "plots/Conds_Barriers.svg", width = 3, height = 3)
+p_Barriers
+svg(filename = "plots/Conds_Barriers.svg", width = 4, height = 4)
 p_Barriers
 dev.off()
 ```
@@ -474,7 +492,7 @@ Stats
 ```{r}
 MS_lm <- lm(data = data2plot, formula = Kr ~ Barrier_Name)
 
-plot(MS_lm)
+# plot(MS_lm)
 # summary(MS_lm)
 anova(MS_lm)
 emmeans(MS_lm, specs = pairwise ~ Barrier_Name)
@@ -766,8 +784,7 @@ data2plot <- Conductivities_processed %>%
   filter(Barrier_Name %in% c("En.CS", 
                              "En.CS-Ex.LC", 
                              "En.CS-Ex.Sub")
-         ) 
-# %>% filter(kAQP == unique(Conductivities_processed$kAQP)[5])
+         ) %>% filter(kAQP == unique(Conductivities_processed$kAQP)[1])
 
 color_scale <- c("En.CS" = "black", "En.CS-Ex.LC" = "#C71AB7", "En.CS-Ex.Sub" = "#4E3CA5")
 
@@ -794,7 +811,7 @@ p <- ggplot(data2plot) +
   #             method = "lm",
   #             alpha = 0.1) +
   
-  facet_wrap(~kAQP) +
+  facet_wrap(~kAQP, nrow = 1) +
   
   scale_color_manual(values = color_scale) +
   scale_fill_manual(values = color_scale) +
@@ -802,6 +819,12 @@ p <- ggplot(data2plot) +
   theme_few()
 
 p
+
+ggsave(filename = "plots/DA_kr_kAQP1.png", device = "png", dpi = 300,
+       width = 5, height = 3)
+
+# ggsave(filename = "plots/DA_kr.png", device = "png", dpi = 300,
+#        width = 15, height = 5)
 ```
 
 
