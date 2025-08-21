@@ -787,75 +787,7 @@ kr.lm <- function(x,
 #     
 # }
 
-#===============================================================================
-#===============================================================================
 
-run_mecha <- function(output_path = "MECHA/Projects/granar/out/Tomato/Root/Project_Test/results/"){
-  
-  # use_condaenv("GRANAR-MECHA") # choose MECHA environment
-  
-  # Moving file to MECHA
-  # file.copy(paste0(anatomy_path, anatomy_file), "MECHA/cellsetdata/")
-  # file.rename(paste0("MECHA/cellsetdata/", anatomy_file), "MECHA/cellsetdata/current_root.xml")
-  
-  temp_name2 <- str_split(anatomy_file, pattern = ".xml")[[1]][1]
-  
-  # initiate try
-  tryCatch(
-    expr= {
-      print("Launching MECHA...")
-      try(py_run_file("MECHA/MECHAv4_TRoot.py"))
-      # system(paste0("python ",MECHA_path))
-      
-      output_0 <- read.delim(paste0(output_path, "Macro_prop_0,0.txt"))
-      output_1 <- read.delim(paste0(output_path, "Macro_prop_1,1.txt"))
-      output_2 <- read.delim(paste0(output_path, "Macro_prop_2,2.txt"))
-      output_3 <- read.delim(paste0(output_path, "Macro_prop_3,3.txt"))
-      output_4 <- read.delim(paste0(output_path, "Macro_prop_4,4.txt"))
-      output_5 <- read.delim(paste0(output_path, "Macro_prop_5,5.txt"))
-      output_6 <- read.delim(paste0(output_path, "Macro_prop_6,6.txt"))
-      output_7 <- read.delim(paste0(output_path, "Macro_prop_7,7.txt"))
-      output_8 <- read.delim(paste0(output_path, "Macro_prop_8,8.txt"))
-      output_9 <- read.delim(paste0(output_path, "Macro_prop_9,9.txt"))
-      #===============================================================================
-      Kx_0 <- as.double(strsplit(output_0[7,], " ")[[1]][5])
-      Kx_1 <- as.double(strsplit(output_1[7,], " ")[[1]][5])
-      Kx_2 <- as.double(strsplit(output_2[7,], " ")[[1]][5])
-      Kx_3 <- as.double(strsplit(output_3[7,], " ")[[1]][5])
-      Kx_4 <- as.double(strsplit(output_4[7,], " ")[[1]][5])
-      Kx_5 <- as.double(strsplit(output_5[7,], " ")[[1]][5])
-      Kx_6 <- as.double(strsplit(output_6[7,], " ")[[1]][5])
-      Kx_7 <- as.double(strsplit(output_7[7,], " ")[[1]][5])
-      Kx_8 <- as.double(strsplit(output_8[7,], " ")[[1]][5])
-      Kx_9 <- as.double(strsplit(output_9[7,], " ")[[1]][5])
-      #===============================================================================
-      kr_0 <- as.double(strsplit(output_0[8,], " ")[[1]][4])
-      kr_1 <- as.double(strsplit(output_1[8,], " ")[[1]][4])
-      kr_2 <- as.double(strsplit(output_2[8,], " ")[[1]][4])
-      kr_3 <- as.double(strsplit(output_3[8,], " ")[[1]][4])
-      kr_4 <- as.double(strsplit(output_4[8,], " ")[[1]][4])
-      kr_5 <- as.double(strsplit(output_5[8,], " ")[[1]][4])
-      kr_6 <- as.double(strsplit(output_6[8,], " ")[[1]][4])
-      kr_7 <- as.double(strsplit(output_7[8,], " ")[[1]][4])
-      kr_8 <- as.double(strsplit(output_8[8,], " ")[[1]][4])
-      kr_9 <- as.double(strsplit(output_9[8,], " ")[[1]][4])
-      #===============================================================================
-      peri <- as.double(strsplit(output_0[6,], " ")[[1]][3])
-      print("     Success of MECHA execution. Saving data...")
-      
-      # Save conductivities
-      Conds <- data.frame(Name = temp_name2,
-                           Barrier = c("b0", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9"),
-                           kr = c(kr_0, kr_1, kr_2, kr_3, kr_4, kr_5, kr_6, kr_7, kr_8, kr_9),
-                           Kx = c(Kx_0, Kx_1, Kx_2, Kx_3, Kx_4, Kx_5, Kx_6, Kx_7, Kx_8, Kx_9),
-                           perimeter = peri)
-      
-      return(Conds)
-      # write.csv(file = paste0("Results/Quantified_Anatomies/", temp_name2, ".csv"), x = Temp_K, row.names = F)
-      
-    }
-  )
-}
 
 #===============================================================================
 #===============================================================================
