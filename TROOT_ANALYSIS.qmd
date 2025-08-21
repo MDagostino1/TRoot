@@ -33,141 +33,51 @@ for(pk in libs) {
 simu_path <- "Results/12-01-2023/"
 ```
 
-# EXTRACT AND PRE-PROCESS RESULTS 
+# Load Results from MECHA
 
-## Extract Data from jobs 
+* kr and kAQP are converted from $cm d^{-1} HPa^{-1}$ to $m s^{-1} MPa^{-1}$
 
-```{r, eval = F}
-# path <- "Results/12-01-2023/Conductivities/"
-# l <- list.files(path, pattern = ".csv")
-# Conductivities <- data.frame()
-# 
-# for(i in l){
-#   # print(i)
-#   temp_df <- read.csv(paste0(path, i))
-#   Conductivities <- rbind(Conductivities, temp_df)
-# }
-# # Correct a bug that make Kx weird for b9 (the bug is fixed in scripts, but remains in results files)
-# Conductivities$Kx[Conductivities$Barrier == "b9"] <- Conductivities$Kx[Conductivities$Barrier == "b5"]
-# 
-# write.csv(Conductivities, file = "Results/12-01-2023/Conductivities_full.csv", row.names = F)
-```
+* kpl is converted from $cm^3/hPa/d/plasmodesmata$ to $m^{3} s^{-1} MPa^{-1} pd^{-1}$
 
-Plot and count the number of successfull simulations.
-We have basically 20 roots x 31 days = 620 combinations, 
-and for MECHA 10 kAQP x 10 barriers = 100.
-But we filter to have only 30 days and 6 barriers : 
+* Kx is converted to $cm^{4} d^{-1} HPa^{-1}$ to $m^3 s^{-1} MPa^{-1}$
 
 ```{r}
-Conductivities         <- read.csv("Results/12-01-2023/Conductivities_full.csv")
-Conductivities         <- Conductivities %>% filter(X > 0 & Barrier %in% c("b1", "b2", "b4", "b6", "b8", "b9"))
-Conductivities$Root_ID <- sapply(Conductivities$Root, function(i) unlist(str_split(string = i, pattern = "root"))[2])
+MECHA_results  <- read.csv("./Results/MECHA_results.csv")
+Anatomy_Full   <- read.csv("Data/Anatomy/Anatomy_Full.csv")
+anatomy2       <- read.csv("Data/Anatomy/anatomy2.csv")
 
-ggplot(data = Conductivities, aes(x = X, y = Root_ID)) + geom_point() + theme_bw()
-```
+# Convert kr and kx to m3 s-1 MPa-1
+MECHA_results <- MECHA_results %>% 
+  mutate(kr = kr*0.001157407,
+         Kx = Kx*1.157407e-09,
+         Kr = kr*perimeter,
+         kpl = kpl*(1e-6 * 1e4 * (60*60*24)^-1)
+         # kAQP = kAQP*0.001157407
+         )
 
-Create Conductivity_Dico and Conductivity_Mono.
-The function *set_conductivities* process and convert to the right units : 
-
-* kr is converted to $m s^{-1} MPa^{-1}$
-
-* Kx is converted to $m^3 s^{-1} MPa^{-1}$
-
-```{r, eval = F}
-Virtual_Roots  <- read.csv("Data/Virtual Roots/Virtual_Root_2023-07-17_30x20.csv")
-Barriers       <- read_xlsx("Data/Barriers.xlsx")
-Conductivities <- read.csv(file = paste0(simu_path, "Conductivities_full.csv"))
-
-source("src/FUNCTIONS/T-Root/Functions.R")
-#==================================================================================
-# Clean data and create dico and mono
-Conductivities_processed          <- set_conductivities(Conductivities, 
-                                                        conv_kr = 0.001157407,
-                                                        conv_kx = 1.157407e-09,
-                                                        Barriers = c("b1", "b3", "b4", "b6", "b9", "b8"))
-
-#==================================================================================
-# Change maturation stage name :
-Conductivities_processed$Barrier  <- as.factor(Conductivities_processed$Barrier)
-Conductivities_processed          <- left_join(Conductivities_processed, Barriers[c("Barrier", "Barrier_Name")])
-#==================================================================================
-# Check that the data is okey (black points have to be +- homogenous) :
-ggplot(data = Conductivities_processed, aes(x = x, y = root)) +
-  geom_point() +
-  ggtitle("Conductivities") +
-  theme_bw()
-
-# Export
-write.csv(Conductivities_processed, file = paste0("Data/Conductivities_processed.csv"), row.names = F)
-```
-
-Create Data Full
-
-```{r, eval = F, include = F}
-Parameters      <- read.csv("Data/Anatomy/Parameters.csv")
-Virtual_Roots   <- read.csv("Data/Virtual Roots/Virtual_Root_2023-07-17_30x20.csv")
-Virtual_Roots   <- left_join(Virtual_Roots, Parameters[c("name", "type", "param_id")])
-
-data_full1      <- left_join(Conductivities_processed, Virtual_Roots)
-data_full1$kAQP <- as.factor(data_full1$kAQP)
-
-Combinations    <- unique(data_full1[c("root", "x", "kAQP", "Barrier_Name")]) %>% 
-  mutate(Combination_ID = paste0(root, "_", x, "_", kAQP, "_", Barrier_Name))
-
-# Isolate Kr, Kx, kr, radius per COmbination_ID
-data_full2      <- left_join(data_full1, Combinations)
-data_full2      <- unique(data_full2[c("Kr", "Kx", "kr", "radius", "Combination_ID")])
-
-# Isolate parameters per Combination_ID
-data_full3      <- left_join(data_full1, Combinations)
-data_full3      <- unique(data_full3[c("Combination_ID", "param_id", "y")])
-data_full3      <- data_full3 %>% spread(key = param_id, value = y)
-
-# Join both
-data_final      <- left_join(data_full2, data_full3)
-data_final      <- left_join(data_final, Combinations)
-
-# Export final database
-write.csv(data_final, "Data/DATA_FULL_FINAL.csv", row.names = F)
+# Change barrier names
+MECHA_results$Barrier_Name <- NaN
+MECHA_results$Barrier_Name[MECHA_results$Barrier == "b1"] <- "En.CS"
+MECHA_results$Barrier_Name[MECHA_results$Barrier == "b2"] <- "En.Sub*"
+MECHA_results$Barrier_Name[MECHA_results$Barrier == "b3"] <- "En.Sub"
+MECHA_results$Barrier_Name[MECHA_results$Barrier == "b4"] <- "En.Sub-Ex.CS"
+MECHA_results$Barrier_Name[MECHA_results$Barrier == "b5"] <- "En.CS-Ex.CS"
+MECHA_results$Barrier_Name[MECHA_results$Barrier == "b6"] <- "En.CS-Ex.Sub"
+MECHA_results$Barrier_Name[MECHA_results$Barrier == "b7"] <- "Ex.CS"
+MECHA_results$Barrier_Name[MECHA_results$Barrier == "b8"] <- "En.Sub-Ex.Sub"
+MECHA_results$Barrier_Name[MECHA_results$Barrier == "b9"] <- "En.CS-Ex.LC"
 ```
 
 # ANALYSE QUANTIFIED DATA
 
 Here we analyse the results of conductivities computed on quantified cross-sections.
 
-```{r}
-Anatomy_Full   <- read.csv("Data/Anatomy/Anatomy_Full.csv")
-anatomy2       <- read.csv("Data/Anatomy/anatomy2.csv")
-
-# Loading results
-path_results <- "Results/Quantified_Anatomies/"
-list_conds <- list.files(path_results, pattern = ".csv")
-Conds <- tibble()
-for(file in list_conds){
-  temp_cond <- read.csv(paste0(path_results, file))
-  Conds <- rbind(Conds, temp_cond)
-}
-
-colnames(Conds)[1] <- "CS_id"
-
-Conds <- Conds %>%
-  filter(Barrier %in% c("b1", "b3", "b4", "b6", "b8", "b9")) %>% 
-  mutate(Barrier_Name = recode(Barrier, 
-                               "b1" = "En.CS", 
-                               "b3" = "En.Sub",
-                               "b4" = "En.Sub-Ex.CS",
-                               "b6" = "En.CS-Ex.Sub",
-                               "b8" = "En.Sub-Ex.Sub",
-                               "b9" = "En.CS-Ex.LC")
-         )
-
-# Creating a big table by merging with anatomical data
-Conds_full <- left_join(Conds, Anatomy_Full, by = c("CS_id"))
-```
-
 ## Plot kr vs each anatomical trait
 
 ```{r}
+data2plot <- MECHA_results %>% 
+  filter(Barrier_Name %in% c("En.CS", "En.CS-Ex.LC", "En.CS-Ex.Sub")) 
+
 cols <- c(
   "cortex_cell_diameter",
   "cortex_n_layers", 
@@ -188,17 +98,9 @@ cols <- c(
   "xylem_n_cells"
   )
 
-# library(ggpmisc)
-data2plot <- Conds %>% 
-  filter(Barrier %in% c("b1", "b8", "b6")) 
-
-data2plot$Barrier_Name <- NaN
-data2plot$Barrier_Name[data2plot$Barrier == "b1"] <- "En.CS"
-data2plot$Barrier_Name[data2plot$Barrier == "b6"] <- "En.CS-Ex.LC"
-data2plot$Barrier_Name[data2plot$Barrier == "b8"] <- "En.CS-Ex.Sub"
 
 data2plot <- data2plot %>% 
-  left_join(anatomy2, by = "CS_id") %>% 
+  left_join(Anatomy_Full, by = "CS_id") %>% 
   filter(param_id %in% cols) 
 
 color_scale <- c("En.CS" = "black", 
@@ -224,21 +126,21 @@ ggsave(filename = "plots/kr_vs_anatomy.png", plot = p,
        device = "png", width = 15, height = 8, dpi = 200)
 ```
 
-## Plot kr and Kr along age
+
+## Radial conductivity & conductance at fixed kAQP
 
 ```{r}
-conv_kr   <-  0.001157407
 color_scale <- c("En.CS"        = "black", 
                  "En.CS-Ex.LC"  = "#C71AB7", 
                  "En.CS-Ex.Sub" = "#4E3CA5")
 
-data2plot <- Conds_full %>% 
-  filter(Barrier %in% c("b1", "b9", "b6")) %>% 
-  mutate(kr_conv = Kr*conv_kr*1e8) %>% 
-  mutate(Kr_conv = kr_conv*perimeter) %>% 
-  select(c("Barrier", "kr_conv", "Kr_conv", "Barrier_Name", "age")) %>% 
-  rename("kr" = "kr_conv") %>% 
-  rename("Kr" = "Kr_conv") %>% 
+data2plot <- MECHA_results %>% 
+  filter(kAQP == 4e-4) %>%
+  filter(Barrier_Name %in% c("En.CS", "En.CS-Ex.LC", "En.CS-Ex.Sub")) %>% 
+  # mutate(kr = kr*1e8,
+  #        Kr = Kr*1e9) %>% 
+  left_join(Anatomy_Full, by = "CS_id") %>% 
+  select(c("Barrier_Name", "age", "kr", "Kr", "kAQP")) %>% 
   gather(kr, Kr, key = "Variable", value = "Value") 
   
 # ============================================================================ #
@@ -264,40 +166,31 @@ p_RadialConds <- ggplot(data2plot) +
   # ylab(expression(K[r] ~ "[" ~ m^{3} ~ MPa^{-1} ~ s^{-1} ~ "]")) +
   
   facet_wrap(~Variable, scales = "free") +
+  # facet_grid(Variable~kAQP) +
   
   theme_few() +
-  theme(legend.position = "right") 
+  theme(legend.position = "bottom") 
 
 # ============================================================================ #
 p_RadialConds
-svg(filename = "plots/Conds_Radial.svg", width = 7, height = 3)
+# svg(filename = "plots/MECHA_results_kr-Kr_all-kAQP.svg", width = 12, height = 6)
+# p_RadialConds
+# dev.off()
+
+svg(filename = "plots/MECHA_results_kr-Kr.svg", width = 6, height = 4)
 p_RadialConds
 dev.off()
-```
-
-
-try some linear regression
-
-```{r}
-kr_lm <- lm(data = Conds_full, formula = Kr ~ 
-              # age * 
-              cortex_n_layers +
-              I(stele_layer_diameter^2) +
-              # phloem_n_layers*
-              phloem_proportion +
-              Barrier
-            )
-
-print(summary(kr_lm))
-
-# Conds_pred <- predict(object = kr_lm)
 ```
 
 ## Axial conductance
 
 ```{r}
 # Select data for only one Barrier (they all have the same values anyway)
-data2plot <- Conds_full %>% filter(Barrier == "b1")
+data2plot <- MECHA_results %>% 
+  filter(Barrier == "b1" & kAQP == 1e-4) %>% 
+  select(c("CS_id", "Kx")) %>% 
+  left_join(Anatomy_Full[c("CS_id", "age")], by = "CS_id") %>% 
+  mutate(Kx_ln = ln(Kx))
 
 Kx_plot <- ggplot(data2plot) +
 
@@ -305,16 +198,21 @@ Kx_plot <- ggplot(data2plot) +
                  y = Kx)) +
   
   geom_smooth(aes(x = age, y = Kx),
-              span = 0.6,se = F) +
+              # span = 1,
+              method = "lm",
+              se = F) +
   
   xlab("Age [d]") +
   ylab(expression(k[x] ~ "[" ~ m^{4} ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  
+  scale_y_continuous(trans = 'log10') +
   
   theme_few()
 
 # =========================================================================== #
 Kx_plot
-svg(filename = "plots/data_kx_plot.svg", width = 3, height = 3)
+
+svg(filename = "plots/MECHA_results_Kx.svg", width = 3, height = 3)
 Kx_plot
 dev.off()
 
@@ -325,21 +223,49 @@ dev.off()
 ## Xylem  number and size 
 
 ```{r}
-data2plot <- Conds_full %>% 
-  select(c("age", "xylem_cell_diameter", "xylem_n_cells")) %>% 
-  gather(xylem_cell_diameter, xylem_n_cells, key = "Variable", value = "Value")
+tissues <- c("xylem_cell_diameter", "xylem_n_cells", "stele_layer_diameter", 
+             "cortex_n_layers", "phloem_n_layers", "radius")
 
-data_xylem <- ggplot(data2plot) +
+data2plot <- Anatomy_Full %>% 
+  select(c("age", tissues)) %>% 
+  gather(tissues,
+         key = "Variable", value = "Value")
+
+Anatomy_plot <- ggplot(data2plot) +
+  
   geom_point(aes(x = age, y = Value)) +
   geom_smooth(aes(x = age, y = Value),
-              span = 1, se = F) +
+              span = 1, se = T) +
+  
   facet_wrap(~Variable, scales = "free") +
   theme_few()
-data_xylem
+Anatomy_plot
 
-ggsave(filename = "plots/data_xylem.svg", plot = data_xylem, 
-       device = "svg", width = 6, height = 3)
+ggsave(filename = "plots/Anatomy_xylem_ncells-size.svg", plot = Anatomy_plot, 
+       device = "svg", width = 6, height = 4)
+
+ggsave(filename = "plots/Anatomy_xylem_ncells-size.png", plot = Anatomy_plot, 
+       device = "png", width = 6, height = 4, dpi = 300)
 ```
+
+```{r}
+data2plot <- Anatomy_Full %>% 
+  select(c("age", tissues)) 
+
+variables <- tissues
+
+plots <- map(variables, ~ {
+  ggplot(data2plot, aes(x = age, y = .data[[.x]])) +
+    geom_point() +
+    geom_smooth(method = "lm", se = FALSE) +
+    labs(title = .x)
+})
+
+# Combine plots into a single faceted plot
+library(patchwork)
+wrap_plots(plots, ncol = 2) + plot_annotation(title = "Variable values by Age")
+```
+
 
 ## Other anatomical parameters
 
@@ -369,7 +295,12 @@ ggsave(filename = "plots/data_xylem.svg", plot = data_xylem,
 ## Barrier Comparison
 
 ```{r}
-b <- c("b1", "b3", "b4", "b6", "b9", "b8")
+b <- c("En.CS", 
+       "En.CS-Ex.LC", 
+       "En.CS-Ex.Sub", 
+       "En.Sub", 
+       "En.Sub-Ex.CS",
+       "En.Sub-Ex.Sub")
 
 color_scale2 <- c("En.CS"        = "black", 
                   "En.CS-Ex.LC"  = "#C71AB7", 
@@ -380,16 +311,9 @@ color_scale2 <- c("En.CS"        = "black",
                   )
 
 # ============================================================================ #
-data2plot <- Conds %>% 
-  filter(Barrier %in% c("b1", "b3", "b4", "b6", "b9", "b8")) %>% 
-  mutate(Barrier_Name = recode(Barrier, 
-                               "b1" = "En.CS", 
-                               "b3" = "En.Sub",
-                               "b4" = "En.Sub-Ex.CS",
-                               "b6" = "En.CS-Ex.Sub",
-                               "b8" = "En.Sub-Ex.Sub",
-                               "b9" = "En.CS-Ex.LC")
-         ) %>% 
+data2plot <- MECHA_results %>% 
+  filter(Barrier_Name %in% b) %>% 
+  filter(kAQP == 4e-4) %>% 
   mutate(Endodermis = recode(Barrier_Name,
                              "En.CS"         = "Endodermal CS",
                              "En.CS-Ex.LC"   = "Endodermal CS",
@@ -428,25 +352,27 @@ data2plot <- data2plot[order(data2plot$Barrier_Name),]
 
 
 ```{r}
+library(ggsignif)
 # ============================================================================ #
 p_Barriers <- ggplot(data = data2plot, 
                      aes(x = Exodermis, 
-                         y = Kr)) +
+                         y = kr)
+                     ) +
   
-  # ADD VIOLINS
+  # # ADD VIOLINS
   geom_violin(aes(fill  = Barrier_Name),
-              # fill  = "lightgrey", 
+              # fill  = "lightgrey",
               color = "white",
               alpha = 0.2) +
-  
+
   # ADD BOXPLOTS
   geom_boxplot(width = 0.5,
                alpha = 1) +
   
   # ADD POINTS
-  geom_jitter(aes(color = Barrier_Name),
-              width = 0.1
-              , size = 0.5
+  geom_jitter(aes(color = Barrier_Name)
+              # ,width = 0.1
+              # ,size = 0.5
               ) +
   
   facet_wrap(~Endodermis, scales = "free_x") +
@@ -456,16 +382,16 @@ p_Barriers <- ggplot(data = data2plot,
                                  c("none", "Sub"),
                                  c("LC", "Sub")
                                  ),
-              map_signif_level = F,
-              test = "anova",
-              test.args = list(formula = "Kr ~ Barrier_Name"),
-              y_position = c(1.1e-4, 1.1e-4 + 0.12e-4, 1.1e-4 +0.24e-4) 
+              map_signif_level = T,
+              # test = "anova",
+              # test.args = list(formula = "kr ~ Barrier_Name"),
+              y_position = c(1, 1.15, 1.3) * 1.4e-7
               ) +
   
   # CUSTOM LABELS
   xlab("Exodermis") +
   ylab(expression(k[r] ~ "[" ~ 10^{-08} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
-  ylim(1e-5, 1.5e-4) +
+  ylim(1e-8, 2e-7) +
   
   # OTHER PARAMS
   # scale_fill_manual(values=c("white","white","white", "grey", "grey", "grey")) +
@@ -482,12 +408,17 @@ p_Barriers <- ggplot(data = data2plot,
 
 # =========================================================================== #
 p_Barriers
-svg(filename = "plots/Conds_Barriers.svg", width = 4, height = 4)
+
+ggsave(filename = "plots/MECHA_results_barriers.svg", 
+       plot = p_Barriers, 
+       device = "svg", width = 5, height = 5)
+
+svg(filename = "plots/MECHA_results_barriers.svg", width = 4, height = 3)
 p_Barriers
 dev.off()
 ```
 
-Stats
+# Stats
 
 ```{r}
 MS_lm <- lm(data = data2plot, formula = Kr ~ Barrier_Name)

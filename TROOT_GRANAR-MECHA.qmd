@@ -771,6 +771,8 @@ for(i in list_results){
   results_temp <- read.csv(file = paste0("./Results/MECHA_results/", i))
   MECHA_results <- rbind(MECHA_results, results_temp)
 }
+
+write.csv(x = MECHA_results, file = "./Results/MECHA_results.csv", row.names = F)
 ```
 
 ```{r}
