@@ -370,7 +370,9 @@ p_Barriers <- ggplot(data = data2plot,
                alpha = 1) +
   
   # ADD POINTS
-  geom_jitter(aes(color = Barrier_Name)
+  geom_point(aes(x = Exodermis, 
+                  y = as.numeric(kr),
+                  color = Barrier_Name),
               # ,width = 0.1
               # ,size = 0.5
               ) +
@@ -421,343 +423,53 @@ dev.off()
 # Stats
 
 ```{r}
-MS_lm <- lm(data = data2plot, formula = Kr ~ Barrier_Name)
+data2stat <- MECHA_results %>% 
+  filter(Barrier_Name %in% c("En.CS", "En.CS-Ex.LC", 
+       "En.CS-Ex.Sub", 
+       "En.Sub", 
+       "En.Sub-Ex.CS",
+       "En.Sub-Ex.Sub"))
 
-# plot(MS_lm)
+MS_lm <- lm(data = data2stat, formula = Kr ~ Barrier_Name)
+
+plot(MS_lm)
 # summary(MS_lm)
 anova(MS_lm)
 emmeans(MS_lm, specs = pairwise ~ Barrier_Name)
 
 # visreg(MS_lm)
+```
 
-DL_pred <- tibble(DL = c("M1", "M2", "M3", "T1", "T2", "T3"),
-                  Estimate = MS_lm$coefficients)
 
-DL_pred2 <- tibble(DL2 = c("M1", "M2", "M3", "T1", "T2", "T3"),
-                  Estimate2 = MS_lm$coefficients)
-
-EM <- emmeans(MS_lm, specs = pairwise ~ Barrier_Name)
-DL_mean <- as_tibble(EM$emmeans)
+```{r}
+EM          <- emmeans(MS_lm, specs = pairwise ~ Barrier_Name)
+DL_mean     <- as_tibble(EM$emmeans)
 DL_contrast <- as_tibble(EM$contrasts)
 
-mean_M1 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS"]
-mean_M2 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.Sub"]
-mean_M3 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.Sub-Ex.CS"]
-mean_T1 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS-Ex.LC"]
-mean_T2 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS-Ex.Sub"]
-mean_T3 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.Sub-Ex.Sub"]
+mean_1 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS"]
+mean_2 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS-Ex.LC"]
+mean_3 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS-Ex.Sub"]
+mean_4 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.Sub"]
+mean_5 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.Sub-Ex.CS"]
+mean_6 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.Sub-Ex.Sub"]
 
-print(paste0("Difference between En.CS and En.CS-Ex.LC [%]         : ", round((mean_M1-mean_T1)*100/mean_M1, digits = 2)))
-print(paste0("Difference between En.CS-Ex.Sub and En.CS-Ex.LC [%]  : ", round((mean_T1-mean_T2)*100/mean_T1, digits = 2)))
-print(paste0("Difference between En.Sub-Ex.Sub and En.CS-Ex.LC [%] : ", round((mean_T1-mean_T3)*100/mean_T1, digits = 2)))
-print(paste0("Difference between En.Sub and En.Sub-Ex.CS [%]       : ", round((mean_M2-mean_M3)*100/mean_M2, digits = 2)))
+DL_contrast
+# ==============================================================================
+print(paste0("Difference between En.CS and En.CS-Ex.LC [%]         : ", 
+             # round((mean_1-mean_2)*100/mean_1, digits = 2))
+             DL_contrast$estimate[DL_contrast$contrast == "En.CS - (En.CS-Ex.LC)"]    
+             )
+      )
+print(paste0("Difference between En.CS-Ex.Sub and En.CS-Ex.LC [%]  : ", 
+             round((mean_2-mean_3)*100/mean_2, digits = 2))
+      )
+print(paste0("Difference between En.CS-Ex.LC and En.Sub [%]        : ", 
+             round((mean_2-mean_4)*100/mean_T1, digits = 2))
+      )
+print(paste0("Difference between En.Sub and En.Sub-Ex.CS [%]       : ", 
+             round((mean_M2-mean_M3)*100/mean_M2, digits = 2))
+      )
 ```
-
-# LOAD PRE-PROCESSED DATA
-
-```{r Load Data}
-Conductivities_processed <- read.csv("Data/Conductivities_processed.csv")
-Anatomy_Full             <- read.csv("Data/Anatomy/Anatomy_Full.csv")
-Data_Full                <- read.csv("Data/DATA_FULL_FINAL.csv")
-Parameters               <- read.csv("Data/Anatomy/Parameters.csv")
-Barriers_Types           <- read_xlsx("Data/Barriers_Types.xlsx")
-
-# Remove day zero
-Conductivities_processed <- Conductivities_processed %>% filter(x != 0)
-Data_Full                <- Data_Full %>% filter(x != 0)
-
-# Change Names of barriers
-Conductivities_processed <- Conductivities_processed %>% 
-  mutate(Barrier_Name = recode(Barrier_Name, 
-                               "M1" = "En.CS", 
-                               "M2" = "En.Sub",
-                               "M3" = "En.Sub-Ex.CS",
-                               "T1" = "En.CS-Ex.LC",
-                               "T2" = "En.CS-Ex.Sub",
-                               "T3" = "En.Sub-Ex.Sub"))
-```
-
-Change M1, M2, M3 etc by explicit names : \
-
-* M1 = En.CS 
-
-* M2 = En.Sub 
-
-* M3 = Ex.CS-En.Sub
-
-* T1 = Ex.LC-En.CS 
-
-* T2 = Ex.Sub-En.CS 
-
-* T3 = Ex.Sub-En.Sub 
-
-# VISUAL ANALYSIS
-
-### Aquaporins
-
-```{r Plot Pure Data}
-# kr vs kAQP
-kAQP_plot1 <- ggplot(data = Conductivities_processed,
-                     aes(x=(kAQP*10^7), 
-                         y = kr*1e08,
-                         # color = Barrier_Name,
-                         group = Barrier_Name),
-                     color = "black")+
-  
-  # geom_jitter(aes(x = kAQP*10000),
-  #            alpha = 0.05,
-  #            width = 1e-4) +
-  
-  # geom_boxplot(aes(x = as.factor(kAQP*10000), y = kr, color = Barrier))+
-  # facet_wrap(~Barrier) +
-  # scale_color_viridis() +
-  
-  geom_smooth(linewidth = 2, color = "black") +
-  
-  ylab(expression(k[r] ~ 10^{-8} ~ "[" * m ~ MPa^{-1} ~ s^{-1}*"]")) +
-  # xlab("kAQP [10e-04 cm hPA-1 d-1]") +
-  xlab(expression(kAQP ~ 10^{-7} ~ "[" * cm ~ hPa^{-1} ~ d^{-1} * "]")) +
-  ylim(2, 12) +
-  theme_test() 
-  # theme(legend.position = "none")
-kAQP_plot1
-
-ggsave(filename = "plots/AQP_influence.svg", 
-       plot = kAQP_plot1, 
-       device = "svg", units = "in",
-       width = 4, height = 3)
-```
-
-### Radial conductivity
-
-```{r Plot Pure Data}
-#============================================================================
-# kr
-kr_plot1 <- ggplot(data = Conductivities_processed %>% 
-                     filter(Barrier_Name %in% c("En.CS", 
-                                                "En.CS-Ex.LC", 
-                                                "En.CS-Ex.Sub")
-                            ),
-       aes(x = x, 
-           y = kr*10^8,
-           color = kAQP*1e7)) +
-  geom_point(alpha = 0.75, position = "jitter") +
-  facet_wrap(~Barrier_Name) +
-  scale_color_viridis() +
-  # geom_smooth(aes(x = x, y = radius/5000000), color = "red") +
-  # ylim(0, 3e-08) +
-  ylab(expression(k[r] ~ 10^{-8} ~ "[" ~ m~ s^{-1} ~ MPa^{-1} ~ "]")) +
-  labs(color = expression(kAQP ~ "[" ~ 10^{-7} ~ m ~ s^{-1} ~ MPa^{-1} ~ "]")) +
-  xlab("Age [d]") +
-  # ggtitle("Hydraulic Radial conductivity") +
-  theme_dark()
-kr_plot1
-```
-
-### Radial Conductance
-
-```{r Plot Pure Data}
-#============================================================================
-Kr_plot1 <- ggplot(data = Conductivities_processed %>% 
-                     filter(Barrier_Name %in% c("En.CS", 
-                                                "En.CS-Ex.LC", 
-                                                "En.CS-Ex.Sub"))) +
-  geom_point(aes(x = x, y = Kr, color = kAQP*1e7),
-              alpha = 0.75) +
-  facet_wrap(~Barrier_Name) +
-  scale_color_viridis() +
-  ylab(expression(K[r] ~ "[" ~ m^{3} ~ s^{-1} ~ MPa^{-1} ~ "]")) +
-  xlab("Age [d]") +
-  # ylim(0, 3e-08) +
-  labs(color = expression(kAQP ~  "[" ~ 10^{-7} ~ m ~ s^{-1} ~ MPa^{-1} ~ "]")) +
-  theme_dark()
-Kr_plot1
-#============================================================================
-```
-
-### Radius
-
-```{r Plot Pure Data}
-# Radius
-Radius_plot1 <- ggplot(data = Conductivities_processed %>% 
-                         filter(Barrier_Name == "En.CS" & kAQP == 1.157e-7),
-                       aes(x = x, y = radius)) +
-  geom_point(alpha = 1) +
-  # geom_smooth() +
-  theme_test() +
-  ylab("Radius [mm]") +
-  xlab("Age [d]") 
-
-Radius_plot1
-svg("Plots/Radius_plot_1.svg", height = 2.5, width = 2.5)
-Radius_plot1
-dev.off()
-```
-
-### Axial conductance
-
-```{r Plot Pure Data}
-#============================================================================
-# Kx
-data2plot_kx <- Conductivities_processed %>%
-  filter(Barrier_Name == "En.CS-Ex.LC" & kAQP == min(Conductivities_processed$kAQP))
-kx_plot1 <- ggplot(data = data2plot_kx,
-       aes(x = x, 
-           y = Kx,
-           color = radius)) +
-  geom_point(alpha = 1, size = 2) +
-  # geom_smooth(method = "lm") +
-  scale_y_log10() +
-  # geom_smooth(method = "lm", se = T) +
-  scale_color_viridis(option = "magma", direction = -1, breaks = c(0.2, 0.3, 0.4)) +
-  # scale_color_gradient(breaks = c(0.2, 0.3, 0.4)) +
-  # ylim(0, 3e-08) +
-  ylab(expression(K[x] ~ "[" ~ m^{4} ~ s^{-1} ~ hPa^{-1} ~ "]")) +
-  xlab("Age [d]") +
-  labs(color = "Radius [mm]") +
-  # ggtitle("Hydraulic axial conductance") +
-  theme_test()
-kx_plot1
-
-# ========================================================================== #
-# EXPORT PLOTS
-# ========================================================================== #
-# svg("Plots/kAQP_1.svg", height = 4, width = 6)
-# kAQP_plot1
-# dev.off()
-# 
-# png("Plots/kr_plot_1.png", height = 5, width = 8, units = "in", res = 300)
-```
-
-## Additional Plots 
-
-### Radial conductivity - Error Bars
-
-```{r}
-data2plot1 <- Conductivities_processed 
-# %>% 
-#   filter(Barrier_Name %in% c("En.CS", 
-#                              "En.CS-Ex.LC", 
-#                              "En.CS-Ex.Sub")) 
-
-data2plot2 <- data2plot1 %>% 
-  group_by(Barrier_Name, x, kAQP) %>% 
-  summarise(kr_mean = median(kr),
-            kr_sd   = mad(kr),
-            radius_mean = median(radius)) 
-
-# =========================================================================== #
-# PLOT
-# =========================================================================== #
-
-AB_colors <- c("En.CS"         = "#C71AB7", 
-               "En.CS-Ex.LC"   = "#C71AB7", 
-               "En.CS-Ex.Sub"  = "#C71AB7",
-               "En.Sub"        = "#4E3CA5",
-               "En.Sub-Ex.CS"  = "#4E3CA5",
-               "En.Sub-Ex.Sub" = "#4E3CA5"
-               )
-
-p2 <- ggplot(data = data2plot2 %>% 
-               # filter(kAQP %in% c(unique(Conductivities_processed$kAQP)[1], 
-               #                    unique(Conductivities_processed$kAQP)[5],
-               #                    unique(Conductivities_processed$kAQP)[9]
-               #                    )
-               #        )
-               filter(kAQP == unique(Conductivities_processed$kAQP)[5])
-             ) +
-  
-  geom_point(aes(x = x,
-                 y = kr_mean,
-                 color = Barrier_Name,
-                 shape = Barrier_Name)) +
-  
-  # geom_ribbon(aes(x = x,
-  #                   ymin = kr_mean - kr_sd,
-  #                   ymax = kr_mean + kr_sd,
-  #                   fill = Barrier_Name
-  #                   ),
-  #               alpha = 0.2) +
-  
-  geom_errorbar(aes(x = x,
-                    ymin = kr_mean - kr_sd,
-                    ymax = kr_mean + kr_sd,
-                    color = Barrier_Name
-                    ),
-                alpha = 0.2, width = 0.2) +
-  
-  geom_line(aes(x = x,
-                y = kr_mean,
-                group = Barrier_Name,
-                color = Barrier_Name
-                )
-            ) +
-  
-  
-  
-  scale_color_manual(values = AB_colors) +
-  # scale_color_viridis(option = "magma") +
-  scale_fill_manual(values = AB_colors) +
-  
-  # facet_wrap(~kAQP, nrow = 1) +
-  
-  theme_few()
-
-p2  
-
-ggsave(filename = "./plots/kr_full_dev2.png", plot = p2, device = "png", width = 7, height = 5, dpi = 300)
-```
-
-### Radial Conductivity - Loess
-
-```{r}
-data2plot <- Conductivities_processed %>% 
-  filter(Barrier_Name %in% c("En.CS", 
-                             "En.CS-Ex.LC", 
-                             "En.CS-Ex.Sub")
-         ) %>% filter(kAQP == unique(Conductivities_processed$kAQP)[1])
-
-color_scale <- c("En.CS" = "black", "En.CS-Ex.LC" = "#C71AB7", "En.CS-Ex.Sub" = "#4E3CA5")
-
-p <- ggplot(data2plot) +
-  
-  geom_jitter(aes(x = x, y = kr*1e8, color = Barrier_Name),
-             alpha = 0.4, 
-             width = 0.2
-             ) +
-  
-  geom_smooth(data = data2plot,
-              aes(x = x,
-                  y = kr*1e8,
-                  color = Barrier_Name,
-                  fill = Barrier_Name), 
-              span = 0.5,
-              alpha = 0.1) +
-  
-  # geom_smooth(data = data2plot %>% filter(x >= 25),
-  #             aes(x = x,
-  #                 y = kr,
-  #                 color = Barrier_Name,
-  #                 fill = Barrier_Name), 
-  #             method = "lm",
-  #             alpha = 0.1) +
-  
-  facet_wrap(~kAQP, nrow = 1) +
-  
-  scale_color_manual(values = color_scale) +
-  scale_fill_manual(values = color_scale) +
-  
-  theme_few()
-
-p
-
-ggsave(filename = "plots/DA_kr_kAQP1.png", device = "png", dpi = 300,
-       width = 5, height = 3)
-
-# ggsave(filename = "plots/DA_kr.png", device = "png", dpi = 300,
-#        width = 15, height = 5)
-```
-
 
 # Statistical Analysis per variable
 
