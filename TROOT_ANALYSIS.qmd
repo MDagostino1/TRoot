@@ -24,7 +24,7 @@ libs <- c("pander", "readxl", "EnvStats",
           "xml2", 
           "viridis", "Hmisc", "ggplot2", 
           "gridExtra", "Matrix", "emmeans", 
-          "ggthemes")
+          "ggthemes", "SciViews")
 
 for(pk in libs) {
   library(pk, character.only = T)
@@ -45,6 +45,7 @@ simu_path <- "Results/12-01-2023/"
 MECHA_results  <- read.csv("./Results/MECHA_results.csv")
 Anatomy_Full   <- read.csv("Data/Anatomy/Anatomy_Full.csv")
 anatomy2       <- read.csv("Data/Anatomy/anatomy2.csv")
+Parameters     <- read_xlsx("Data/Parameters.xlsx")
 
 # Convert kr and kx to m3 s-1 MPa-1
 MECHA_results <- MECHA_results %>% 
@@ -75,13 +76,13 @@ Here we analyse the results of conductivities computed on quantified cross-secti
 ## Plot kr vs each anatomical trait
 
 ```{r}
-data2plot <- MECHA_results %>% 
-  filter(Barrier_Name %in% c("En.CS", "En.CS-Ex.LC", "En.CS-Ex.Sub")) 
-
+# data2plot <- MECHA_results %>% 
+#   filter(Barrier_Name %in% c("En.CS", "En.CS-Ex.LC", "En.CS-Ex.Sub")) 
+# 
 cols <- c(
   "cortex_cell_diameter",
-  "cortex_n_layers", 
-  "endodermis_cell_diameter", 
+  "cortex_n_layers",
+  "endodermis_cell_diameter",
   "epidermis_cell_diameter",
   "exodermis_cell_diameter",
   "pericycle_cell_diameter",
@@ -98,25 +99,31 @@ cols <- c(
   "xylem_n_cells"
   )
 
+plist <- Parameters %>% 
+  filter(param_id %in% cols)
+plist <- plist$param_id
 
-data2plot <- data2plot %>% 
-  left_join(Anatomy_Full, by = "CS_id") %>% 
-  filter(param_id %in% cols) 
+data2plot <- MECHA_results[c("CS_id", "kr", "kAQP", "Barrier_Name")] %>% 
+  filter(kAQP == 4e-4) %>% 
+  select(-kAQP) %>% 
+  filter(Barrier_Name %in% c("En.CS")) %>% 
+  left_join(Anatomy_Full[c("CS_id", plist, "radius", "age")], by = "CS_id") %>% 
+  select(-c("CS_id")) %>% 
+  gather(c(all_of(plist), "radius", "age"), key = "Variable", value = "Value")
 
 color_scale <- c("En.CS" = "black", 
                  "En.CS-Ex.LC" = "#C71AB7", 
                  "En.CS-Ex.Sub" = "#4E3CA5")
 
 p <- ggplot(data2plot,
-       aes(x = value, y = Kr, color = Barrier_Name)) +
+       aes(x = Value, y = kr, color = Barrier_Name)) +
+  
   # geom_line(aes(x = age, y = Kr, group = plant_id)) +
-  geom_jitter(alpha = 0.5) +
-  geom_smooth(method = "lm") +
-  # stat_poly_eq(formula = y ~ x,
-  #              aes(label = paste(..rr.label.., sep = "~~~")),
-  #              parse = TRUE) +
+  
+  geom_point(alpha = 1, size = 0.5) +
+  # geom_smooth(method = "loess", span = 1) +
   scale_color_manual(values = color_scale) +
-  facet_wrap(~param_id, scales = "free", nrow = 3) +
+  facet_wrap(~Variable, scales = "free", nrow = 3) +
   theme_few() +
   theme(axis.text.x = 
           element_text(angle = 90, hjust = 1, vjust = 0.5))
@@ -220,15 +227,20 @@ dev.off()
 ```
 
 
-## Xylem  number and size 
+## Important anatomical parameters
 
 ```{r}
-tissues <- c("xylem_cell_diameter", "xylem_n_cells", "stele_layer_diameter", 
-             "cortex_n_layers", "phloem_n_layers", "radius")
+variables <- c("xylem_cell_diameter", 
+               "xylem_n_cells", 
+               "stele_layer_diameter", 
+               "cortex_n_layers", 
+               "phloem_n_layers", 
+               "radius")
 
-data2plot <- Anatomy_Full %>% 
-  select(c("age", tissues)) %>% 
-  gather(tissues,
+data2plot <- unique(MECHA_results[c("CS_id", "Kx")]) %>% 
+  left_join(Anatomy_Full, by = "CS_id") %>% 
+  select(c("age", variables)) %>% 
+  gather(variables,
          key = "Variable", value = "Value")
 
 Anatomy_plot <- ggplot(data2plot) +
@@ -241,67 +253,402 @@ Anatomy_plot <- ggplot(data2plot) +
   theme_few()
 Anatomy_plot
 
-ggsave(filename = "plots/Anatomy_xylem_ncells-size.svg", plot = Anatomy_plot, 
-       device = "svg", width = 6, height = 4)
+svg(filename = "plots/Anatomy_important_traits.svg", width = 5, height = 4)
+Anatomy_plot
+dev.off()
 
-ggsave(filename = "plots/Anatomy_xylem_ncells-size.png", plot = Anatomy_plot, 
+ggsave(filename = "plots/Anatomy_important_traits.png", plot = Anatomy_plot, 
        device = "png", width = 6, height = 4, dpi = 300)
 ```
 
+### Secondary growth
+
 ```{r}
 data2plot <- Anatomy_Full %>% 
-  select(c("age", tissues)) 
+  select("age", "secondarygrowth_param")
 
-variables <- tissues
-
-plots <- map(variables, ~ {
-  ggplot(data2plot, aes(x = age, y = .data[[.x]])) +
-    geom_point() +
-    geom_smooth(method = "lm", se = FALSE) +
-    labs(title = .x)
-})
-
-# Combine plots into a single faceted plot
-library(patchwork)
-wrap_plots(plots, ncol = 2) + plot_annotation(title = "Variable values by Age")
+ggplot(data2plot, aes(x = age, y = secondarygrowth_param)) +
+  geom_point() +
+  geom_smooth_logistic
 ```
 
 
-## Other anatomical parameters
+
+## Analyse corelations between kr and anatomical measurements
 
 ```{r}
-cols <- c("stele_layer_diameter", 
-           "phloem_n_layers",
-           "cortex_n_layers")
-data2plot <- Conds_full %>% 
-  select(c("age", 
-           cols)
-         ) %>% 
-  gather(cols, key = "Variable", value = "Value")
+plist <- Parameters %>% 
+  filter(param_id %in% colnames(Anatomy_Full))
+plist <- plist$param_id
 
-data_anat <- ggplot(data2plot) +
-  geom_point(aes(x = age, y = Value)) +
-  geom_smooth(aes(x = age, y = Value),
-              span = 1, se = F) +
-  facet_wrap(~Variable, scales = "free") +
+data2stat <- MECHA_results[c("CS_id", "kr", "kAQP")] %>%
+  filter(kAQP == 4e-4) %>% 
+  select(-kAQP) %>% 
+  left_join(Anatomy_Full[c("CS_id", plist, "radius", "age")], by = "CS_id") %>% 
+  select(-c("CS_id"))
+
+kr_corr <- data2stat %>% 
+  select(-kr) %>% 
+  sapply(function(x) cor(x, data2stat$kr, use = "complete.obs"))
+
+pander(kr_corr)
+```
+
+
+
+
+
+# COMPLETE STATISTICAL ANALYSIS
+
+## 1) Radial conductivity
+
+### Linear model
+
+```{r}
+barriers <- c("En.CS", 
+              "En.CS-Ex.LC", 
+              "En.CS-Ex.Sub", 
+              "En.Sub", 
+              "En.Sub-Ex.CS", 
+              "En.Sub-Ex.Sub")
+
+th <- 3 # Outlier treshold (x)
+
+# Define data
+data2stat <- MECHA_results %>% 
+  select(c("Barrier_Name", "kr", "kAQP", "CS_id")) %>% 
+  left_join(Anatomy_Full[c("CS_id", "age", "radius")], by = "CS_id") %>% 
+  mutate(Barrier_Name = as.factor(Barrier_Name)) %>% 
+  filter(Barrier_Name %in% barriers) %>% 
+  mutate(kr = 1e8*kr)
+
+# # Remove outliers
+# data2stat <- data2stat %>% 
+#   group_by(Barrier_Name) %>%
+#   mutate(
+#     median = median(kr, na.rm = TRUE),
+#     mad = mad(kr, na.rm = TRUE),
+#     lower_bound = median - th * mad,
+#     upper_bound = median + th * mad
+#   ) %>%
+#   filter(kr >= lower_bound & kr <= upper_bound) %>%
+#   select(-median, -mad, -lower_bound, -upper_bound) 
+
+# CHECK NORMALITY
+par(mfrow = c(1, 2))
+qqnorm(data2stat$kr)
+qqline(data2stat$kr)
+hist(data2stat$kr)  
+shapiro.test(data2stat$kr)
+
+# NORMALIZE WITH BOX-COX
+# par(mfrow = c(1))
+bc     <- MASS::boxcox(lm(data2stat$kr ~ 1))
+lambda <- bc$x[which(bc$y == max(bc$y))]
+
+data2stat$kr_tf <- BoxCox(data2stat$kr, lambda)
+# data2stat$kr_tf <- log(sqrt(data2stat$kr))
+
+# CHECK NORMALITY
+par(mfrow = c(1, 2))
+qqnorm(data2stat$kr_tf)
+qqline(data2stat$kr_tf)
+hist(data2stat$kr_tf)  
+shapiro.test(data2stat$kr_tf)
+```
+
+```{r}
+p <- ggplot(data2stat) +
+  
+  geom_jitter(aes(x = Barrier_Name, 
+                  y = kr,
+                  color = kAQP,
+                  size = radius^2), 
+              width = 0.25,
+              alpha = 0.75
+              ) +
+  
+  # geom_boxplot(aes(x = Barrier_Name,
+  #                 y = ))
+  
+  scale_color_viridis() +
+  scale_size_area(
+                  max_size = 5) +
+  
+  theme_few() +
+  theme(axis.line = element_line()
+        ,panel.border = element_blank()
+        ) +
+  theme(axis.text.x = element_text(angle = 90))
+  
+p
+
+ggsave("./plots/MECHA_results_MixedPlot.svg", plot = p,
+       device = "svg", width = 5, height = 5)
+```
+
+
+```{r}
+data2plot <- data2stat %>% 
+  mutate(
+    # kr_tf2 = kr_tf,
+    # kr_tf2 = 25^-(kr_tf)
+  )
+
+p <- ggplot(data2plot,
+       aes(x = radius, y = kr_tf
+           )
+       ) +
+  geom_point(aes(shape = Barrier_Name, color = kAQP)) +
+  scale_color_viridis() +
+  facet_grid(Barrier_Name ~ kAQP) +
+  geom_smooth(method = "lm") +
   theme_few()
-data_anat
-
-ggsave(filename = "plots/data_xylem.svg", plot = data_xylem, 
-       device = "svg", width = 6, height = 3)
+p
+ggsave(filename = "./plots/MECHA_results_FULL_TABLE.svg", plot = p,
+       device = "svg", width = 5, height = 5)
 ```
 
 
-## Barrier Comparison
+```{r}
+lm_kr1 <- lm(data = data2stat, 
+             formula = kr_tf ~ 
+               age +
+               radius +
+               Barrier_Name +
+               kAQP +
+               kAQP:Barrier_Name
+               )
+
+par(mfrow = c(2, 2))
+plot(lm_kr1)
+
+cat("================= \n  LINEAR MODEL \n=================\n")
+summary(lm_kr1)
+
+# cat("================= \n  ANOVA \n=================\n")
+# anova(lm_kr1)
+
+# Export model 
+saveRDS(object = lm_kr1, file = "./Results/kr_model.rds")
+```
+
+Let's try to predict some stuff :
 
 ```{r}
-b <- c("En.CS", 
-       "En.CS-Ex.LC", 
-       "En.CS-Ex.Sub", 
-       "En.Sub", 
-       "En.Sub-Ex.CS",
-       "En.Sub-Ex.Sub")
+# ============================================================================ #
+data2stat$kr_pred <- BoxCox_reverse(predict(lm_kr0, data2stat), lambda)
+cat("RMSE : ", sqrt(mean((data2stat$kr - data2stat$kr_pred)^2)))
+# ============================================================================ #
+ggplot(data2stat) +
+  geom_point(aes(x = kr, 
+                 y = kr_pred,
+                 color = kAQP,
+                 size = radius
+                 ),
+             alpha = 0.5) +
+  
+  # geom_smooth(aes(x = kr, 
+  #                 y = kr_pred), 
+  #             method = "loess", 
+  #             color = "red") +
 
+  coord_fixed(ratio = 1:1) +
+  
+  xlim(0, 20) +
+  ylim(0, 20) +
+  
+  geom_abline(linewidth = 1, color = "red") +
+  scale_color_viridis() +
+  
+  # facet_wrap(~kAQP) +
+  
+  xlab("Computed kr") + ylab("Predicted kr") +
+  theme_classic()
+```
+
+## 2) Axial Kx
+
+At first i tested a ln transformation, but generalised Box-Cox transformation is better, so let's keep it.
+
+```{r}
+data2stat <- MECHA_results %>%
+  filter(kAQP == 1e-4 & Barrier_Name == "En.CS-Ex.Sub") %>% 
+  left_join(Anatomy_Full[c("CS_id", "age", "radius")], by = "CS_id") %>% 
+  select("Kx", "age", "radius") %>% 
+  mutate("Kx_ln" = ln(Kx))
+
+# CHECK NORMALITY ON ln TRANSFORMED DATA
+par(mfrow = c(1, 2))
+qqnorm(data2stat$Kx_ln)
+qqline(data2stat$Kx_ln)
+hist(data2stat$Kx_ln)  
+shapiro.test(data2stat$Kx_ln)
+
+# NORMALIZE WITH BOX-COX
+bc              <- MASS::boxcox(lm(data2stat$Kx ~ 1))
+lambda          <- bc$x[which(bc$y == max(bc$y))]
+cat("Kx lambda : ", lambda, "\n")
+data2stat$Kx_tf <- BoxCox(data2stat$Kx,  lambda)
+
+# RE-CHECK NORMALITY ON BOX-COX TRANSFORMED DATA
+par(mfrow = c(1, 2))
+qqnorm(data2stat$Kx_tf)
+qqline(data2stat$Kx_tf)
+hist(data2stat$Kx_tf)  
+shapiro.test(data2stat$Kx_tf)
+
+# LINEAR REGRESSION
+lm_Kx1 <- lm(data    = data2stat, 
+             formula = ln(Kx) ~ radius+age)
+
+plot(lm_Kx1)
+summary(lm_Kx1)
+# anova(Kx_lm)
+
+```
+
+$$
+ln(K_x^*) = \alpha + \beta \cdot t + \gamma \cdot r
+$$
+
+```{r}
+cat("alpha = ", lm_Kx1$coefficients[1], "\n")
+cat("beta  = ", lm_Kx1$coefficients[2], "\n")
+cat("gamma = ", lm_Kx1$coefficients[3], "\n")
+```
+
+```{r}
+data2stat$Kx_pred <- BoxCox_reverse(exp(1)^(predict(lm_Kx1, data2stat)), lambda)
+
+ggplot(data2stat) +
+  geom_point(aes(x = ln(Kx), y = ln(Kx_reg), color = x)) +
+  geom_smooth(aes(x = ln(Kx), y = ln(Kx_reg)), method = "lm", color = "red") +
+  coord_fixed() +
+  xlim(-26.5, -18) +
+  ylim(-26.5, -18) +
+  xlab("ln(Kx)") + ylab("ln(Kx*)") +
+  geom_abline() +
+  scale_color_viridis() +
+  theme_classic()
+  
+# ==============================================================================
+```
+
+
+
+
+# Pairwise analysis of hydrophobic barriers
+
+We take here the effect of barriers when kAQP is at mean value
+
+### 0) Prepare data
+
+```{r}
+barriers <- c("En.CS", "En.CS-Ex.LC", "En.CS-Ex.Sub", 
+              "En.Sub", "En.Sub-Ex.CS", "En.Sub-Ex.Sub")
+th <- 3 # Outlier treshold (x)
+
+# Define data
+data2stat <- MECHA_results %>% 
+  filter(kAQP == 4e-4) %>% 
+  select(c("Barrier_Name", "kr")) %>% 
+  mutate(Barrier_Name = as.factor(Barrier_Name)) %>% 
+  filter(Barrier_Name %in% barriers)
+
+# Remove outliers
+data2stat <- data2stat %>% 
+  group_by(Barrier_Name) %>%
+  mutate(
+    median = median(kr, na.rm = TRUE),
+    mad = mad(kr, na.rm = TRUE),
+    lower_bound = median - th * mad,
+    upper_bound = median + th * mad
+  ) %>%
+  filter(kr >= lower_bound & kr <= upper_bound) %>%
+  select(-median, -mad, -lower_bound, -upper_bound) 
+```
+
+### 1) Check normality
+
+We use Shapiro-Wilk test (Shapiro & Wilk 1963).
+
+```{r}
+# FIRST NORMALITY TEST
+shapiro.test(data2stat$kr)
+ks.test(data2stat$kr, 'pnorm', mean(data2stat$kr), sd(data2stat$kr))
+hist(data2stat$kr, breaks = 20)
+qqnorm(data2stat$kr)
+qqline(data2stat$kr)
+```
+
+We see that data is not normal so we apply a Cox-Box transfomation (Box & Cox 1964).
+
+```{r}
+#APPLY COX-BOX TRANSFORMATION
+bc     <- MASS::boxcox(lm(data2stat$kr ~ 1))
+lambda <- bc$x[which(bc$y == max(bc$y))]
+
+data2stat <- data2stat %>% 
+  mutate(kr_tf = BoxCox(kr, lambda)) %>% 
+  mutate(kr_test = BoxCox_reverse(kr_tf, lambda))
+
+# SECOND NORMALITY CHECK
+shapiro.test(data2stat$kr_tf)
+ks.test(data2stat$kr_tf, 'pnorm', mean(data2stat$kr_tf), sd(data2stat$kr_tf))
+hist(data2stat$kr_tf, breaks = 15)
+qqnorm(data2stat$kr_tf)
+qqline(data2stat$kr_tf)
+
+# ============================================================================ #
+ggplot(data2stat) +
+  geom_point(aes(x = Barrier_Name, y = kr_tf)) +
+  theme_few()
+```
+
+### 2) ANOVA
+
+Let's try a linear model on transform (normalized) data.
+
+```{r}
+Barrier_lm <- lm(data = data2stat, 
+                 formula = kr_tf ~ Barrier_Name)
+
+plot(Barrier_lm)
+# summary(Barrier_lm)
+anova(Barrier_lm)
+```
+
+### 3) Post-Hoc Mean Comparison
+
+```{r}
+EM <- emmeans(Barrier_lm, specs = pairwise ~ Barrier_Name)
+
+Means <- as_tibble(EM$emmeans)
+Contrasts <- as_tibble(EM$contrasts)
+
+Means$emmean_TF <- BoxCox_reverse(Means$emmean, lambda)
+
+```
+
+To develop because we transformed the data !
+
+```{r}
+mean_b1 <- BoxCox_reverse(Means$emmean[Means$Barrier_Name == "En.CS"], lambda)
+mean_b2 <- BoxCox_reverse(Means$emmean[Means$Barrier_Name == "En.CS-Ex.LC"], lambda)
+mean_b3 <- BoxCox_reverse(Means$emmean[Means$Barrier_Name == "En.CS-Ex.Sub"], lambda)
+mean_b4 <- BoxCox_reverse(Means$emmean[Means$Barrier_Name == "En.Sub"], lambda)
+mean_b5 <- BoxCox_reverse(Means$emmean[Means$Barrier_Name == "En.Sub-Ex.CS"], lambda)
+mean_b6 <- BoxCox_reverse(Means$emmean[Means$Barrier_Name == "En.Sub-Ex.Sub"], lambda)
+
+print(paste0("Difference between En.CS and En.CS-Ex.LC [%]         : ", round((mean_b1-mean_b2)*100/mean_b1, digits = 2)))
+print(paste0("Difference between En.CS and En.Sub [%]              : ", round((mean_b1-mean_b4)*100/mean_b1, digits = 2)))
+```
+
+
+### 5) Plot
+
+```{r}
 color_scale2 <- c("En.CS"        = "black", 
                   "En.CS-Ex.LC"  = "#C71AB7", 
                   "En.CS-Ex.Sub" = "#4E3CA5",
@@ -311,9 +658,7 @@ color_scale2 <- c("En.CS"        = "black",
                   )
 
 # ============================================================================ #
-data2plot <- MECHA_results %>% 
-  filter(Barrier_Name %in% b) %>% 
-  filter(kAQP == 4e-4) %>% 
+data2plot <- data2stat %>% 
   mutate(Endodermis = recode(Barrier_Name,
                              "En.CS"         = "Endodermal CS",
                              "En.CS-Ex.LC"   = "Endodermal CS",
@@ -329,7 +674,8 @@ data2plot <- MECHA_results %>%
                              "En.Sub"        = "none",
                              "En.Sub-Ex.CS"  = "LC",
                              "En.Sub-Ex.Sub" = "Sub")
-         )
+         ) %>% 
+  mutate(kr = kr*1e8)
 
 # Custom order
 data2plot$Barrier_Name <- factor(data2plot$Barrier_Name, 
@@ -348,12 +694,9 @@ data2plot$Exodermis <- factor(data2plot$Exodermis,
                                  )
 
 data2plot <- data2plot[order(data2plot$Barrier_Name),]
-```
 
-
-```{r}
-library(ggsignif)
 # ============================================================================ #
+library(ggsignif)
 p_Barriers <- ggplot(data = data2plot, 
                      aes(x = Exodermis, 
                          y = kr)
@@ -370,30 +713,30 @@ p_Barriers <- ggplot(data = data2plot,
                alpha = 1) +
   
   # ADD POINTS
-  geom_point(aes(x = Exodermis, 
-                  y = as.numeric(kr),
-                  color = Barrier_Name),
-              # ,width = 0.1
-              # ,size = 0.5
+  geom_jitter(aes(x = Exodermis, 
+                  y = kr,
+                  color = Barrier_Name)
+              ,width = 0.1
+              ,size = 1
               ) +
   
-  facet_wrap(~Endodermis, scales = "free_x") +
+  facet_wrap(~Endodermis, scales = "free") +
   
   # ADD SIGNIFICANTS
   geom_signif(comparisons = list(c("none", "LC"),
                                  c("none", "Sub"),
                                  c("LC", "Sub")
                                  ),
-              map_signif_level = T,
-              # test = "anova",
+              map_signif_level = F,
+              test = "wilcox.test",
               # test.args = list(formula = "kr ~ Barrier_Name"),
-              y_position = c(1, 1.15, 1.3) * 1.4e-7
+              y_position = c(15, 17, 19)
               ) +
   
   # CUSTOM LABELS
   xlab("Exodermis") +
   ylab(expression(k[r] ~ "[" ~ 10^{-08} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
-  ylim(1e-8, 2e-7) +
+  ylim(1, 20) +
   
   # OTHER PARAMS
   # scale_fill_manual(values=c("white","white","white", "grey", "grey", "grey")) +
@@ -404,7 +747,7 @@ p_Barriers <- ggplot(data = data2plot,
   theme_few() +
   theme(legend.position = "none"
         ,axis.line = element_line()
-        # ,panel.border = element_blank()
+        ,panel.border = element_blank()
         ) +
   theme(axis.text.x = element_text(angle = 90))
 
@@ -415,709 +758,12 @@ ggsave(filename = "plots/MECHA_results_barriers.svg",
        plot = p_Barriers, 
        device = "svg", width = 5, height = 5)
 
-svg(filename = "plots/MECHA_results_barriers.svg", width = 4, height = 3)
+svg(filename = "plots/MECHA_results_barriers.svg", width = 4, height = 4)
 p_Barriers
 dev.off()
 ```
 
-# Stats
 
-```{r}
-data2stat <- MECHA_results %>% 
-  filter(Barrier_Name %in% c("En.CS", "En.CS-Ex.LC", 
-       "En.CS-Ex.Sub", 
-       "En.Sub", 
-       "En.Sub-Ex.CS",
-       "En.Sub-Ex.Sub"))
 
-MS_lm <- lm(data = data2stat, formula = Kr ~ Barrier_Name)
 
-plot(MS_lm)
-# summary(MS_lm)
-anova(MS_lm)
-emmeans(MS_lm, specs = pairwise ~ Barrier_Name)
-
-# visreg(MS_lm)
-```
-
-
-```{r}
-EM          <- emmeans(MS_lm, specs = pairwise ~ Barrier_Name)
-DL_mean     <- as_tibble(EM$emmeans)
-DL_contrast <- as_tibble(EM$contrasts)
-
-mean_1 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS"]
-mean_2 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS-Ex.LC"]
-mean_3 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS-Ex.Sub"]
-mean_4 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.Sub"]
-mean_5 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.Sub-Ex.CS"]
-mean_6 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.Sub-Ex.Sub"]
-
-DL_contrast
-# ==============================================================================
-print(paste0("Difference between En.CS and En.CS-Ex.LC [%]         : ", 
-             # round((mean_1-mean_2)*100/mean_1, digits = 2))
-             DL_contrast$estimate[DL_contrast$contrast == "En.CS - (En.CS-Ex.LC)"]    
-             )
-      )
-print(paste0("Difference between En.CS-Ex.Sub and En.CS-Ex.LC [%]  : ", 
-             round((mean_2-mean_3)*100/mean_2, digits = 2))
-      )
-print(paste0("Difference between En.CS-Ex.LC and En.Sub [%]        : ", 
-             round((mean_2-mean_4)*100/mean_T1, digits = 2))
-      )
-print(paste0("Difference between En.Sub and En.Sub-Ex.CS [%]       : ", 
-             round((mean_M2-mean_M3)*100/mean_M2, digits = 2))
-      )
-```
-
-# Statistical Analysis per variable
-
-## 0) Global Correlations
-
-```{r Correlations}
-library(corrplot)
-
-print(colnames(Data_Full))
-
-Data_Full_2cor <- Data_Full %>% 
-  select(-any_of(c("endodermis_n_layers", 
-                   "epidermis_n_layers",
-                   "pericycle_n_layers",
-                   "xylem_n_files", 
-                   "exodermis_n_layers",
-                   "Combination_ID", 
-                   "root", 
-                   "Barrier_Name",
-                   "Barrier")
-  ))
-
-Data_Full_2cor <- as_tibble(scale(Data_Full_2cor))
-                   
-
-# svg(filename = "plots/Results_Correlations.svg", width = 7, height = 7)
-corrplot(cor(Data_Full_2cor), method = 'color')
-# dev.off()
-```
-
-## 1) Effect of Radius
-
-### 1.1) Regression of radius from quantification data
-
-```{r Radius plot}
-radius_df <- Anatomy_Full[c("age", "radius")]
-
-# PLot
-r_plot2 <- ggplot(data = radius_df, aes(x = age, y = radius))+
-  # ylim(0, 0.8) +
-  geom_point() +
-  # geom_smooth(formula = y~x) +
-  theme_bw() +
-  ggtitle("Radius of the data")
-
-# svg(filename = paste0("Plots/Radius_data.svg"), width = 5, height = 5)
-r_plot2
-# dev.off()
-```
-
-To regress that, we split in two half : - If x is \< 25, we consider the radius as constant = 0.188 - If x is \>= 25, we consider exponential function
-
-```{r Radius Regression}
-# FIRST STAGE
-radius_df1 <- radius_df %>% filter(age < 25)
-radius_df2 <- radius_df %>% filter(age >= 25)
-radius_df2$radius_ln <- ln(radius_df2$radius)
-summary(radius_df1$radius)
-
-rlm1 <- lm(data = radius_df1, formula = radius ~ 1)
-summary(rlm1)
-
-# SECOND STAGE
-rlm2 <- lm(data = radius_df2, formula = radius_ln ~ age)
-summary(rlm2)
-plot(rlm2)
-visreg(rlm2)
-```
-
-Okey, so this is nice. With these two regression function, we coded the "radius" function.
-
-## 2) Influence of Aquaporins
-
-```{r}
-ggplot(data = Conductivities_processed) +
-  geom_point(aes(x = kAQP*1e7, 
-                  y = kr, 
-                  color = Barrier_Name), alpha = 0.1) +
-  geom_smooth(aes(x = kAQP*1e7, 
-                  y = kr, 
-                  color = Barrier_Name)) +
-  # facet_wrap(~Barrier) +
-  
-  theme_test()
-
-kAQP_lm <- lm(data = Conductivities_processed, 
-              formula = kr ~ kAQP*Barrier)
-anova(kAQP_lm)
-```
-
-## 3) Influence of Deposition Levels
-
-Globally, we clearly see that all maturation stages are different and significantly.
-
-```{r}
-ggplot(data = Conductivities_processed) +
-  # geom_jitter(aes(x = kAQP, 
-  #                 y = kr*10^8, 
-  #                 color = Barrier_Name),
-  #             alpha = 0.75) +
-  geom_boxplot(aes(x = as.factor(kAQP), y = kr*10^8, fill = Barrier_Name)) +
-  ylab("Kr [10^-8]") +
-  xlab("kAQP") +
-  theme_classic() + theme(axis.text.x     = element_text(size = 8, angle = 90, hjust = 1, vjust = 0.5),) 
-```
-
-```{r}
-Barriers_Types           <- read_xlsx("Data/Barriers_Types.xlsx")
-
-data2plot <- Conductivities_processed %>% 
-  left_join(Barriers_Types[c("Endodermis", "Exodermis", "Barrier_Name")], 
-            by = "Barrier_Name") %>% 
-  filter(kAQP == 5.7870e-07)
-
-data2plot$Exodermis <- factor(data2plot$Exodermis, levels = c("none", "CS", "LC", "Sub")) 
-
-# ============================================================================ #
-MS_all <- ggplot(data = data2plot,
-                 aes(x = Barrier_Name,
-                     y = kr*10^8)) +
-  
-  # ADD POINTS
-  # geom_jitter(aes(x = Barrier_Name, 
-  #                 y = kr*10^08, 
-  #                 color = kAQP), 
-  #             width = 0.1, 
-  #             alpha = 0.1) +
-  
-  # ADD VIOLINS
-  geom_violin(side = "right", 
-              fill = "lightgrey", 
-              color = "lightgrey", 
-              alpha = 1) +
-  
-  # ADD BOXPLOTS
-  geom_boxplot(aes(fill = Endodermis),
-               width = 0.2,
-               alpha = 1) +
-  
-  # facet_wrap(~Endodermis, scales = "free_x") +
-  
-  # CUSTOM LABELS
-  xlab("Exodermis apoplastic barrier") +
-  ylab(expression(k[r] ~ "[" ~ 10^{-08} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
-  
-  # OTHER PARAMS
-  # scale_fill_manual(values=c("white","white","white", "grey", "grey", "grey")) +
-  scale_color_viridis() +
-  theme_few() +
-  theme(axis.text.x = element_text(angle = 90))
-  # ggtitle("Radial Hydraulic Conductivity per hydrophobic deposition level") 
-  # theme(legend.position = "none") 
-
-# ============================================================================ #
-MS_all
-
-svg("Plots/kr_Maturation_Stages.svg", height = 4, width = 5)
-MS_all
-dev.off()
-```
-
-
-
-Stats :
-
-```{r}
-MS_lm <- lm(data = Conductivities_processed, formula = kr ~ Barrier_Name)
-
-plot(MS_lm)
-summary(MS_lm)
-anova(MS_lm)
-emmeans(MS_lm, specs = pairwise ~ Barrier_Name)
-
-# visreg(MS_lm)
-
-DL_pred <- tibble(DL = c("M1", "M2", "M3", "T1", "T2", "T3"),
-                  Estimate = MS_lm$coefficients)
-
-DL_pred2 <- tibble(DL2 = c("M1", "M2", "M3", "T1", "T2", "T3"),
-                  Estimate2 = MS_lm$coefficients)
-
-EM <- emmeans(MS_lm, specs = pairwise ~ Barrier_Name)
-DL_mean <- as_tibble(EM$emmeans)
-DL_contrast <- as_tibble(EM$contrasts)
-```
-
-Some interesting stats :
-
-```{r}
-# mean_M1 <- DL_mean$emmean[DL_mean$Barrier_Name == "M1"]
-# mean_M2 <- DL_mean$emmean[DL_mean$Barrier_Name == "M2"]
-# mean_M3 <- DL_mean$emmean[DL_mean$Barrier_Name == "M3"]
-# mean_T1 <- DL_mean$emmean[DL_mean$Barrier_Name == "T1"]
-# mean_T2 <- DL_mean$emmean[DL_mean$Barrier_Name == "T2"]
-# mean_T3 <- DL_mean$emmean[DL_mean$Barrier_Name == "T3"]
-# 
-# print(paste0("Difference between T1 and M1 [%] : ", round((mean_M1-mean_T1)*100/mean_M1, digits = 2)))
-# print(paste0("Difference between T2 and T1 [%] : ", round((mean_T1-mean_T2)*100/mean_T1, digits = 2)))
-# print(paste0("Difference between T3 and T1 [%] : ", round((mean_T1-mean_T3)*100/mean_T1, digits = 2)))
-# print(paste0("Difference between M2 and M3 [%] : ", round((mean_M2-mean_M3)*100/mean_M2, digits = 2)))
-
-mean_M1 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS"]
-mean_M2 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.Sub"]
-mean_M3 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.Sub-Ex.CS"]
-mean_T1 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS-Ex.LC"]
-mean_T2 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.CS-Ex.Sub"]
-mean_T3 <- DL_mean$emmean[DL_mean$Barrier_Name == "En.Sub-Ex.Sub"]
-
-print(paste0("Difference between En.CS and En.CS-Ex.LC [%]         : ", round((mean_M1-mean_T1)*100/mean_M1, digits = 2)))
-print(paste0("Difference between En.CS-Ex.Sub and En.CS-Ex.LC [%]  : ", round((mean_T1-mean_T2)*100/mean_T1, digits = 2)))
-print(paste0("Difference between En.Sub-Ex.Sub and En.CS-Ex.LC [%] : ", round((mean_T1-mean_T3)*100/mean_T1, digits = 2)))
-print(paste0("Difference between En.Sub and En.Sub-Ex.CS [%]       : ", round((mean_M2-mean_M3)*100/mean_M2, digits = 2)))
-```
-
-# COMPLETE STATISTICAL ANALYSIS
-
-## 1) Radial conductivity
-
-```{r}
-lm_kr0 <- lm(data = Conductivities_processed, 
-             formula = kr ~ 
-               x + 
-               radius + 
-               Barrier_Name + 
-               kAQP + 
-               kAQP:Barrier_Name 
-               )
-cat("================= \n  LINEAR MODEL \n=================\n")
-summary(lm_kr0)
-cat("================= \n  ANOVA \n=================\n")
-anova(lm_kr0)
-cat("================= \n  MEAN COMPARISON \n=================\n")
-EM <- emmeans(lm_kr0, specs = pairwise ~ Barrier_Name:kAQP)
-EM
-```
-
-```{r}
-test <- EM$contrasts
-```
-
-```{r}
-# IN CASE OF ALL DEPOSITION LEVELS
-coefficients_kr <- tibble(a       = lm_kr0$coefficients[1],
-                          x       = lm_kr0$coefficients[2],
-                          r       = lm_kr0$coefficients[3],
-                          M2      = lm_kr0$coefficients[4],
-                          M3      = lm_kr0$coefficients[5],
-                          T1      = lm_kr0$coefficients[6],
-                          T2      = lm_kr0$coefficients[7],
-                          T3      = lm_kr0$coefficients[8],
-                          kAQP    = lm_kr0$coefficients[9],
-                          M2_kAQP = lm_kr0$coefficients[10],
-                          M3_kAQP = lm_kr0$coefficients[11],
-                          T1_kAQP = lm_kr0$coefficients[12],
-                          T2_kAQP = lm_kr0$coefficients[13],
-                          T3_kAQP = lm_kr0$coefficients[14])
-
-# IN CASE OF ONLY TOMATO DL
-# coefficients_kr <- tibble(a = lm_kr0$coefficients[1],
-#                           x = lm_kr0$coefficients[2],
-#                           r = lm_kr0$coefficients[3],
-#                           T2 = lm_kr0$coefficients[4],
-#                           T3 = lm_kr0$coefficients[5],
-#                           kAQP = lm_kr0$coefficients[6],
-#                           T2_kAQP = lm_kr0$coefficients[7],
-#                           T3_kAQP = lm_kr0$coefficients[8])
-                    
-pander(coefficients_kr)
-write.csv(coefficients_kr, "./Data/kr_coefficients.csv", row.names = F)
-```
-
-```{r}
-source("src/FUNCTIONS/T-Root/Functions.R")
-kr_reg_df <- Data_Full[c("kr", "Combination_ID", "x", "radius", "Barrier_Name", "kAQP")] 
-kr_reg_df$kr_reg <- NaN
-
-for(i in 1:nrow(kr_reg_df)){
-  
-  kr_reg_df$kr_reg[i] <- kr.lm(x            = kr_reg_df$x[i],
-                               radius       = kr_reg_df$radius[i], 
-                               MS           = kr_reg_df$Barrier_Name[i],
-                               timing       = c(7, 20), 
-                               kAQP         = kr_reg_df$kAQP[i], 
-                               coefficients = coefficients_kr)
-}
-
-cor <- cor.test(kr_reg_df$kr, kr_reg_df$kr_reg)
-print(cor)
-kr_test <- lm(data = kr_reg_df, formula = kr_reg~kr)
-summary(kr_test)
-
-# ============================================================================ #
-ggplot(kr_reg_df) +
-  geom_point(aes(x = kr, y = kr_reg, color = x),
-             alpha = 0.4) +
-  geom_smooth(aes(x = kr, y = kr_reg), method = "lm", color = "red") +
-  coord_fixed() +
-  # xlim(-27, -18) +
-  # ylim(-27, -18) +
-  geom_abline() +
-  scale_color_viridis() +
-  ggtitle(paste0("Correlation : ", round(cor$estimate, digits = 2),
-                 " | R.sq. = ", 
-                 round(summary(kr_test)$r.squared, digits = 2)
-                 )
-          ) +
-  xlab("Computed kr") + ylab("Predicted kr") +
-  theme_classic()
-# ============================================================================ #
-```
-
-Let's compute final coefficients for the regression equation :
-
-$$
-k_r^* \cdot 10^8 = 
-  \begin{cases}
-    \alpha_{T1} + \beta \cdot t + \gamma \cdot r + \delta_{T1} \cdot kAQP & \text{if} & DL = T1 \\
-    \alpha_{T2} + \beta \cdot t + \gamma \cdot r + \delta_{T2} \cdot kAQP & \text{if} & DL = T2  \\
-    \alpha_{T3} + \beta \cdot t + \gamma \cdot r + \delta_{T3} \cdot kAQP & \text{if} & DL = T3
-  \end{cases}
-$$
-
-```{r}
-# T1 :
-cat("alpha_T1 : ", (coefficients_kr$a)*1e8, "(x 10e-8) \n")
-cat("alpha_T2 : ", (coefficients_kr$a + coefficients_kr$T2)*1e8, "(x 10e-8) \n")
-cat("alpha_T3 : ", (coefficients_kr$a + coefficients_kr$T3)*1e8, "(x 10e-8) \n")
-cat("\n")
-cat("beta     : ", (coefficients_kr$x)*1e8, "(x 10e-8) \n")
-cat("gamma    : ", (coefficients_kr$r)*1e8, "(x 10e-8) \n")
-cat("\n")
-cat("delta_T1 : ", (coefficients_kr$kAQP)*1e8*1e-06, "(x 10e-8 x 10e6) \n")
-cat("delta_T2 : ", (coefficients_kr$kAQP + coefficients_kr$T2_kAQP)*1e8*1e-6, "(x 10e-8 x 10e6) \n")
-cat("delta_T3 : ", (coefficients_kr$kAQP + coefficients_kr$T3_kAQP)*1e8*1e-5, "(x 10e-8 x 10e5) \n")
-```
-This is very nice. So we see different informations : \
-* The whole linear model is significant at R2 = 0.918 \
-* On the ANOVA, all variables are significant \ 
-* The less significant factor is T2 (p = 0.0178).\
-
-Really nice !
-
-## 2) Axial Kx
-
-```{r}
-Kx_lm <- lm(data = Data_Full%>%filter(Barrier_Name == "T1" & kAQP == 1.1570e-07), 
-            formula = ln(Kx) ~ radius+x)
-
-plot(Kx_lm)
-summary(Kx_lm)
-anova(Kx_lm)
-
-
-coefficients_Kx <- tibble(a   = Kx_lm$coefficients[1],
-                          r   = Kx_lm$coefficients[2],
-                          x   = Kx_lm$coefficients[3])
-
-write.csv(coefficients_Kx, "./Data/Kx_coefficients.csv", row.names = F)
-```
-
-$$
-ln(K_x^*) = \alpha + \beta \cdot t + \gamma \cdot r
-$$
-
-```{r}
-cat("alpha = ", coefficients_Kx$a, "\n")
-cat("beta  = ", coefficients_Kx$x, "\n")
-cat("gamma = ", coefficients_Kx$r, "\n")
-```
-
-```{r}
-Kx_reg_df <- Data_Full[c("Kx", "Combination_ID", "x", "radius", "xylem_max_size")] %>% 
-  mutate(Kx_reg = exp(coefficients_Kx$a + coefficients_Kx$r*radius + coefficients_Kx$x*x)) 
-
-for(i in 1:nrow(Kx_reg)){
-  Kx_reg_df$Kx_reg[i] <- Kx.lm(x            = Kx_reg_df$x[i],
-                               radius       = Kx_reg_df$radius[i], 
-                               coefficients = coefficients_Kx)
-}
-
-cor <- cor.test(Kx_reg_df$Kx, Kx_reg_df$Kx_reg)
-print(cor)
-Kx_test <- lm(data = Kx_reg_df, formula = Kx_reg~Kx)
-summary(Kx_test)
-
-ggplot(Kx_reg_df) +
-  geom_point(aes(x = ln(Kx), y = ln(Kx_reg), color = x)) +
-  geom_smooth(aes(x = ln(Kx), y = ln(Kx_reg)), method = "lm", color = "red") +
-  coord_fixed() +
-  xlim(-26.5, -18) +
-  ylim(-26.5, -18) +
-  xlab("ln(Kx)") + ylab("ln(Kx*)") +
-  geom_abline() +
-  scale_color_viridis() +
-  theme_classic()
-  
-# ==============================================================================
-```
-
-
-
-# Error bar plots
-
-Define data : In this chunk we
-
-1\) Create a dataframe where we store mean values and errors bars for constant kAQP == 4e-04
-
-2\) Apply Maturation Stages Timings
-
-```{r}
-kAQP_value <- unique(Data_Full$kAQP)[5]
-
-Data_EB <- data.frame()
-for(i in unique(Conductivities_processed$x)){
-  temp_cdt <- Conductivities_processed %>% filter(x == i & kAQP==kAQP_value)
-  for(j in unique(temp_cdt$Barrier_Name)){
-    # cat("x = ", i, " | Barrier_Name = ", j, "\n")
-    temp_df <- data.frame(x = i, 
-                          Barrier_Name = j,
-                          kr_mean = mean(temp_cdt$kr[temp_cdt$Barrier_Name == j]),
-                          kr_sd = sd(temp_cdt$kr[temp_cdt$Barrier_Name == j]),
-                          kr_median = median(temp_cdt$kr[temp_cdt$Barrier_Name == j]),
-                          kr_mad = mad(temp_cdt$kr[temp_cdt$Barrier_Name == j]),
-                          Kx_mean = mean(temp_cdt$Kx[temp_cdt$Barrier_Name == j]),
-                          Kx_sd = sd(temp_cdt$Kx[temp_cdt$Barrier_Name == j]),
-                          Kx_median = median(temp_cdt$Kx[temp_cdt$Barrier_Name == j]),
-                          Kx_mad = mad(temp_cdt$Kx[temp_cdt$Barrier_Name == j]),
-                          Kr_mean = mean(temp_cdt$Kr[temp_cdt$Barrier_Name == j]),
-                          Kr_sd = sd(temp_cdt$Kr[temp_cdt$Barrier_Name == j]),
-                          Kr_median = median(temp_cdt$Kr[temp_cdt$Barrier_Name == j]),
-                          Kr_mad = mad(temp_cdt$Kr[temp_cdt$Barrier_Name == j]))
-    Data_EB <- rbind(Data_EB, temp_df)
-  }
-}
-
-# ================================================================================
-Data_EB_timed = Data_EB %>% filter(Barrier_Name == "T1" & x <= 7)
-Data_EB_timed = rbind(Data_EB_timed, Data_EB%>% filter(Barrier_Name == "T2" & x <= 20 & x > 7))
-Data_EB_timed = rbind(Data_EB_timed, Data_EB%>% filter(Barrier_Name == "T3" & x > 20))
-# ================================================================================
-
-# timings :
-t0 <- c(0, 7)
-t1 <- c(8, 31)
-# t2 <- c(25, 30)
-
-m1 <- subset(Data_EB, 
-             Barrier_Name == "T1" & x >= t0[1] & x <= t0[2])
-m2 <- subset(Data_EB, 
-             Barrier_Name == "T2" & x >= t1[1] & x <= t1[2])
-# m3 <- subset(Data_EB,
-#              Barrier_Name == "T3" & x >= t2[1] & x <= t2[2])
-
-
-
-
-# MERGE
-Data_EB_MS <- rbind(m1, m2)
-# write_csv(m_full, "Data/m_full.csv")
-```
-
-## Fixed kAQP
-
-```{r}
-EB_kr <- ggplot(data = Data_EB_MS) + 
-  geom_point(aes(x = x, y = kr_median, color = Barrier_Name)) +
-  geom_errorbar(mapping=aes(x=x, ymin=kr_median-kr_mad, ymax=kr_median+kr_mad, color = Barrier_Name), 
-                width=0.5, 
-                linewidth=1,
-                alpha = 0.75) + 
-  # geom_line(aes(x = x, y = kr_median, color = Barrier)) +
-  # geom_smooth(aes(x = x, y = kr_median)) +
-  # ylim(2.5e-08, 1.2e-07) +
-  theme_test() +
-  ggtitle(expression(k[r] ~ "[" ~ 10^{8} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
-  theme_test() +
-  theme(axis.title.x=element_blank(),
-        axis.title.y = element_blank(),
-        plot.title = element_text(hjust = 0.5))
-# ==============================================================================
-EB_Kx <- ggplot(data = Data_EB_MS) + 
-  geom_point(aes(x = x, y = ln(Kx_median), color = Barrier_Name)) +
-  geom_errorbar(mapping=aes(x=x, 
-                            ymin= ln(Kx_median - Kx_mad), 
-                            ymax= ln(Kx_median + Kx_mad), 
-                            color = Barrier_Name),
-                width=0.5,
-                linewidth=1,
-                alpha = 0.75) +
-  ggtitle(expression(ln(K[x]) ~ "[" ~ cm^{4} ~ hPa^{-1} ~ d^{-1} ~ "]")) +
-  theme_test() +
-  theme(axis.title.x=element_blank(),
-        axis.title.y=element_blank(),
-        plot.title = element_text(hjust = 0.5))
-# ==============================================================================
-EB_Kr <- ggplot(data = Data_EB_MS) + 
-  geom_point(aes(x = x, y = Kr_median, color = Barrier_Name)) +
-  geom_errorbar(mapping=aes(x=x, ymin=Kr_median-Kr_mad, ymax=Kr_median+Kr_mad, color = Barrier_Name), 
-                width=0.5, 
-                linewidth=1,
-                alpha = 0.75) + 
-  xlab("Age [d]")+
-  ggtitle(expression(K[r] ~ "[" ~ m^{3} ~ MPa^{-1} ~ s^{-1} ~ "]")) +
-  theme_test() +
-  theme(axis.title.x=element_blank(), 
-        legend.position = "bottom",
-        axis.title.y=element_blank(),
-        plot.title = element_text(hjust = 0.5))
-
-# ==============================================================================
-legend <- get_legend(EB_kr + theme(legend.title = element_blank()))
-# ==============================================================================
-
-EB_kr
-EB_Kx
-EB_Kr
-
-# ==============================================================================
-pg1 <- plot_grid(EB_kr + theme(legend.position = "none"),
-                 EB_Kx + theme(legend.position = "none"),
-                 EB_Kr + theme(legend.position = "none"),
-          align = 'v',
-          labels = 'auto',
-          ncol = 1)
-pg2 <- plot_grid(pg1 + 
-                   theme(plot.margin=unit(c(0,0,-4,0), "cm")), 
-                 legend,
-                 ncol = 1)
-```
-
-Export
-
-```{r, eval=F}
-svg("Plots/Error_Bar_Plots2.svg", height = 10, width = 3)
-pg2 
-dev.off()
-```
-
-## Full Plots
-
-```{r}
-treshold <- 31
-
-
-p_kr <- ggplot(data = Data_Full, aes(x = x, y = kr*10^8, color = kAQP*1e7)) +
-  geom_jitter(data = Data_Full%>%filter(Barrier_Name == "T1" & x < 7), 
-              alpha = 0.4, 
-              size = 2) +
-  geom_jitter(data = Data_Full%>%filter(Barrier_Name == "T2" & x >= 7 & x < treshold), 
-              alpha = 0.4,
-              size = 2) +
-  geom_jitter(data = Data_Full%>%filter(Barrier_Name == "T3" & x >= treshold), 
-              alpha = 0.4,
-              size = 2) +
-  scale_color_viridis() +
-  xlab("Age [d]") +
-  ylab("Radial Conductivity [cm d-1 MPa-1]") +
-  labs(color = "kAQP") +
-  theme_test() +
-  ggtitle(expression(k[r] ~ "[" ~ 10^{-8} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
-  theme(panel.background = element_rect(fill = "gray")) +
-    theme(axis.title.x=element_blank(),
-        axis.title.y = element_blank(),
-        plot.title = element_text(hjust = 0.5))
-p_kr
-#===============================================================================
-p_Kx <- ggplot(data = Data_Full%>%
-                 filter(Barrier_Name == "T1" & kAQP == kAQP_value), aes(x = x, y = ln(Kx), color = radius)) +
-  geom_jitter() +
-  scale_color_viridis(option = "magma") +
-  xlab("Age [d]") +
-  theme_test() +
-  ggtitle(expression(ln(K[x]) ~ "[" ~ cm^{4} ~ hPa^{-1} ~ d^{-1} ~ "]")) +
-  theme(panel.background = element_rect(fill = "gray")) +
-  theme(axis.title.x=element_blank(),
-        axis.title.y=element_blank(),
-        plot.title = element_text(hjust = 0.5))
-p_Kx
-#===============================================================================
-p_Kr <- ggplot(data = Data_Full, 
-               aes(x = x, y = Kr*1e8, color = kAQP*1e7)) +
-  geom_jitter(data = Data_Full%>%filter(Barrier_Name == "T1" & x < 7), 
-              alpha = 0.4, 
-              size = 2) +
-  geom_jitter(data = Data_Full%>%filter(Barrier_Name == "T2" & x >= 7 & x < treshold), 
-              alpha = 0.4,
-              size = 2) +
-  geom_jitter(data = Data_Full%>%filter(Barrier_Name == "T3" & x >= treshold), 
-              alpha = 0.4,
-              size = 2) +
-  scale_color_viridis() +
-  xlab("Age [d]") +
-  labs(color = "kAQP") +
-  theme_test() +
-  ggtitle("Radial Kr with observed maturation timings") +
-  theme(panel.background = element_rect(fill = "gray")) +
-    ggtitle(expression(K[r] ~ "[" ~ 10^{-8} ~ m^{3} ~ MPa^{-1} ~ s^{-1} ~ "]")) +
-  theme(legend.position = "right",
-        # axis.title.x=element_blank(), 
-        axis.title.y=element_blank(),
-        plot.title = element_text(hjust = 0.5)) 
-p_Kr
-
-```
-
-```{r, eval = F}
-svg("Plots/Points_Plots_full.svg", height = 3, width = 12)
-plot_grid(p_kr, p_Kx, p_Kr,
-          align = 'h',
-          labels = 'auto',
-          ncol = 3)
-dev.off()
-
-png("Plots/Points_Plots_full.png", height = 3, width = 12, units = "in", res = 300)
-plot_grid(p_kr, p_Kx, p_Kr,
-          align = 'h',
-          labels = 'auto',
-          ncol = 3)
-dev.off()
-```
-
-# DEV
-
-```{r}
-data2plot <- Anatomy_Full
-```
-
-```{r}
-data2plot <- Conductivities_processed %>% 
-  mutate(kAQP_scaled = 1e7*kAQP,
-         kr_scaled = 1e8*kr) 
-
-ggplot(data = data2plot) +
-  geom_jitter(aes(x = radius, y = kr_scaled, color = kAQP_scaled)) + 
-  scale_color_viridis() +
-  facet_wrap(~Barrier_Name) +
-  theme_test()
-```
-
-```{r}
-data2plot <- Conductivities_processed %>% 
-  mutate(kAQP_scaled = 1e7*kAQP,
-         kr_scaled = 1e8*kr) 
-
-test_lm <- lm(data = data2plot, 
-              formula = kr_scaled ~ Barrier_Name*I(kAQP_scaled^0.5))
-
-summary(test_lm)
-visreg(test_lm, by = "kAQP_scaled")
-```
 

@@ -922,3 +922,29 @@ sf_to_df <- function(CellSet_clean){
   }
   return(CellSet_clean_df)
 }
+
+# ============================================================================ #
+# ============================================================================ #
+BoxCox <- function(kr, lambda){
+  
+  if(lambda == 0){
+    return(log(kr))
+    
+  }else if(lambda == 1){
+    return(kr)
+    
+  }else{
+    return((((kr^lambda) - 1)/lambda))
+  }
+}
+
+BoxCox_reverse <- function(kr_tf, lambda){
+  if(lambda == 0){
+    return(exp(kr_tf))
+  }else if(lambda == 1){
+    return(kr_tf)
+  }else{
+    return((lambda*(kr_tf) + 1)^(1/lambda))
+  }
+}
+# ============================================================================ #
