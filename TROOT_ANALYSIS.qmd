@@ -27,7 +27,7 @@ libs <- c("pander", "readxl", "EnvStats",
           "ggthemes", "SciViews")
 
 for(pk in libs) {
-  library(pk, character.only = T)
+  library(pk, character.only = T)   
 }
 
 simu_path <- "Results/12-01-2023/"
@@ -39,21 +39,26 @@ simu_path <- "Results/12-01-2023/"
 
 * kpl is converted from $cm^3/hPa/d/plasmodesmata$ to $m^{3} s^{-1} MPa^{-1} pd^{-1}$
 
-* Kx is converted to $cm^{4} d^{-1} HPa^{-1}$ to $m^3 s^{-1} MPa^{-1}$
+* kx is converted to $cm^{4} d^{-1} HPa^{-1}$ to $m^3 s^{-1} MPa^{-1}$
 
 ```{r}
+kr.conv <- 1.1574e-3
+kx.conv <- 1.1574e-9
+
 MECHA_results  <- read.csv("./Results/MECHA_results.csv")
 Anatomy_Full   <- read.csv("Data/Anatomy/Anatomy_Full.csv")
 anatomy2       <- read.csv("Data/Anatomy/anatomy2.csv")
 Parameters     <- read_xlsx("Data/Parameters.xlsx")
 
-# Convert kr and kx to m3 s-1 MPa-1
+# Convert kr to m s-1 MPa-1 and kx to m4 s-1 MPa-1
 MECHA_results <- MECHA_results %>% 
-  mutate(kr = kr*0.001157407,
-         Kx = Kx*1.157407e-09,
+  rename(kx = Kx) %>% 
+  mutate(perimeter = perimeter*10, # from cm to mm
+         kr = kr*kr.conv,
+         kx = kx*kx.conv,
          Kr = kr*perimeter,
          kpl = kpl*(1e-6 * 1e4 * (60*60*24)^-1)
-         # kAQP = kAQP*0.001157407
+         # kAQP = kAQP*kr.conv
          )
 
 # Change barrier names
@@ -69,11 +74,11 @@ MECHA_results$Barrier_Name[MECHA_results$Barrier == "b8"] <- "En.Sub-Ex.Sub"
 MECHA_results$Barrier_Name[MECHA_results$Barrier == "b9"] <- "En.CS-Ex.LC"
 ```
 
-# ANALYSE QUANTIFIED DATA
+# DESCRIPTIVE AND PLOTS OF QUANTIFIED DATA
 
 Here we analyse the results of conductivities computed on quantified cross-sections.
 
-## Plot kr vs each anatomical trait
+## - Plot kr vs each anatomical trait
 
 ```{r}
 # data2plot <- MECHA_results %>% 
@@ -134,7 +139,7 @@ ggsave(filename = "plots/kr_vs_anatomy.png", plot = p,
 ```
 
 
-## Radial conductivity & conductance at fixed kAQP
+## - Radial conductivity & conductance at fixed kAQP
 
 ```{r}
 color_scale <- c("En.CS"        = "black", 
@@ -189,22 +194,22 @@ p_RadialConds
 dev.off()
 ```
 
-## Axial conductance
+## - Axial conductance
 
 ```{r}
 # Select data for only one Barrier (they all have the same values anyway)
 data2plot <- MECHA_results %>% 
   filter(Barrier == "b1" & kAQP == 1e-4) %>% 
-  select(c("CS_id", "Kx")) %>% 
+  select(c("CS_id", "kx")) %>% 
   left_join(Anatomy_Full[c("CS_id", "age")], by = "CS_id") %>% 
-  mutate(Kx_ln = ln(Kx))
+  mutate(kx_ln = ln(kx))
 
-Kx_plot <- ggplot(data2plot) +
+kx_plot <- ggplot(data2plot) +
 
   geom_point(aes(x = age,
-                 y = Kx)) +
+                 y = kx)) +
   
-  geom_smooth(aes(x = age, y = Kx),
+  geom_smooth(aes(x = age, y = kx),
               # span = 1,
               method = "lm",
               se = F) +
@@ -217,17 +222,17 @@ Kx_plot <- ggplot(data2plot) +
   theme_few()
 
 # =========================================================================== #
-Kx_plot
+kx_plot
 
-svg(filename = "plots/MECHA_results_Kx.svg", width = 3, height = 3)
-Kx_plot
+svg(filename = "plots/MECHA_results_kx.svg", width = 3, height = 3)
+kx_plot
 dev.off()
 
-# ggsave(filename = "plots/data_kx_plot.svg", plot = Kx_plot, device = "svg", width = 3, height = 3)
+# ggsave(filename = "plots/data_kx_plot.svg", plot = kx_plot, device = "svg", width = 3, height = 3)
 ```
 
 
-## Important anatomical parameters
+## - Important anatomical parameters
 
 ```{r}
 variables <- c("xylem_cell_diameter", 
@@ -237,7 +242,7 @@ variables <- c("xylem_cell_diameter",
                "phloem_n_layers", 
                "radius")
 
-data2plot <- unique(MECHA_results[c("CS_id", "Kx")]) %>% 
+data2plot <- unique(MECHA_results[c("CS_id", "kx")]) %>% 
   left_join(Anatomy_Full, by = "CS_id") %>% 
   select(c("age", variables)) %>% 
   gather(variables,
@@ -261,7 +266,7 @@ ggsave(filename = "plots/Anatomy_important_traits.png", plot = Anatomy_plot,
        device = "png", width = 6, height = 4, dpi = 300)
 ```
 
-### Secondary growth
+## - Secondary growth
 
 ```{r}
 data2plot <- Anatomy_Full %>% 
@@ -272,9 +277,7 @@ ggplot(data2plot, aes(x = age, y = secondarygrowth_param)) +
   geom_smooth_logistic
 ```
 
-
-
-## Analyse corelations between kr and anatomical measurements
+## - Analyse corelations between kr and anatomical measurements
 
 ```{r}
 plist <- Parameters %>% 
@@ -298,11 +301,93 @@ pander(kr_corr)
 
 
 
-# COMPLETE STATISTICAL ANALYSIS
+# STATISTICAL ANALYSIS
 
-## 1) Radial conductivity
+## - Radius
 
-### Linear model
+```{r}
+mean_radius <- mean(Anatomy_Full$radius[Anatomy_Full$age < 25])
+
+data2stat <- Anatomy_Full[c("age", "radius")] %>% 
+  filter(age >= 25)
+
+ggplot(data2stat) +
+  geom_point(aes(x = age, y = radius)) +
+  theme_few()
+
+# CHECK NORMALITY
+par(mfrow = c(1, 2))
+qqnorm(data2stat$radius)
+qqline(data2stat$radius)
+hist(data2stat$radius)  
+shapiro.test(data2stat$radius)
+
+# NORMALIZE WITH BOX-COX
+# par(mfrow = c(1))
+bc        <- MASS::boxcox(lm(data2stat$radius ~ 1))
+lambda_r <- bc$x[which(bc$y == max(bc$y))]
+
+data2stat$radius_tf <- BoxCox(data2stat$radius, lambda_r)
+# data2stat$kr_tf <- log(sqrt(data2stat$kr))
+
+# CHECK NORMALITY
+par(mfrow = c(1, 2))
+qqnorm(data2stat$radius_tf)
+qqline(data2stat$radius_tf)
+hist(data2stat$radius_tf)  
+shapiro.test(data2stat$radius_tf)
+
+# LINEAR REGRESSION
+par(mfrow = c(2,2))
+radius_lm <- lm(data = data2stat, formula = radius_tf ~ age)
+plot(radius_lm)
+summary(radius_lm)
+
+# write radius_lm
+saveRDS(object = radius_lm, file = "./Results/radius_model.rds")
+```
+
+
+```{r}
+radius_lm <- readRDS("./Results/radius_model.rds")
+
+data2plot <- Anatomy_Full[c("age", "radius")] 
+
+data2plot$radius_pred <- radius_pred(newdata     = data2plot, 
+                                     radius_lm   = radius_lm, 
+                                     lambda      = lambda_r,
+                                     radius.mean = mean(data2plot$radius[data2plot$age < 25]),
+                                     age.th      = 25)
+
+p <- ggplot(data2plot) +
+  
+  geom_line(aes(x = age, 
+                y = radius_pred),
+            linewidth = 2,
+            color = "orange") +
+  
+  geom_point(aes(x = age, 
+                 y = radius)
+             # ,color = "blue"
+             ) +
+  
+  
+  
+  ylab("Radius [mm]") +
+  xlab("Root age [d]") +
+  theme_few()
+
+svg(filename = "./plots/Anatomy_Radius.svg", width = 3, height = 3)
+p
+dev.off()
+p
+
+```
+
+
+## - Radial conductivity
+
+### Prepare data
 
 ```{r}
 barriers <- c("En.CS", 
@@ -320,7 +405,7 @@ data2stat <- MECHA_results %>%
   left_join(Anatomy_Full[c("CS_id", "age", "radius")], by = "CS_id") %>% 
   mutate(Barrier_Name = as.factor(Barrier_Name)) %>% 
   filter(Barrier_Name %in% barriers) %>% 
-  mutate(kr = 1e8*kr)
+  mutate(kr = kr)
 
 # # Remove outliers
 # data2stat <- data2stat %>% 
@@ -343,10 +428,10 @@ shapiro.test(data2stat$kr)
 
 # NORMALIZE WITH BOX-COX
 # par(mfrow = c(1))
-bc     <- MASS::boxcox(lm(data2stat$kr ~ 1))
-lambda <- bc$x[which(bc$y == max(bc$y))]
+bc        <- MASS::boxcox(lm(data2stat$kr ~ 1))
+lambda_kr <- bc$x[which(bc$y == max(bc$y))]
 
-data2stat$kr_tf <- BoxCox(data2stat$kr, lambda)
+data2stat$kr_tf <- BoxCox(data2stat$kr, lambda_kr)
 # data2stat$kr_tf <- log(sqrt(data2stat$kr))
 
 # CHECK NORMALITY
@@ -357,11 +442,13 @@ hist(data2stat$kr_tf)
 shapiro.test(data2stat$kr_tf)
 ```
 
+### Advanced plots
+
 ```{r}
 p <- ggplot(data2stat) +
   
   geom_jitter(aes(x = Barrier_Name, 
-                  y = kr,
+                  y = kr*1e8,
                   color = kAQP,
                   size = radius^2), 
               width = 0.25,
@@ -375,6 +462,8 @@ p <- ggplot(data2stat) +
   scale_size_area(
                   max_size = 5) +
   
+  ylab(expression(k[r] ~ "[" ~ 10^{-08} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  
   theme_few() +
   theme(axis.line = element_line()
         ,panel.border = element_blank()
@@ -386,7 +475,6 @@ p
 ggsave("./plots/MECHA_results_MixedPlot.svg", plot = p,
        device = "svg", width = 5, height = 5)
 ```
-
 
 ```{r}
 data2plot <- data2stat %>% 
@@ -409,9 +497,10 @@ ggsave(filename = "./plots/MECHA_results_FULL_TABLE.svg", plot = p,
        device = "svg", width = 5, height = 5)
 ```
 
+### Linear Regression
 
 ```{r}
-lm_kr1 <- lm(data = data2stat, 
+lm_kr <- lm(data = data2stat, 
              formula = kr_tf ~ 
                age +
                radius +
@@ -421,53 +510,204 @@ lm_kr1 <- lm(data = data2stat,
                )
 
 par(mfrow = c(2, 2))
-plot(lm_kr1)
+plot(lm_kr)
 
 cat("================= \n  LINEAR MODEL \n=================\n")
-summary(lm_kr1)
+summary(lm_kr)
 
 # cat("================= \n  ANOVA \n=================\n")
-# anova(lm_kr1)
+# anova(lm_kr)
 
 # Export model 
-saveRDS(object = lm_kr1, file = "./Results/kr_model.rds")
+saveRDS(object = lm_kr, file = "./Results/kr_model.rds")
 ```
 
-Let's try to predict some stuff :
+$k_r^* = \beta_0 + \beta_1* $
 
 ```{r}
-# ============================================================================ #
-data2stat$kr_pred <- BoxCox_reverse(predict(lm_kr0, data2stat), lambda)
-cat("RMSE : ", sqrt(mean((data2stat$kr - data2stat$kr_pred)^2)))
-# ============================================================================ #
-ggplot(data2stat) +
-  geom_point(aes(x = kr, 
-                 y = kr_pred,
-                 color = kAQP,
-                 size = radius
-                 ),
-             alpha = 0.5) +
-  
-  # geom_smooth(aes(x = kr, 
-  #                 y = kr_pred), 
-  #             method = "loess", 
-  #             color = "red") +
+Coef <- lm_kr$coefficients
 
-  coord_fixed(ratio = 1:1) +
-  
-  xlim(0, 20) +
-  ylim(0, 20) +
-  
-  geom_abline(linewidth = 1, color = "red") +
-  scale_color_viridis() +
-  
-  # facet_wrap(~kAQP) +
-  
-  xlab("Computed kr") + ylab("Predicted kr") +
-  theme_classic()
+alpha1 = Coef["(Intercept)"]
+beta1  = Coef["age"]
+beta2  = Coef["radius"]
+beta3  = Coef["kAQP"]
+
+cat("En.CS         : ", alpha1, 
+    " + ", beta1, "*age + ", 
+    beta2, "*radius + ", 
+    beta3, "*kAQP",
+    "\n")
+
+cat("En.CS-Ex.LC   : ", alpha1+Coef["Barrier_NameEn.CS-Ex.LC"], " + ", 
+    beta1, "*age + ", 
+    beta2, "*radius + ", 
+    beta3+Coef["Barrier_NameEn.CS-Ex.LC:kAQP"], "*kAQP",
+    "\n")
+
+cat("En.CS-Ex.Sub  : ", alpha1+Coef["Barrier_NameEn.CS-Ex.Sub"], " + ", 
+    beta1, "*age + ", 
+    beta2, "*radius + ", 
+    beta3+Coef["Barrier_NameEn.CS-Ex.Sub:kAQP"], "*kAQP",
+    "\n")
+
+cat("En.Sub        : ", alpha1+Coef["Barrier_NameEn.Sub"], " + ", 
+    beta1, "*age + ", 
+    beta2, "*radius + ", 
+    beta3+Coef["Barrier_NameEn.Sub"], "*kAQP",
+    "\n")
+
+cat("En.Sub-Ex.CS  : ", alpha1+Coef["Barrier_NameEn.Sub-Ex.CS"], " + ", 
+    beta1, "*age + ", 
+    beta2, "*radius + ", 
+    beta3+Coef["Barrier_NameEn.Sub-Ex.CS:kAQP"], "*kAQP",
+    "\n")
+
+cat("En.Sub-Ex.Sub : ", alpha1+Coef["Barrier_NameEn.Sub-Ex.Sub"], " + ", 
+    beta1, "*age + ", 
+    beta2, "*radius + ", 
+    beta3+Coef["Barrier_NameEn.Sub-Ex.Sub:kAQP"], "*kAQP",
+    "\n")
 ```
 
-## 2) Axial Kx
+I created a function (in Function_Misc.R) to automatically predict kr.
+Prediction analysis
+
+```{r}
+lm_kr <- readRDS(file = "./Results/kr_model.rds")
+
+# data2plot <- MECHA_results[c("CS_id", "kr", "Barrier_Name", "kAQP")] %>% 
+#   filter(Barrier_Name %in% c("En.CS", "En.")) 
+#   left_join(Anatomy_Full[c("CS_id", "age", "radius")], by = "CS_id") %>% 
+#   select(-CS_id)
+  
+# data2stat$kr_pred <- kr_pred(newdata = data2stat, 
+#                              lm_kr = lm_kr, 
+#                              lambda = lambda_kr)
+# 
+# # ============================================================================ #
+# cat("RMSE : ", sqrt(mean((data2stat$kr - data2stat$kr_pred)^2)))
+# # ============================================================================ #
+# ggplot(data2stat) +
+#   geom_point(aes(x = kr, 
+#                  y = kr_pred,
+#                  color = kAQP,
+#                  size = radius
+#                  ),
+#              alpha = 0.5) +
+#   
+#   # geom_smooth(aes(x = kr, 
+#   #                 y = kr_pred), 
+#   #             method = "loess", 
+#   #             color = "red") +
+# 
+#   coord_fixed(ratio = 1:1) +
+#   
+#   # xlim(0, 20) +
+#   # ylim(0, 20) +
+#   
+#   geom_abline(linewidth = 1, color = "red") +
+#   scale_color_viridis() +
+#   
+#   # facet_wrap(~kAQP) +
+#   
+#   xlab("Computed kr") + ylab("Predicted kr") +
+#   theme_classic()
+```
+
+### Predict and plot
+
+## - Radial conductivity & conductance at fixed kAQP
+
+```{r}
+color_scale <- c("En.CS"        = "black", 
+                 "En.CS-Ex.LC"  = "#C71AB7", 
+                 "En.CS-Ex.Sub" = "#4E3CA5")
+
+data2plot <- MECHA_results %>% 
+  filter(kAQP == 4e-4) %>%
+  filter(Barrier_Name %in% c("En.CS", "En.CS-Ex.LC", "En.CS-Ex.Sub")) %>% 
+  # mutate(kr = kr*1e8,
+  #        Kr = Kr*1e9) %>% 
+  left_join(Anatomy_Full[c("CS_id", "radius", "age")], by = "CS_id") %>% 
+  select(c("Barrier_Name", "age", "kr", "Kr", "kAQP", "radius", "perimeter")) %>% 
+  rename("r_data" = "radius")
+
+data2plot$radius  <- radius_pred(data2plot
+                                 ,radius_lm = radius_lm
+                                 ,radius.mean = 0.198
+                                 ,age.th = 25)
+data2plot$kr_pred <- kr_pred(newdata = data2plot, lm_kr = lm_kr,lambda = lambda_kr)
+data2plot$Kr_pred <- data2plot$kr_pred*2*3.1415*data2plot$radius    
+
+# ============================================================================ #
+p_kr <- ggplot(data2plot) +
+  
+  geom_line(aes(x = age
+                ,y = kr_pred
+                ,color = Barrier_Name
+                )
+            ,linewidth = 1
+            ,linetype = 1
+            ,alpha = 1
+            ,span = 1
+            ) +
+  
+  geom_point(aes(x = age, 
+                 y = kr,
+                 color = Barrier_Name)) +
+  
+  
+  scale_color_manual(values = color_scale) +
+  # scale_fill_manual(values = color_scale) +
+  
+  xlab("Age [d]") +
+  ylab(expression(k[r] ~ "[" ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  
+  # facet_wrap(~Variable, scales = "free") +
+  # facet_grid(Variable~kAQP) +
+  
+  theme_few() +
+  theme(legend.position = "none") 
+# ============================================================================ #
+p_Kr <- ggplot(data2plot) +
+  
+  geom_line(aes(x = age, 
+                y = Kr_pred,
+                color = Barrier_Name)
+            ,linewidth = 1
+            ,linetype = 1
+            ,alpha = 1
+            ,span = 1
+            ) +
+  
+  geom_point(aes(x = age, 
+                 y = Kr,
+                 color = Barrier_Name)) +
+  
+  
+  scale_color_manual(values = color_scale) +
+  # scale_fill_manual(values = color_scale) +
+  
+  xlab("Age [d]") +
+  ylab(expression(K[r] ~ "[" ~ m^{3} ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  
+  # facet_wrap(~Variable, scales = "free") +
+  # facet_grid(Variable~kAQP) +
+  
+  theme_few() +
+  theme(legend.position = "none") 
+# ============================================================================ #
+grid.arrange(p_kr, p_Kr, nrow = 1)
+# svg(filename = "plots/MECHA_results_kr-Kr_all-kAQP.svg", width = 12, height = 6)
+# p_RadialConds
+# dev.off()
+# 
+svg(filename = "plots/MECHA_results_kr-Kr.svg", width = 6, height = 3)
+grid.arrange(p_kr, p_Kr, nrow = 1)
+dev.off()
+```
+
+## - Axial conductance
 
 At first i tested a ln transformation, but generalised Box-Cox transformation is better, so let's keep it.
 
@@ -475,74 +715,116 @@ At first i tested a ln transformation, but generalised Box-Cox transformation is
 data2stat <- MECHA_results %>%
   filter(kAQP == 1e-4 & Barrier_Name == "En.CS-Ex.Sub") %>% 
   left_join(Anatomy_Full[c("CS_id", "age", "radius")], by = "CS_id") %>% 
-  select("Kx", "age", "radius") %>% 
-  mutate("Kx_ln" = ln(Kx))
+  select("kx", "age", "radius") %>% 
+  mutate("kx_ln" = ln(kx))
+
+ggplot(data2stat) +
+  geom_point(aes(x = age, y = kx)) +
+  theme_few()
 
 # CHECK NORMALITY ON ln TRANSFORMED DATA
 par(mfrow = c(1, 2))
-qqnorm(data2stat$Kx_ln)
-qqline(data2stat$Kx_ln)
-hist(data2stat$Kx_ln)  
-shapiro.test(data2stat$Kx_ln)
+qqnorm(data2stat$kx_ln)
+qqline(data2stat$kx_ln)
+hist(data2stat$kx_ln)  
+shapiro.test(data2stat$kx_ln)
 
 # NORMALIZE WITH BOX-COX
-bc              <- MASS::boxcox(lm(data2stat$Kx ~ 1))
-lambda          <- bc$x[which(bc$y == max(bc$y))]
-cat("Kx lambda : ", lambda, "\n")
-data2stat$Kx_tf <- BoxCox(data2stat$Kx,  lambda)
+bc              <- MASS::boxcox(lm(data2stat$kx ~ 1))
+lambda_kx          <- bc$x[which(bc$y == max(bc$y))]
+cat("kx lambda : ", lambda_kx, "\n")
+data2stat$kx_tf <- BoxCox(data2stat$kx,  lambda_kx)
 
 # RE-CHECK NORMALITY ON BOX-COX TRANSFORMED DATA
 par(mfrow = c(1, 2))
-qqnorm(data2stat$Kx_tf)
-qqline(data2stat$Kx_tf)
-hist(data2stat$Kx_tf)  
-shapiro.test(data2stat$Kx_tf)
+qqnorm(data2stat$kx_tf)
+qqline(data2stat$kx_tf)
+hist(data2stat$kx_tf)  
+shapiro.test(data2stat$kx_tf)
 
 # LINEAR REGRESSION
-lm_Kx1 <- lm(data    = data2stat, 
-             formula = ln(Kx) ~ radius+age)
+lm_kx <- lm(data    = data2stat, 
+             formula = kx_tf ~ radius+age)
 
-plot(lm_Kx1)
-summary(lm_Kx1)
-# anova(Kx_lm)
+par(mfrow = c(2,2))
+plot(lm_kx)
+summary(lm_kx)
+# anova(kx_lm)
 
+saveRDS(object = lm_kx, file = "./Results/kx_model.rds")
 ```
 
 $$
-ln(K_x^*) = \alpha + \beta \cdot t + \gamma \cdot r
+ln(K_x^*) = \alpha + \beta \cdot radius + \gamma \cdot age
 $$
 
-```{r}
-cat("alpha = ", lm_Kx1$coefficients[1], "\n")
-cat("beta  = ", lm_Kx1$coefficients[2], "\n")
-cat("gamma = ", lm_Kx1$coefficients[3], "\n")
-```
+with :
 
 ```{r}
-data2stat$Kx_pred <- BoxCox_reverse(exp(1)^(predict(lm_Kx1, data2stat)), lambda)
+cat("alpha = ", lm_kx$coefficients["(Intercept)"], "\n")
+cat("beta  = ", lm_kx$coefficients["radius"], "\n")
+cat("gamma = ", lm_kx$coefficients["age"], "\n")
+```
+
+Test prediction
+
+```{r}
+lm_kx <- readRDS("./Results/kx_model.rds")
+
+data2stat$r_data  <- data2stat$radius
+data2stat$radius  <- kx_pred(data2stat, lm_kx = lm_kx)
+data2stat$kx_pred <- kx_pred(data2stat, lm_kx)
 
 ggplot(data2stat) +
-  geom_point(aes(x = ln(Kx), y = ln(Kx_reg), color = x)) +
-  geom_smooth(aes(x = ln(Kx), y = ln(Kx_reg)), method = "lm", color = "red") +
+  
+  geom_point(aes(x = ln(kx), 
+                 y = ln(kx_pred), 
+                 color = age
+                 )
+             ) +
+  
+  geom_smooth(aes(x = ln(kx),
+                  y = ln(kx_pred)
+                  ), 
+              method = "lm", color = "red") +
+  
   coord_fixed() +
-  xlim(-26.5, -18) +
-  ylim(-26.5, -18) +
-  xlab("ln(Kx)") + ylab("ln(Kx*)") +
-  geom_abline() +
+  
+  # xlim(-26.5, -18) +
+  # ylim(-26.5, -18) +
+  
+  xlab("ln(kx)") + ylab("ln(kx*)") +
+  
+  # geom_abline() +
   scale_color_viridis() +
   theme_classic()
-  
 # ==============================================================================
+
+
+p_kx <- ggplot(data2stat) +
+  
+  geom_line(aes(x = age, y = ln(kx_pred)), 
+            color = "orange",
+            linewidth =2)+
+  
+  geom_point(aes(x = age, y = ln(kx))) +
+  
+  ylab(expression(ln(k)[x] ~ "[" ~ m^{4} ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  
+  theme_few()
+
+p_kx
+svg(filename = "./plots/MECHA_results_Kx.svg", width =3, height = 3)
+p_kx
+dev.off()
 ```
 
 
-
-
-# Pairwise analysis of hydrophobic barriers
+# PAIRWISE ANALYSIS OF HYDROPHOBIC BARRIERS
 
 We take here the effect of barriers when kAQP is at mean value
 
-### 0) Prepare data
+### - Prepare data
 
 ```{r}
 barriers <- c("En.CS", "En.CS-Ex.LC", "En.CS-Ex.Sub", 
@@ -569,7 +851,7 @@ data2stat <- data2stat %>%
   select(-median, -mad, -lower_bound, -upper_bound) 
 ```
 
-### 1) Check normality
+### - Check normality
 
 We use Shapiro-Wilk test (Shapiro & Wilk 1963).
 
@@ -606,7 +888,7 @@ ggplot(data2stat) +
   theme_few()
 ```
 
-### 2) ANOVA
+### - ANOVA
 
 Let's try a linear model on transform (normalized) data.
 
@@ -614,12 +896,13 @@ Let's try a linear model on transform (normalized) data.
 Barrier_lm <- lm(data = data2stat, 
                  formula = kr_tf ~ Barrier_Name)
 
+par(mfrow = c(2,2))
 plot(Barrier_lm)
 # summary(Barrier_lm)
 anova(Barrier_lm)
 ```
 
-### 3) Post-Hoc Mean Comparison
+### - Post-Hoc Mean Comparison
 
 ```{r}
 EM <- emmeans(Barrier_lm, specs = pairwise ~ Barrier_Name)
@@ -646,7 +929,7 @@ print(paste0("Difference between En.CS and En.Sub [%]              : ", round((m
 ```
 
 
-### 5) Plot
+### - Plot
 
 ```{r}
 color_scale2 <- c("En.CS"        = "black", 

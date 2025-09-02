@@ -59,7 +59,18 @@ RSA.IDs        <- read.csv(paste0(CRBM.path, "inputs/RSA_id.csv"))
 
 # ============================================================================ #
 # define colors 
-S_colors <- c("WT" = '#0070C0', 'AQP' = '#0070C0', 'Sub' = '#0070C0', 'Sub+SG' = '#0070C0')
+S_colors <- c("WT"    = '#0F9ED5', 
+              'kAQP'  = '#4EA72E', 
+              'Sub'   = '#E97132', 
+              'SubSG' = '#FFC000')
+
+# LOAD PRE-PROCESSED RSA
+RSA.all <- read.csv(paste0(CRBM.path, "inputs/RSA_all.csv"))
+
+# Set conversion rates
+kr.conv   <-  1.157407e-3
+kx.conv   <-  1.157407e-9
+krs.conv  <-  1.157407e-7
 ```
 
 # LOAD ROOT SYSTEM ARCHITECTURES
@@ -71,69 +82,67 @@ Each RSA is associated with a RSA_id and we create a table `RSA_id`. \
 ## [ONLY DO IT ONCE!] Load and process raw RSA files
 
 ```{r}
-process.RSA <- F
-
-if(process.RSA){
-  
-  RSA.path     <- "./src/CRB-MARSHAL/inputs/RSA/"
-  RSA.path.raw <- paste0(RSA.path, "raw/")
-  RSA_list     <- list.files(RSA.path.raw, pattern = ".txt")
-  RSA.all      <- tibble()
-  RSA.IDs      <- tibble()
-  
-  for(RSA_i in RSA_list){
-    # Load and process temp RSA
-    RSA_id_i        <- unlist(strsplit(RSA_i, split = ".txt"))[1]
-    RSA_temp        <- read.table(paste0(RSA.path.raw, RSA_i), header = T)
-    RSA_temp        <- reconnect.nodes(RSA_temp)
-    RSA_temp$RSA_id <- RSA_id_i
-    write.csv(x = RSA_temp, 
-              file = paste0(RSA.path, RSA_id_i, ".csv"), 
-              row.names = F)
-  
-    # Update RSA.IDs table
-    RSA_id_i_df     <- tibble(planttype = 
-                                unlist(strsplit(RSA_id_i, split = "_"))[1],
-                              age       = 
-                                unlist(strsplit(RSA_id_i, split = "_"))[2],
-                              rep       = 
-                                unlist(strsplit(RSA_id_i, split = "_"))[3],
-                              RSA_id    = 
-                                RSA_id_i)
-    RSA.IDs         <- rbind(RSA.IDs, RSA_id_i_df)
-  
-    # Add RSA to global RSA.all table
-    RSA.all         <- rbind(RSA.all, RSA_temp)
-  }
-  
-  # Write files
-  write.csv(x = RSA.all,
-            file = paste0(CRBM.path, "inputs/RSA_all.csv"),
-            row.names = F)
-  
-  write.csv(x = RSA.IDs,
-            file = paste0(CRBM.path, "inputs/RSA_id.csv"),
-            row.names = F)
-  
-}
+# process.RSA <- F
+# 
+# if(process.RSA){
+#   
+#   RSA.path     <- "./src/CRB-MARSHAL/inputs/RSA/"
+#   RSA.path.raw <- paste0(RSA.path, "raw/")
+#   RSA_list     <- list.files(RSA.path.raw, pattern = ".txt")
+#   RSA.all      <- tibble()
+#   RSA.IDs      <- tibble()
+#   
+#   for(RSA_i in RSA_list){
+#     # Load and process temp RSA
+#     RSA_id_i        <- unlist(strsplit(RSA_i, split = ".txt"))[1]
+#     RSA_temp        <- read.table(paste0(RSA.path.raw, RSA_i), header = T)
+#     RSA_temp        <- reconnect.nodes(RSA_temp)
+#     RSA_temp$RSA_id <- RSA_id_i
+#     write.csv(x = RSA_temp, 
+#               file = paste0(RSA.path, RSA_id_i, ".csv"), 
+#               row.names = F)
+#   
+#     # Update RSA.IDs table
+#     RSA_id_i_df     <- tibble(planttype = 
+#                                 unlist(strsplit(RSA_id_i, split = "_"))[1],
+#                               age       = 
+#                                 unlist(strsplit(RSA_id_i, split = "_"))[2],
+#                               rep       = 
+#                                 unlist(strsplit(RSA_id_i, split = "_"))[3],
+#                               RSA_id    = 
+#                                 RSA_id_i)
+#     RSA.IDs         <- rbind(RSA.IDs, RSA_id_i_df)
+#   
+#     # Add RSA to global RSA.all table
+#     RSA.all         <- rbind(RSA.all, RSA_temp)
+#   }
+#   
+#   # Write files
+#   write.csv(x = RSA.all,
+#             file = paste0(CRBM.path, "inputs/RSA_all.csv"),
+#             row.names = F)
+#   
+#   write.csv(x = RSA.IDs,
+#             file = paste0(CRBM.path, "inputs/RSA_id.csv"),
+#             row.names = F)
+#   
+# }
 ```
 
-## Load pre-processed RSA
+## Plot pre-processed RSA
 
 ```{r}
-RSA.all <- read.csv(paste0(CRBM.path, "inputs/RSA_all.csv"))
-
-RSA_plot <- ggplot(RSA.all) +
-  geom_segment(aes(x = x1, xend = x2, 
-                   y = z1, yend = z2, 
-                   color = branchID)
-               ) +
-  facet_wrap(~RSA_id, nrow = 2) +
-  scale_color_viridis(option = "plasma") +
-  coord_fixed() +
-  theme_few()
-
-RSA_plot
+# RSA_plot <- ggplot(RSA.all) +
+#   geom_segment(aes(x = x1, xend = x2, 
+#                    y = z1, yend = z2, 
+#                    color = branchID)
+#                ) +
+#   facet_wrap(~RSA_id, nrow = 2) +
+#   scale_color_viridis(option = "plasma") +
+#   coord_fixed() +
+#   theme_few()
+# 
+# RSA_plot
 
 # ggsave(filename = paste0(path.plots, "RSA_raw.png"), 
 #        plot = RSA_plot, device = "png", 
@@ -143,39 +152,31 @@ RSA_plot
 ## Only plot 1
 
 ```{r}
-RSA_plot_solo <- ggplot(RSA.all %>% filter(RSA_id == "Tomato_60_1" & time <= 30)) +
-  geom_segment(aes(x = x1, xend = x2, 
-                   y = z1, yend = z2
-                   # color = branchID
-                   )
-               ) +
-  # facet_wrap(~RSA_id, nrow = 2) +
-  scale_color_viridis(option = "plasma") +
-  coord_fixed() +
-  theme_void()
+# RSA_plot_solo <- ggplot(RSA.all %>% filter(RSA_id == "Tomato_60_1" & time <= 30)) +
+#   geom_segment(aes(x = x1, xend = x2, 
+#                    y = z1, yend = z2
+#                    # color = branchID
+#                    )
+#                ) +
+#   # facet_wrap(~RSA_id, nrow = 2) +
+#   scale_color_viridis(option = "plasma") +
+#   coord_fixed() +
+#   theme_void()
+# 
+# RSA_plot_solo
 
-RSA_plot_solo
-
-ggsave(filename = paste0(path.plots, "RSA_raw_solo.png"),
-       plot = RSA_plot_solo, device = "png",
-       width = 4 , height = 5, dpi = 300)
+# ggsave(filename = paste0(path.plots, "RSA_raw_solo.png"),
+#        plot = RSA_plot_solo, device = "png",
+#        width = 4 , height = 5, dpi = 300)
 ```
 
 
 # Define conductivities
 
 Here we build and plot conductivities curves that we will apply in MARSHAL. \
-First, load coefficients of kr and Kx regressions computed in TROOT_ANALYSIS \
+First, load coefficients of kr and kx regressions computed in TROOT_ANALYSIS \
 * kr is converted from $m s^{-1} MPa^{-1}$ to $cm d^{-1} HPa^{-1}$ \
-* Kx is converted from $m^3 s^{-1} MPa^{-1}$ to $cm^4 d^{-1} HPa^{-1}$ \
-
-```{r}
-coefficients_kr <- read.csv("./Data/kr_coefficients.csv")
-coefficients_Kx <- read.csv("./Data/Kx_coefficients.csv")
-
-conv_kr   <-  0.001157407
-conv_kx   <-  1.157407e-09
-```
+* kx is converted from $m^4 s^{-1} MPa^{-1}$ to $cm^4 d^{-1} HPa^{-1}$ \
 
 Let's define 3 scenarios :
 
@@ -204,134 +205,151 @@ Let's define 3 scenarios :
 
 ```{r}
 source("./src/CRB-MARSHAL/CRBM_functions.R")
+source("./src/FUNCTIONS/T-Root/Functions_Misc.R")
+lm_kr <- readRDS("./Results/kr_model.rds")
+lm_kx <- readRDS("./Results/kx_model.rds")
+lm_r  <- readRDS("./Results/radius_model.rds")
 
 # DEFAULTS PARAMETERS
-nmin         <- 0
-nmax         <- 60         # Maximum number of iterations
+nmin           <- 0
+nmax           <- 60         # Maximum number of iterations
 
 # SG TIMING (default 7 - 20)
-SG_timing1A  <- c(7, 25)
-SG_timing1B  <- c(7, 25)
-SG_timing2   <- c(7, 25)
-SG_timing3   <- c(100, 101)
+SG_timingWT    <- c(7, 25)
+SG_timingkAQP  <- c(7, 25)
+SG_timingSub   <- c(7, 25)
+SG_timingSubSG <- c(100, 101)
 
 # MS TIMING (default 7 - 20)
-MS_timing1A  <- c(7,   100)
-MS_timing1B  <- c(7,   100)
-MS_timing2   <- c(100, 101)
-MS_timing3   <- c(100, 101)
+MS_timingWT    <- c(1,   7)
+MS_timingkAQP  <- c(7,   100)
+MS_timingSub   <- c(100, 101)
+MS_timingSubSG <- c(100, 101)
 
-rmin         <- 0.1887     # minimum radius (default = 0.1887 from data)
-rmax         <- 2          # maximum radius
-kAQP_start   <- 6.35e-7    # kAQP (default = 6.35e-7)
-kAQP_end     <- 6.35e-7    # 
-Kx.max       <- 1e-8
+rmin           <- 0.198      # minimum radius (default = 0.198 from data)
+rmax           <- 2          # maximum radius
+
+kx.min         <- 0
+kx.max         <- 1e-7
 
 # ============================================================================ #
 # SCENARIO WT
-Conds_S1A <- create.conds(S_ID = "1A"
-                          ,nmin       = nmin
-                          ,nmax       = nmax
-                          ,SG_timing  = SG_timing1A
-                          ,MS_timing  = MS_timing1A
-                          ,kr.coeff   = coefficients_kr
-                          ,Kx.coeff   = coefficients_Kx
-                          ,kAQP_start = 6.35e-7
-                          ,kAQP_end   = 6.35e-7
-                          ,rmin       = 0.1887
-                          ,rmax       = 2
-                          ,Kx.max     = Kx.max
+Conds_WT <- create.conds(S_ID = "WT"
+                          ,nmin          = nmin
+                          ,nmax          = nmax
+                          ,SG_timing     = SG_timingWT
+                          ,MS_timing     = MS_timingWT
+                          ,radius_pred_f = lm_r
+                          ,kr_pred       = lm_kr
+                          ,kx_pred       = lm_kx
+                          ,kAQP_start    = 5e-4
+                          ,kAQP_end      = 5e-4
+                          ,rmin          = 0.198
+                          ,rmax          = 2
+                          ,kx.max        = kx.max
                           )
-mparam_1A <- tibble(SG_timing = SG_timing1A,
-                    MS_timing = MS_timing1A,
+
+mparam_WT <- tibble(SG_timing = SG_timingWT,
+                    MS_timing = MS_timingWT,
                     rmin      = rmin,
                     rmw       = rmax,
-                    S_ID      = "1A")
+                    S_ID      = "WT")
+
 # ============================================================================ #
 # SCENARIO -AQP
-Conds_S1B <- create.conds(S_ID = "1B"
-                          ,nmin        = nmin
-                          ,nmax        = nmax
-                          ,SG_timing  = SG_timing1B
-                          ,MS_timing  = MS_timing1B
-                          ,kr.coeff   = coefficients_kr
-                          ,Kx.coeff   = coefficients_Kx
-                          ,kAQP_start = 6.35e-7
-                          ,kAQP_end   = 1e-16
-                          ,rmin       = 0.1887
-                          ,rmax       = 2
-                          ,Kx.max     = Kx.max
+Conds_kAQP <- create.conds(S_ID = "kAQP"
+                          ,nmin          = nmin
+                          ,nmax          = nmax
+                          ,SG_timing     = SG_timingWT
+                          ,MS_timing     = MS_timingWT
+                          ,radius_pred_f = lm_r
+                          ,kr_pred       = lm_kr
+                          ,kx_pred       = lm_kx
+                          ,kAQP_start    = 5e-4
+                          ,kAQP_end      = 1e-16
+                          ,rmin          = 0.1988
+                          ,rmax          = 2
+                          ,kx.max        = kx.max
                           )
-mparam_1B <- tibble(SG_timing = SG_timing1B,
-                    MS_timing = MS_timing1B,
+
+mparam_kAQP <- tibble(SG_timing = SG_timingkAQP,
+                      MS_timing = MS_timingkAQP,
+                      rmin      = rmin,
+                      rmw       = rmax,
+                      S_ID      = "kAQP")
+# ============================================================================ #
+# SCENARIO Sub
+Conds_Sub <- create.conds(S_ID = "Sub"
+                          ,nmin          = nmin
+                          ,nmax          = nmax
+                          ,SG_timing     = SG_timingSub
+                          ,MS_timing     = MS_timingSub
+                          ,radius_pred_f = lm_r
+                          ,kr_pred       = lm_kr
+                          ,kx_pred       = lm_kx
+                          ,kAQP_start    = 5e-4
+                          ,kAQP_end      = 5e-4
+                          ,rmin          = 0.198
+                          ,rmax          = 2
+                          ,kx.max        = kx.max
+                          )
+
+mparam_Sub <- tibble(SG_timing = SG_timingSub,
+                    MS_timing = MS_timingSub,
                     rmin      = rmin,
                     rmw       = rmax,
-                    S_ID      = "1B")
+                   S_ID       = "Sub")
 # ============================================================================ #
-# SCENARIO 2
-Conds_S2 <- create.conds(S_ID = "2"
-                         ,nmin       = nmin
-                         ,nmax       = nmax
-                         ,SG_timing  = SG_timing2
-                         ,MS_timing  = MS_timing2
-                         ,kr.coeff   = coefficients_kr
-                         ,Kx.coeff   = coefficients_Kx
-                         ,kAQP_start = 6.35e-7
-                         ,kAQP_end   = 6.35e-7
-                         ,rmin       = 0.1887
-                         ,rmax       = 2
-                         ,Kx.max     = Kx.max
-                         )
-mparam_2 <- tibble(SG_timing = SG_timing2,
-                    MS_timing = MS_timing2,
-                    rmin      = rmin,
-                    rmw       = rmax,
-                   S_ID       = "2")
-# ============================================================================ #
-# SCENARIO 3
-Conds_S3 <- create.conds(S_ID = "3"
-                         ,nmin        = nmin
-                         ,nmax        = nmax
-                         ,SG_timing  = SG_timing3
-                         ,MS_timing  = MS_timing3
-                         ,kr.coeff   = coefficients_kr
-                         ,Kx.coeff   = coefficients_Kx
-                         ,kAQP_start = 6.35e-7
-                         ,kAQP_end   = 6.35e-7
-                         ,rmin       = 0.1887
-                         ,rmax       = 1
-                         ,kr.min     = 6.5e-8
-                         ,kr.max     = 6.5e-8   
-                         ,Kx.min     = 1e-10
-                         ,Kx.max     = 2e-10  # Manually limited !
-                         )
-mparam_3 <- tibble(SG_timing = SG_timing3,
-                   MS_timing = MS_timing3,
+# SCENARIO SubSG
+Conds_SubSG <- create.conds(S_ID = "SubSG"
+                          ,nmin          = nmin
+                          ,nmax          = nmax
+                          ,SG_timing     = SG_timingSubSG
+                          ,MS_timing     = MS_timingSubSG
+                          ,radius_pred_f = lm_r
+                          ,kr_pred       = lm_kr
+                          ,kx_pred       = lm_kx
+                          ,kAQP_start    = 5e-4
+                          ,kAQP_end      = 5e-4
+                          ,rmin          = 0.198
+                          ,rmax          = 0.198
+                          ,kr.min        = 1e-10
+                          ,kr.max        = 1.5e-7
+                          ,kx.min        = 0
+                          ,kx.max        = 2e-10
+                          )
+
+mparam_SubSG <- tibble(SG_timing = SG_timingSubSG,
+                   MS_timing = MS_timingSubSG,
                    rmin      = rmin,
                    rmw       = rmax,
-                   S_ID = "3")
+                   S_ID = "SubSG")
 # ============================================================================ #
 # Rbind all scenarios together
-Conds.tot <- rbind(Conds_S1A, Conds_S1B) %>% 
-  rbind(Conds_S2) %>% rbind(Conds_S3)
+Conds.tot <- rbind(Conds_WT, Conds_kAQP) %>% 
+  rbind(Conds_Sub) %>% rbind(Conds_SubSG) %>% 
+  gather(radius, kAQP, kr, kx, key = "type", value = "y")
 
-mparams   <- rbind(mparam_1A, mparam_1B) %>% 
-  rbind(mparam_2) %>% rbind(mparam_3)
+mparams   <- rbind(mparam_WT, mparam_kAQP) %>% 
+  rbind(mparam_Sub) %>% rbind(mparam_SubSG)
+
+Conds.tot$S_ID <- factor(Conds.tot$S_ID,
+                         levels = c("WT", "kAQP", "Sub", "SubSG"))
 
 
-# Convert kr and Kx to cm d HPa
-Conds.tot$y[Conds.tot$type == "kr"]   <- Conds.tot$y[Conds.tot$type == "kr"]/conv_kr
-Conds.tot$y[Conds.tot$type == "kAQP"] <- Conds.tot$y[Conds.tot$type == "kAQP"]/conv_kr
-Conds.tot$y[Conds.tot$type == "kx"]   <- Conds.tot$y[Conds.tot$type == "kx"]/conv_kx
+# Convert kr and kx to cm d HPa
+# Conds.tot$y[Conds.tot$type == "kr"]   <- Conds.tot$y[Conds.tot$type == "kr"]/conv_kr
+# Conds.tot$y[Conds.tot$type == "kAQP"] <- Conds.tot$y[Conds.tot$type == "kAQP"]/conv_kr
+# Conds.tot$y[Conds.tot$type == "kx"]   <- Conds.tot$y[Conds.tot$type == "kx"]/conv_kx
 
+# ============================================================================ #
 ggplot(Conds.tot) +
-  geom_line(aes(x = x, y = y, color = S_ID),
+  geom_line(aes(x = age, y = y, color = S_ID),
             size = 1,
             alpha = 0.5) +
   scale_color_manual(values = S_colors) +
   facet_grid(type~S_ID, scales = "free") +
   theme_test()
-
 # ============================================================================ #
 # Add root types
 roottypes <- tibble(order_id = c(1, 2),
@@ -343,56 +361,59 @@ Conds.tot <- merge(Conds.tot, roottypes)
 Plot all together with a rectangle for MS
 
 ```{r}
-# Create rectangles
-rect_data <- expand.grid(start = 0, end = 0, 
-                         MS = c("En.CS-Ex.LC", "En.CS-Ex.Sub"), 
-                         S_ID = unique(Conds.tot$S_ID))
-
-# Define rectangle coordinates
-rect_data$start[rect_data$S_ID == "1A" & rect_data$MS == "En.CS-Ex.LC"] <- 1
-rect_data$end[rect_data$S_ID   == "1A" & rect_data$MS == "En.CS-Ex.LC"] <- 7
-rect_data$start[rect_data$S_ID == "1A" & rect_data$MS == "En.CS-Ex.Sub"] <- 8
-rect_data$end[rect_data$S_ID   == "1A" & rect_data$MS == "En.CS-Ex.Sub"] <- 60
-
-rect_data$start[rect_data$S_ID == "1B" & rect_data$MS == "En.CS-Ex.LC"] <- 1
-rect_data$end[rect_data$S_ID   == "1B" & rect_data$MS == "En.CS-Ex.LC"] <- 7
-rect_data$start[rect_data$S_ID == "1B" & rect_data$MS == "En.CS-Ex.Sub"] <- 8
-rect_data$end[rect_data$S_ID   == "1B" & rect_data$MS == "En.CS-Ex.Sub"] <- 60
-
-rect_data$start[rect_data$S_ID == "2" & rect_data$MS == "En.CS-Ex.LC"]  <- 1
-rect_data$end[rect_data$S_ID   == "2" & rect_data$MS == "En.CS-Ex.LC"]  <- 60
-rect_data$start[rect_data$S_ID == "2" & rect_data$MS == "En.CS-Ex.Sub"]  <- 0
-rect_data$end[rect_data$S_ID   == "2" & rect_data$MS == "En.CS-Ex.Sub"]  <- 0
-
-rect_data$start[rect_data$S_ID == "3" & rect_data$MS == "En.CS-Ex.LC"]  <- 1
-rect_data$end[rect_data$S_ID   == "3" & rect_data$MS == "En.CS-Ex.LC"]  <- 60
-rect_data$start[rect_data$S_ID == "3" & rect_data$MS == "En.CS-Ex.Sub"]  <- 0
-rect_data$end[rect_data$S_ID   == "3" & rect_data$MS == "En.CS-Ex.Sub"]  <- 0
-
-# Create plot
-S_full_plot <- ggplot(data = Conds.tot) +
-  
-  geom_rect(data = rect_data, 
-            aes(xmin = start, xmax = end, 
-                ymin = -Inf, ymax = Inf, 
-                fill = MS
-                ),
-    alpha = 0.2
-  ) +
-  
-  # Display curves
-  geom_line(aes(x = x, y = y),
-            linewidth = 1) +
-  
-  # scale_color_manual(values = S_colors) +
-  
-  facet_grid(type~S_ID, scales = "free_y") +
-  ylab("Value [normalised]") +
-  xlab("Root age [d]") +
-  theme_few() 
-
-S_full_plot
-ggsave(plot = S_full_plot, filename = "./plots/CRB-MARSHAL/Scenarios_full.svg", device = "svg", width = 8, height = 5)
+# # Create rectangles
+# rect_data <- expand.grid(start = 0, end = 0, 
+#                          MS = c("En.CS-Ex.LC", "En.CS-Ex.Sub"), 
+#                          S_ID = unique(Conds.tot$S_ID))
+# 
+# age.max <- 30
+# 
+# # Define rectangle coordinates
+# rect_data$start[rect_data$S_ID == "WT" & rect_data$MS == "En.CS-Ex.LC"]  <- 1
+# rect_data$end[rect_data$S_ID   == "WT" & rect_data$MS == "En.CS-Ex.LC"]  <- 7
+# rect_data$start[rect_data$S_ID == "WT" & rect_data$MS == "En.CS-Ex.Sub"] <- 8
+# rect_data$end[rect_data$S_ID   == "WT" & rect_data$MS == "En.CS-Ex.Sub"] <- age.max
+# 
+# rect_data$start[rect_data$S_ID == "kAQP" & rect_data$MS == "En.CS-Ex.LC"] <- 1
+# rect_data$end[rect_data$S_ID   == "kAQP" & rect_data$MS == "En.CS-Ex.LC"] <- 7
+# rect_data$start[rect_data$S_ID == "kAQP" & rect_data$MS == "En.CS-Ex.Sub"] <- 8
+# rect_data$end[rect_data$S_ID   == "kAQP" & rect_data$MS == "En.CS-Ex.Sub"] <- age.max
+# 
+# rect_data$start[rect_data$S_ID == "Sub" & rect_data$MS == "En.CS-Ex.LC"]  <- 1
+# rect_data$end[rect_data$S_ID   == "Sub" & rect_data$MS == "En.CS-Ex.LC"]  <- age.max
+# rect_data$start[rect_data$S_ID == "Sub" & rect_data$MS == "En.CS-Ex.Sub"]  <- 0
+# rect_data$end[rect_data$S_ID   == "Sub" & rect_data$MS == "En.CS-Ex.Sub"]  <- 0
+# 
+# rect_data$start[rect_data$S_ID == "SubSG" & rect_data$MS == "En.CS-Ex.LC"]  <- 1
+# rect_data$end[rect_data$S_ID   == "SubSG" & rect_data$MS == "En.CS-Ex.LC"]  <- age.max
+# rect_data$start[rect_data$S_ID == "SubSG" & rect_data$MS == "En.CS-Ex.Sub"]  <- 0
+# rect_data$end[rect_data$S_ID   == "SubSG" & rect_data$MS == "En.CS-Ex.Sub"]  <- 0
+# 
+# # Create plot
+# S_full_plot <- ggplot(data = Conds.tot) +
+#   
+#   geom_rect(data = rect_data, 
+#             aes(xmin = start, xmax = end, 
+#                 ymin = -Inf, ymax = Inf, 
+#                 fill = MS
+#                 ),
+#     alpha = 0.2
+#   ) +
+#   
+#   # Display curves
+#   geom_line(aes(x = age, y = y),
+#             linewidth = 1) +
+#   
+#   # scale_color_manual(values = S_colors) +
+#   
+#   facet_grid(type~S_ID, scales = "free_y") +
+#   ylab("Value") +
+#   xlab("Root age [d]") +
+#   theme_few() 
+# 
+# S_full_plot
+# 
+# ggsave(plot = S_full_plot, filename = "./plots/CRB-MARSHAL/Scenarios_full.svg", device = "svg", width = 8, height = 5)
 ```
 
 # LOOP MPIPE
@@ -404,11 +425,11 @@ source("./src/CRB-MARSHAL/CRBM_functions.R")
 
 # ============================================================================ #
 # DEFINE SIMULATIONS MACRO PARAMETERS
-tmin          <- 0
+tmin          <- 10
 tmax          <- 60
 it_length     <- 10
 S_list        <- unique(Conds.tot$S_ID)
-gif.delay     <- 10
+gif.delay     <- 50
 radius.range  <- c(0.75, 2)
 # SG_timing     <- c(7, 25)
 # ============================================================================ #
@@ -418,25 +439,27 @@ RSA_list      <- unique(RSA.IDs$RSA_id)
 RSA.all       <- read.csv("./src/CRB-MARSHAL/inputs/RSA_all.csv") %>% 
   filter(RSA_id %in% RSA_list & time <= tmax)
 
-RSA_plot <- ggplot(RSA.all) +
-  geom_segment(aes(x = x1, xend = x2, 
-                   y = z1, yend = z2, 
-                   color = branchID)
-               ) +
-  facet_wrap(~RSA_id, nrow = 2) +
-  scale_color_viridis(option = "plasma") +
-  coord_fixed() +
-  theme_few()
-
-RSA_plot
+# RSA_plot <- ggplot(RSA.all %>% filter(time <= tmax)) +
+#   geom_segment(aes(x = x1, xend = x2, 
+#                    y = z1, yend = z2, 
+#                    color = branchID)
+#                ) +
+#   facet_wrap(~RSA_id, nrow = 2) +
+#   scale_color_viridis(option = "plasma") +
+#   coord_fixed() +
+#   theme_few()
+# 
+# RSA_plot
 
 # ============================================================================ #
 # RUN MPIPE FOR EVERY SCENARIO
 for(S_ID_i in S_list){
 
   Scenario_ID_i  <- S_ID_i
+  # print(Scenario_ID_i)
   
   Conds          <- Conds.tot %>% filter(S_ID == S_ID_i)
+  Conds$x        <- Conds$age
   
   SG_timing      <- mparams$SG_timing[mparams$S_ID == S_ID_i]
   MS_timing      <- mparams$MS_timing[mparams$S_ID == S_ID_i]
@@ -446,6 +469,8 @@ for(S_ID_i in S_list){
   path.out       <- paste0(path.results, S_ID_i, "/")
   
   S_ID           <- S_ID_i
+  
+  # UNLEASH MARSHAL PIPELINE !
   source("./src/MPIPE.R")
 }
 ```
@@ -460,7 +485,7 @@ for(S_ID_i in S_list){
 # ============================================================================ #
 Macro_full <- tibble()
 RSHA_full  <- tibble()
-S_list     <- c("1A", "1B", "2", "3")
+S_list     <- c("WT", "kAQP", "Sub", "SubSG")
 
 for(si in S_list){
   print(si)
@@ -487,32 +512,21 @@ write.csv(x = Macro_full, file = paste0(path.results, "Macro_full.csv"), row.nam
 
 ```{r}
 RSHA_full  <- read.csv(paste0(path.results, "RSHA_full.csv")) %>% 
-  mutate(Mutant_Name = case_when(
-    Scenario_ID == "1A" ~ "WT",
-    Scenario_ID == "1B" ~ "AQP",
-    Scenario_ID == "2" ~ "Sub",
-    Scenario_ID == "3" ~ "Sub+SG",
-  ))
-
-Macro_full <- read.csv(paste0(path.results, "Macro_full.csv"))%>% 
-  mutate(Mutant_Name = case_when(
-    Scenario_ID == "1A" ~ "WT",
-    Scenario_ID == "1B" ~ "AQP",
-    Scenario_ID == "2" ~ "Sub",
-    Scenario_ID == "3" ~ "Sub+SG",
-  ))
+  mutate(Scenario_ID = factor(Scenario_ID, levels = c("WT", "kAQP", "Sub", "SubSG")))
+Macro_full <- read.csv(paste0(path.results, "Macro_full.csv")) %>% 
+  mutate(Scenario_ID = factor(Scenario_ID, levels = c("WT", "kAQP", "Sub", "SubSG")))
 ```
 
 ```{r}
 data2export <- RSHA_full %>% 
-  filter(age == 30 & Mutant_Name == "WT")
+  filter(age == max(RSHA_full$age) & Scenario_ID == "WT")
 
 data2export <- data2export[c("node1ID",
                              "node2ID",
                              "branchID",
                              "x1","y1","z1","x2","y2","z2",
-                             "radius","length","R","G","B",
-                             "time","type","RSA_id","kr","Kx","SUF")]
+                             "radius","length","R","G","B", "age",
+                             "time","type","RSA_id","kr","kx","SUF")]
 
 write.csv(x = data2export, file = "src/CRB-MARSHAL/RSHA_WT_30d_export.csv", row.names = F)
 
@@ -552,20 +566,23 @@ ggsave(filename = paste0(path.plots, "data2export_plot.png"),
 # ============================================================================ #
 # ANALYSE KRS
 # ============================================================================ #
-p <- ggplot(Macro_full) +
+data2plot <- Macro_full %>% 
+  filter(age %in% c(10, 20, 30, 40, 50, 60)) 
+
+p <- ggplot(data2plot) +
   
-  geom_line(aes(x = as.factor(age), 
-                y = Krs, 
-                group = Sim_ID, 
-                # color = Mutant_Name,
-                # linetype = Mutant_Name
+  geom_line(aes(x     = as.factor(age), 
+                y     = Krs, 
+                group = Sim_ID,
+                color = Scenario_ID
+                # linetype = Scenario_ID
                 ),
-            color = "black",
+            # color = "black",
             alpha = 0.2) +
   
-  geom_boxplot(aes(x = as.factor(age),
-                   y = Krs,
-                   fill = Mutant_Name
+  geom_boxplot(aes(x    = as.factor(age),
+                   y    = Krs,
+                   fill = Scenario_ID
                    ),
                # fill = "#0070C0",
                width = 0.5,
@@ -575,16 +592,21 @@ p <- ggplot(Macro_full) +
   scale_color_manual(values = S_colors) +
   
   xlab("Age [d]") +
-  ylab(expr(K[rs] ~ "[" ~ m^{4} ~ MPa^{-1} ~ s^{-1} ~ "]"))     +
+  ylab(expr(K[rs] ~ "[" ~ m^{3} ~ MPa^{-1} ~ s^{-1} ~ "]"))     +
   theme_few()
 
 
 p
 
-ggsave(filename = paste0(path.plots, "Krs_full.svg"), 
-       plot = p
-       ,device = "svg"
-       ,width = 5, height = 3)
+# ggsave(filename = paste0(path.plots, "Krs_full.svg"), 
+#        plot = p
+#        ,device = "svg"
+#        ,width = 5, height = 3)
+
+svg(filename = paste0(path.plots, "Krs_full.svg"), 
+    width = 5, height = 3)
+p
+dev.off()
 ```
 
 ## Analyse SUF
@@ -593,15 +615,17 @@ ggsave(filename = paste0(path.plots, "Krs_full.svg"),
 # ============================================================================ #
 # ANALYSE SUF
 # ============================================================================ #
+data2plot <- RSHA_full %>% 
+  filter(age %in% c(10, 30, 60)) 
 
-SUF_df2 <- RSHA_full %>% 
-  filter(age >= 30) %>%
-  select(c("SUF", "RSHA_id", "age", "Mutant_Name", "z1", "type")) %>% 
+SUF_df2 <- data2plot %>% 
+  # filter(age >= 30) %>%
+  select(c("SUF", "RSHA_id", "age", "Scenario_ID", "z1", "type")) %>% 
   mutate(zr = round(z1/2, digits = 0)*2) %>% 
-  group_by(RSHA_id, zr, Mutant_Name, age) %>% 
+  group_by(RSHA_id, zr, Scenario_ID, age) %>% 
   summarise(SUF_sum = sum(SUF)) %>% 
   ungroup() %>% 
-  group_by(zr, Mutant_Name, age) %>% 
+  group_by(zr, Scenario_ID, age) %>% 
   summarise(SUF_sum_mean = mean(SUF_sum),
             SUF_sum_sd   = sd(SUF_sum)
             )
@@ -613,37 +637,45 @@ SUF_plot <- ggplot(data = SUF_df2) +
   #          position = "dodge", 
   #          alpha = 0.75) +
 
-  geom_ribbon(aes(x = zr, 
-                    ymin = SUF_sum_mean-SUF_sum_sd, 
-                    ymax = SUF_sum_mean+SUF_sum_sd,
-                    fill = Mutant_Name),
-              alpha = 0.5
-                ) +
-  
-  geom_point(aes(x = zr,
-                 y = SUF_sum_mean,
-                 # color = Mutant_name,
-                 shape = Mutant_Name)
-             # ,position = position_dodge(2)
-             ) +
-  # 
-  # geom_errorbar(aes(x = zr, 
-  #                   ymin = SUF_sum_mean-SUF_sum_sd, 
-  #                   ymax = SUF_sum_mean+SUF_sum_sd,
-  #                   color = Scenario_ID),
-  #               width = 0.5
-  #               # ,position = position_dodge(2)
+  # geom_ribbon(aes(x = zr
+  #                 ,ymin = SUF_sum_mean-SUF_sum_sd
+  #                 ,ymax = SUF_sum_mean+SUF_sum_sd
+  #                 ,fill = Scenario_ID),
+  #             alpha = 0.5
   #               ) +
   
-  # geom_line(aes(x = zr, 
-  #               y = SUF_sum_mean, 
-  #               # color = Scenario_ID
-  #               linetype = Scenario_ID),
-  #           size = 1) +
+  geom_point(aes(x = zr
+                 ,y = SUF_sum_mean
+                 ,color = Scenario_ID
+                 # ,shape = Scenario_ID
+                 )
+             # ,position = position_dodge(0.5)
+             ,size = 1
+             ) +
+
+  geom_errorbar(aes(x = zr
+                    ,ymin = SUF_sum_mean-SUF_sum_sd
+                    ,ymax = SUF_sum_mean+SUF_sum_sd
+                    ,color = Scenario_ID
+                    )
+                ,width = 0.4
+                ,size = 0.3
+                ,alpha = 0.5
+                # ,position = position_dodge(0.5)
+                ) +
   
-  # scale_color_manual(values = S_colors) +
+  geom_line(aes(x = zr
+                ,y = SUF_sum_mean
+                ,color = Scenario_ID
+                # ,linetype = Scenario_ID
+                )
+            # ,position = position_dodge(0.5)
+            # ,size = 1
+            ) +
+  
+  scale_color_manual(values = S_colors) +
   # scale_fill_manual(values = S_colors) +
-  scale_fill_viridis(discrete = T) +
+  # scale_fill_viridis(discrete = T) +
 
   ylab("Standart Uptake Fractions [-]") +
   xlab("depth [cm]") +
@@ -654,18 +686,25 @@ SUF_plot <- ggplot(data = SUF_df2) +
   coord_flip() +
   # ggtitle(paste0("Sum of SUF per scenario")) +
   theme_few() +
-  theme(axis.text.x  = element_text(size = 8, angle = 90, hjust = 1, vjust = 0.5))
+  theme(axis.text.x  = element_text(size = 8, angle = 90, hjust = 1, vjust = 0.5)) +
+  theme(legend.position = "none")
   
 SUF_plot
-ggsave(filename = paste0(path.plots, "SUF_sum_full.svg"), 
-       plot = SUF_plot, 
-       device = "svg", width = 7, height = 4)
+
+# ggsave(filename = paste0(path.plots, "SUF_sum_full.svg"), 
+#        plot = SUF_plot, 
+#        device = "svg", width = 5, height = 5)
+
+svg(filename = paste0(path.plots, "SUF_sum_full.svg"), 
+    width = 4, height = 4)
+SUF_plot
+dev.off()
 ```
 
 ## Compare all root systems
 
 ```{r}
-data2plot <- RSHA_full %>% filter(age == 40)
+data2plot <- RSHA_full # %>% filter(age == 40)
 
 data2plot_main <- data2plot %>% filter(type == 1)
 data2plot_lat <- data2plot %>% filter(type == 2)
@@ -712,20 +751,21 @@ ggsave(filename = "RSHA_full.png", plot = p
 ### Plot SUF
 
 ```{r}
-data2plot <- RSHA_full %>% filter(age == 60 & RSA_id == unique(RSA.IDs$RSA_id[1]))
+data2plot <- RSHA_full %>% 
+  filter(age == 60 & RSA_id == unique(RSA.IDs$RSA_id[1]) & Scenario_ID == "WT")
 
-data2plot_main <- data2plot %>% filter(type == 1)
-data2plot_lat <- data2plot %>% filter(type == 2)
+# data2plot_main <- data2plot %>% filter(type == 1)
+# data2plot_lat <- data2plot %>% filter(type == 2)
 
 p <- ggplot() +
   
-  geom_segment(data = data2plot_main,
-               aes(x = x1, xend = x2,
-                   y = z1, yend = z2,
-                   size = radius),
-               color = "blue") +  
+  # geom_segment(data = data2plot_main,
+  #              aes(x = x1, xend = x2,
+  #                  y = z1, yend = z2,
+  #                  size = radius),
+  #              color = "blue") +  
   
-  geom_segment(data = data2plot_lat,
+  geom_segment(data = data2plot,
                aes(x = x1, xend = x2,
                    y = z1, yend = z2,
                    color = SUF, size = radius)) +
@@ -742,23 +782,23 @@ p <- ggplot() +
                           # , limits = c(0, max(RSHA.all$SUF[RSHA.all$RSA_id == RSA_id_i]))
                           ) +
   
-  facet_wrap(~ Scenario_ID, nrow = 1) +
+  # facet_wrap(~ Scenario_ID, nrow = 1) +
   coord_fixed() +
-  theme_few() 
+  theme_void() 
 
 p
 
 ggsave(filename = "RSHA_suf_example.png", plot = p
        ,device = "png"
        ,path = path.plots
-       ,width = 6, height = 4)
+       ,width = 4, height = 4)
 ```
 
 ### Plot kr
 
 ```{r}
 data2plot <- RSHA_full %>% 
-  filter(age == 60 & RSA_id == unique(RSA.IDs$RSA_id[1]))
+  filter(age == 60 & RSA_id == unique(RSA.IDs$RSA_id[1]) & Scenario_ID == "WT")
 
 p <- ggplot() +
   
@@ -778,7 +818,7 @@ p <- ggplot() +
                         # , limits = c(0, max(RSHA.all$SUF[RSHA.all$RSA_id == RSA_id_i]))
                         ) +
   
-  facet_wrap(~ Scenario_ID, nrow = 1) +
+  # facet_wrap(~ Scenario_ID, nrow = 1) +
   coord_fixed() +
   theme_void() 
 
@@ -787,50 +827,50 @@ p
 ggsave(filename = "RSHA_kr_example.png", plot = p
        ,device = "png"
        ,path = path.plots
-       ,width = 6, height = 4)
+       ,width = 4, height = 4)
 ```
 
-### Kx
+### kx
 
 ```{r}
 data2plot <- RSHA_full %>% 
-  filter(age == 60 & RSA_id == unique(RSA.IDs$RSA_id[1]))
+  filter(age == 60 & RSA_id == unique(RSA.IDs$RSA_id[1]) & Scenario_ID == "WT")
 
 p <- ggplot() +
   
   geom_segment(data = data2plot,
                aes(x = x1, xend = x2,
                    y = z1, yend = z2,
-                   color = Kx, 
+                   color = kx, 
                    size = radius)) +
   
   scale_size_continuous(range = c(0.5, 1), 
                         limits = c(min(data2plot$radius), 
                                    max(data2plot$radius))) +
   
-  scale_color_viridis_c(breaks = c(min(data2plot$Kx),max(data2plot$Kx)),
+  scale_color_viridis_c(breaks = c(min(data2plot$kx),max(data2plot$kx)),
                         labels = c("low", "high"),
                         direction = 1
                         # , limits = c(0, max(RSHA.all$SUF[RSHA.all$RSA_id == RSA_id_i]))
                         ) +
   
-  facet_wrap(~ Scenario_ID, nrow = 1) +
+  # facet_wrap(~ Scenario_ID, nrow = 1) +
   coord_fixed() +
   theme_void() 
 
 p
 
-ggsave(filename = "RSHA_Kx_example.png", plot = p
+ggsave(filename = "RSHA_kx_example.png", plot = p
        ,device = "png"
        ,path = path.plots
-       ,width = 6, height = 4)
+       ,width = 4, height = 4)
 ```
 
 ## Plot only one
 
 ```{r}
 ## Select only one to make a figure
-data2plot <- RSHA_full %>% filter(RSHA_id == "Tomato_60_1_60_1A")
+data2plot <- RSHA_full %>% filter(RSHA_id == "Tomato_60_1_60_WT")
 
 data2plot_main <- data2plot %>% filter(type == 1)
 data2plot_lat <- data2plot %>% filter(type == 2)
@@ -884,7 +924,7 @@ ggsave(filename = "RSA_visu_example_suf.svg", plot = p
 
 ```{r}
 ## Select only one to make a figure
-data2plot <- RSHA_full %>% filter(RSHA_id == "Tomato_60_1_30_1A" & time <= 20)
+data2plot <- RSHA_full %>% filter(RSHA_id == "Tomato_60_1_30_WT" & time <= 20)
 
 data2plot_main <- data2plot %>% filter(type == 1)
 data2plot_lat <- data2plot %>% filter(type == 2)
@@ -938,11 +978,15 @@ ggsave(filename = "RSA_solo.svg", plot = p
 ## Krs
 
 ```{r}
-for(age_i in unique(Macro_full$age)[order(unique(Macro_full$age))]){
+ages <- c(10, 20, 30, 60)
+
+for(age_i in ages){
   cat("================= \n")
   cat("Age = ", age_i, "\n")
   cat("================= \n")
-  temp_df <- Macro_full %>% filter(age == age_i)
+  temp_df <- Macro_full %>% 
+    filter(age == age_i)
+    
   temp_lm <- lm(temp_df, formula = Krs ~ Scenario_ID)
   # plot(temp_lm)
   pander(summary(temp_lm))
@@ -966,6 +1010,82 @@ print(emmeans(temp_lm, ~Scenario_ID))
 
 ```
 
+make a LM with Scenario_ID and age
+
+```{r}
+data2stat   <- Macro_full %>% 
+  filter(age >= 20)
+
+# CHECK NORMALITY
+par(mfrow = c(1, 2))
+qqnorm(data2stat$Krs)
+qqline(data2stat$Krs)
+hist(data2stat$Krs)  
+shapiro.test(data2stat$Krs)
+
+# NORMALIZE WITH BOX-COX
+bc         <- MASS::boxcox(lm(data2stat$Krs ~ 1))
+lambda_Krs <- bc$x[which(bc$y == max(bc$y))]
+
+data2stat$Krs_tf <- BoxCox(data2stat$Krs, lambda_Krs)
+# data2stat$kr_tf <- log(sqrt(data2stat$kr))
+
+# CHECK NORMALITY
+par(mfrow = c(1, 2))
+qqnorm(data2stat$Krs_tf)
+qqline(data2stat$Krs_tf)
+hist(data2stat$Krs_tf)  
+shapiro.test(data2stat$Krs_tf)
+
+Krs_lm_full1 <- lm(data = data2stat, 
+                   formula = Krs ~ Scenario_ID + age + age:Scenario_ID
+                   )
+par(mfrow = c(2,2))
+plot(Krs_lm_full1)[1]
+summary(Krs_lm_full1)
+
+data2stat$Krs_pred <- predict(Krs_lm_full1, data2stat)
+p1 <- ggplot(data2stat) +
+  geom_point(aes(x = age,
+                 y = Krs,
+                 color = Scenario_ID),
+             position = position_dodge(4)
+             ) +
+  geom_line(aes(x = age, 
+                y = Krs_pred,
+                color = Scenario_ID),
+             # shape = 2,
+             position = position_dodge(4)) +
+  # geom_smooth(method = "lm") +
+  scale_color_manual(values = S_colors)+
+  theme_few()
+p1
+
+
+Krs_lm_full2 <- lm(data = data2stat, 
+                   formula = Krs_tf ~ Scenario_ID + age + age:Scenario_ID)
+par(mfrow = c(2,2))
+plot(Krs_lm_full2)[1]
+summary(Krs_lm_full2)
+
+data2stat$Krs_tf_pred <- predict(Krs_lm_full2, data2stat)
+p2 <- ggplot(data2stat) +
+  geom_point(aes(x = age,
+                 y = Krs_tf,
+                 color = Scenario_ID),
+             position = position_dodge(4)
+             ) +
+  geom_line(aes(x = age,
+                y = Krs_tf_pred,
+                color = Scenario_ID),
+             # shape = 2,
+             position = position_dodge(4)) +
+  scale_color_manual(values = S_colors)+
+  theme_few()
+
+grid.arrange(p1, p2)
+```
+
 ## SUF
 
 ```{r}
@@ -982,15 +1102,15 @@ for(age_i in unique(SUF_df2$age[order(SUF_df2$age)])){
   
   plot(p)
   
-  distrib_1A <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "1A"]
-  distrib_1B <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "1B"]
-  distrib_2  <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "2"]
-  distrib_3  <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "3"]
+  distrib_WT     <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "WT"]
+  distrib_kAQP   <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "kAQP"]
+  distrib_2      <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "Sub"]
+  distrib_SubSG  <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "SubSG"]
   
-  # plot(distrib_1A)
-  # plot(distrib_3)
+  # plot(distrib_WT)
+  # plot(distrib_SubSG)
   
-  ks_test    <- ks.test(distrib_1A, distrib_3)
+  ks_test    <- ks.test(distrib_WT, distrib_SubSG)
   print(ks_test)
 }
 ```
