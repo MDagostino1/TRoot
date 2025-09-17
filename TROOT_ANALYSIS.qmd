@@ -39,7 +39,7 @@ simu_path <- "Results/12-01-2023/"
 
 * kpl is converted from $cm^3/hPa/d/plasmodesmata$ to $m^{3} s^{-1} MPa^{-1} pd^{-1}$
 
-* kx is converted to $cm^{4} d^{-1} HPa^{-1}$ to $m^3 s^{-1} MPa^{-1}$
+* kx  is converted from $cm^{4} d^{-1} HPa^{-1}$   to $m^{3} s^{-1} MPa^{-1}$
 
 ```{r}
 kr.conv <- 1.1574e-3
@@ -280,33 +280,70 @@ ggplot(data2plot, aes(x = age, y = secondarygrowth_param)) +
 ## - Analyse corelations between kr and anatomical measurements
 
 ```{r}
-plist <- Parameters %>% 
+plist <- Parameters %>%
   filter(param_id %in% colnames(Anatomy_Full))
 plist <- plist$param_id
+print(plist)
+plist <- c(
+           # "aerenchyma_proportion", 
+           # "aerenchyma_n_files",    
+           "xylem_max_size",
+           "xylem_cell_diameter",
+           # "xylem_n_files",
+           "xylem_n_cells",
+           "stele_cell_diameter",
+           "stele_SD",
+           "stele_layer_diameter", 
+           "phloem_n_layers", 
+           "phloem_cell_diameter",  
+           "phloem_proportion",    
+           "pericycle_cell_diameter",
+           # "pericycle_n_layers",    
+           "endodermis_cell_diameter", 
+           # "endodermis_n_layers",   
+           "cortex_cell_diameter",  
+           "cortex_n_layers",
+           "exodermis_cell_diameter",
+           # "exodermis_n_layers",    
+           "epidermis_cell_diameter"
+           # "epidermis_n_layers"
+           )
 
-data2stat <- MECHA_results[c("CS_id", "kr", "kAQP")] %>%
-  filter(kAQP == 4e-4) %>% 
-  select(-kAQP) %>% 
+data2stat <- MECHA_results %>%
+  select(c("CS_id", "kr", "kx", "Barrier_Name", "kAQP")) %>% 
+  filter(Barrier_Name == "En.CS" & kAQP == 4e-4) %>% 
   left_join(Anatomy_Full[c("CS_id", plist, "radius", "age")], by = "CS_id") %>% 
   select(-c("CS_id"))
 
-kr_corr <- data2stat %>% 
-  select(-kr) %>% 
-  sapply(function(x) cor(x, data2stat$kr, use = "complete.obs"))
-
-pander(kr_corr)
 ```
 
 
+```{r}
+library(corrplot)
 
+# Print correlations
+kr_corr <- data2stat %>%
+  select(-kr, -kAQP, -Barrier_Name) %>%
+  sapply(function(x) cor(x, data2stat$kr, use = "complete.obs", method = "pearson")) %>% 
+  as.data.frame()
 
+# Add cortex layer length
+data2stat <- data2stat %>% 
+  mutate(cortex_layer_diameter = cortex_n_layers*cortex_cell_diameter) %>% 
+  select(-kAQP, -Barrier_Name)
+
+svg(filename = "./plots/Correlations.svg", width = 10, height = 10)
+p <- corrplot(cor(data2stat, method = "pearson"), method = "number")
+dev.off()
+```
 
 # STATISTICAL ANALYSIS
 
 ## - Radius
 
 ```{r}
-mean_radius <- mean(Anatomy_Full$radius[Anatomy_Full$age < 25])
+radius_mean <- mean(Anatomy_Full$radius[Anatomy_Full$age < 25])
+radius_sd   <- sd(Anatomy_Full$radius[Anatomy_Full$age < 25])
 
 data2stat <- Anatomy_Full[c("age", "radius")] %>% 
   filter(age >= 25)
@@ -325,7 +362,7 @@ shapiro.test(data2stat$radius)
 # NORMALIZE WITH BOX-COX
 # par(mfrow = c(1))
 bc        <- MASS::boxcox(lm(data2stat$radius ~ 1))
-lambda_r <- bc$x[which(bc$y == max(bc$y))]
+lambda_r  <- bc$x[which(bc$y == max(bc$y))]
 
 data2stat$radius_tf <- BoxCox(data2stat$radius, lambda_r)
 # data2stat$kr_tf <- log(sqrt(data2stat$kr))
@@ -349,29 +386,48 @@ saveRDS(object = radius_lm, file = "./Results/radius_model.rds")
 
 
 ```{r}
+# To have condfidence interval we will do it mannually 
+
 radius_lm <- readRDS("./Results/radius_model.rds")
 
 data2plot <- Anatomy_Full[c("age", "radius")] 
 
-data2plot$radius_pred <- radius_pred(newdata     = data2plot, 
-                                     radius_lm   = radius_lm, 
-                                     lambda      = lambda_r,
-                                     radius.mean = mean(data2plot$radius[data2plot$age < 25]),
-                                     age.th      = 25)
+newdata_1 <- data2plot %>% 
+  filter(age < 25) %>% 
+  mutate(fit = mean(radius),
+         lwr = mean(radius) - sd(radius),
+         upr = mean(radius) + sd(radius)
+         )
+
+newdata_2 <- data2plot %>% 
+  filter(age >= 25)
+
+df <- BoxCox_reverse(predict(radius_lm, newdata = newdata_2, interval = 'confidence'),
+                            lambda = lambda_r)
+
+newdata_2 <- cbind(newdata_2, df)
+
+data2plot <- rbind(newdata_1, newdata_2)
 
 p <- ggplot(data2plot) +
   
   geom_line(aes(x = age, 
-                y = radius_pred),
+                y = fit),
             linewidth = 2,
             color = "orange") +
+  
+  geom_ribbon(aes(x = age,
+                  ymin = lwr,
+                  ymax = upr),
+              fill = "orange",
+              alpha = 0.2) +
   
   geom_point(aes(x = age, 
                  y = radius)
              # ,color = "blue"
              ) +
   
-  
+  ylim(0.1,1.25) +
   
   ylab("Radius [mm]") +
   xlab("Root age [d]") +
@@ -383,7 +439,6 @@ dev.off()
 p
 
 ```
-
 
 ## - Radial conductivity
 
@@ -514,6 +569,7 @@ plot(lm_kr)
 
 cat("================= \n  LINEAR MODEL \n=================\n")
 summary(lm_kr)
+pander(summary(lm_kr))
 
 # cat("================= \n  ANOVA \n=================\n")
 # anova(lm_kr)
@@ -630,14 +686,32 @@ data2plot <- MECHA_results %>%
   #        Kr = Kr*1e9) %>% 
   left_join(Anatomy_Full[c("CS_id", "radius", "age")], by = "CS_id") %>% 
   select(c("Barrier_Name", "age", "kr", "Kr", "kAQP", "radius", "perimeter")) %>% 
-  rename("r_data" = "radius")
+  rename("r_data" = "radius") 
 
-data2plot$radius  <- radius_pred(data2plot
+# Order by age
+data2plot <- data2plot[order(data2plot$age),]
+
+data2plot$radius  <- radius_pred(newdata = data2plot
                                  ,radius_lm = radius_lm
-                                 ,radius.mean = 0.198
+                                 ,radius.mean = radius_mean
+                                 ,radius.sd   = radius_sd
                                  ,age.th = 25)
-data2plot$kr_pred <- kr_pred(newdata = data2plot, lm_kr = lm_kr,lambda = lambda_kr)
-data2plot$Kr_pred <- data2plot$kr_pred*2*3.1415*data2plot$radius    
+
+# For this plot we will do mannually to plot CI
+kr_pred_df <- BoxCox_reverse(predict(newdata = data2plot, 
+                                     lm_kr,
+                                     interval = 'prediction'),
+                             lambda = lambda_kr)
+
+data2plot <- data2plot %>% 
+  cbind(kr_pred_df) %>% 
+  rename("kr_pred" = "fit",
+         "kr_pred_upr" = "upr",
+         "kr_pred_lwr" = "lwr")
+
+data2plot$Kr_pred     <- data2plot$kr_pred*2*3.1415*data2plot$radius
+data2plot$Kr_pred_lwr <- data2plot$kr_pred_lwr*2*3.1415*data2plot$radius
+data2plot$Kr_pred_upr <- data2plot$kr_pred_upr*2*3.1415*data2plot$radius
 
 # ============================================================================ #
 p_kr <- ggplot(data2plot) +
@@ -652,13 +726,19 @@ p_kr <- ggplot(data2plot) +
             ,span = 1
             ) +
   
+  geom_ribbon(aes(x = age,
+                  ymin = kr_pred_lwr,
+                  ymax = kr_pred_upr,
+                  fill = Barrier_Name),
+              alpha = 0.1) +
+  
   geom_point(aes(x = age, 
                  y = kr,
                  color = Barrier_Name)) +
   
   
   scale_color_manual(values = color_scale) +
-  # scale_fill_manual(values = color_scale) +
+  scale_fill_manual(values = color_scale) +
   
   xlab("Age [d]") +
   ylab(expression(k[r] ~ "[" ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
@@ -680,13 +760,19 @@ p_Kr <- ggplot(data2plot) +
             ,span = 1
             ) +
   
+  geom_ribbon(aes(x = age,
+                  ymin = Kr_pred_lwr,
+                  ymax = Kr_pred_upr,
+                  fill = Barrier_Name),
+              alpha = 0.1) +
+  
   geom_point(aes(x = age, 
                  y = Kr,
                  color = Barrier_Name)) +
   
   
   scale_color_manual(values = color_scale) +
-  # scale_fill_manual(values = color_scale) +
+  scale_fill_manual(values = color_scale) +
   
   xlab("Age [d]") +
   ylab(expression(K[r] ~ "[" ~ m^{3} ~ MPa^{-1} ~ s^{-1} ~ "]")) +
@@ -748,7 +834,7 @@ lm_kx <- lm(data    = data2stat,
 
 par(mfrow = c(2,2))
 plot(lm_kx)
-summary(lm_kx)
+pander(summary(lm_kx))
 # anova(kx_lm)
 
 saveRDS(object = lm_kx, file = "./Results/kx_model.rds")

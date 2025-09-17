@@ -206,6 +206,7 @@ Let's define 3 scenarios :
 ```{r}
 source("./src/CRB-MARSHAL/CRBM_functions.R")
 source("./src/FUNCTIONS/T-Root/Functions_Misc.R")
+
 lm_kr <- readRDS("./Results/kr_model.rds")
 lm_kx <- readRDS("./Results/kx_model.rds")
 lm_r  <- readRDS("./Results/radius_model.rds")
@@ -220,11 +221,11 @@ SG_timingkAQP  <- c(7, 25)
 SG_timingSub   <- c(7, 25)
 SG_timingSubSG <- c(100, 101)
 
-# MS TIMING (default 7 - 20)
+# MS TIMING (default 1 - 7) # for En.CS | timing[1] | En.CS-Ex.LC | timing[2] | En.CS-Ex.Sub
 MS_timingWT    <- c(1,   7)
-MS_timingkAQP  <- c(7,   100)
-MS_timingSub   <- c(100, 101)
-MS_timingSubSG <- c(100, 101)
+MS_timingkAQP  <- c(1,   7)
+MS_timingSub   <- c(1,   101)
+MS_timingSubSG <- c(1,   101)
 
 rmin           <- 0.198      # minimum radius (default = 0.198 from data)
 rmax           <- 2          # maximum radius
@@ -343,13 +344,18 @@ Conds.tot$S_ID <- factor(Conds.tot$S_ID,
 # Conds.tot$y[Conds.tot$type == "kx"]   <- Conds.tot$y[Conds.tot$type == "kx"]/conv_kx
 
 # ============================================================================ #
-ggplot(Conds.tot) +
+p <- ggplot(Conds.tot) +
   geom_line(aes(x = age, y = y, color = S_ID),
             size = 1,
             alpha = 0.5) +
   scale_color_manual(values = S_colors) +
   facet_grid(type~S_ID, scales = "free") +
   theme_test()
+
+p
+svg(filename = "./plots/Mutant_Conds.svg", width = 7, height = 5)
+p
+dev.off()
 # ============================================================================ #
 # Add root types
 roottypes <- tibble(order_id = c(1, 2),
@@ -607,6 +613,54 @@ svg(filename = paste0(path.plots, "Krs_full.svg"),
     width = 5, height = 3)
 p
 dev.off()
+
+# ============================================================================ #
+
+PD <- 2
+
+data2plot2 <- data2plot %>% 
+  group_by(age, Scenario_ID) %>% 
+  summarise(Krs_mean = mean(Krs),
+            Krs_sd   = sd(Krs)
+            )
+  
+p2 <- ggplot(data2plot2) +
+  
+  geom_point(aes(x     = age, 
+                 y     = Krs_mean,
+                 color = Scenario_ID
+                ),
+             position = position_dodge(width = PD),
+             alpha = 1) +
+  
+  geom_line(aes(x     = age, 
+                y     = Krs_mean,
+                color = Scenario_ID
+                ),
+            position = position_dodge(width = PD),
+            alpha = 1) +
+  
+  geom_errorbar(aes(x = age, 
+                    ymin = Krs_mean - Krs_sd,
+                    ymax = Krs_mean + Krs_sd,
+                    color = Scenario_ID),
+                position = position_dodge(width = PD),
+                width = 1
+                ) +
+  
+  scale_fill_manual(values = S_colors) +
+  scale_color_manual(values = S_colors) +
+  
+  xlab("Age [d]") +
+  ylab(expr(K[rs] ~ "[" ~ m^{3} ~ MPa^{-1} ~ s^{-1} ~ "]"))     +
+  theme_few()
+
+
+p2
+svg(filename = paste0(path.plots, "Krs_full_2.svg"), 
+    width = 4, height = 2)
+p2
+dev.off()
 ```
 
 ## Analyse SUF
@@ -751,8 +805,10 @@ ggsave(filename = "RSHA_full.png", plot = p
 ### Plot SUF
 
 ```{r}
+age_i <- 60
+
 data2plot <- RSHA_full %>% 
-  filter(age == 60 & RSA_id == unique(RSA.IDs$RSA_id[1]) & Scenario_ID == "WT")
+  filter(age == age_i & RSA_id == unique(RSA.IDs$RSA_id[1]) & Scenario_ID == "WT")
 
 # data2plot_main <- data2plot %>% filter(type == 1)
 # data2plot_lat <- data2plot %>% filter(type == 2)
@@ -788,7 +844,7 @@ p <- ggplot() +
 
 p
 
-ggsave(filename = "RSHA_suf_example.png", plot = p
+ggsave(filename = paste0("RSHA_suf_example_", age_i, ".png"), plot = p
        ,device = "png"
        ,path = path.plots
        ,width = 4, height = 4)
@@ -1037,13 +1093,16 @@ qqline(data2stat$Krs_tf)
 hist(data2stat$Krs_tf)  
 shapiro.test(data2stat$Krs_tf)
 
+# BUILD LM
 Krs_lm_full1 <- lm(data = data2stat, 
                    formula = Krs ~ Scenario_ID + age + age:Scenario_ID
                    )
+
 par(mfrow = c(2,2))
 plot(Krs_lm_full1)[1]
 summary(Krs_lm_full1)
 
+# PREDICT AND PLOT
 data2stat$Krs_pred <- predict(Krs_lm_full1, data2stat)
 p1 <- ggplot(data2stat) +
   geom_point(aes(x = age,
@@ -1062,28 +1121,38 @@ p1 <- ggplot(data2stat) +
 p1
 
 
+
 Krs_lm_full2 <- lm(data = data2stat, 
                    formula = Krs_tf ~ Scenario_ID + age + age:Scenario_ID)
 par(mfrow = c(2,2))
 plot(Krs_lm_full2)[1]
 summary(Krs_lm_full2)
 
-data2stat$Krs_tf_pred <- predict(Krs_lm_full2, data2stat)
+data2stat$Krs_tf_pred    <- predict(Krs_lm_full2, data2stat)
+
 p2 <- ggplot(data2stat) +
   geom_point(aes(x = age,
-                 y = Krs_tf,
+                 y = BoxCox_reverse(Krs_tf, lambda_Krs),
                  color = Scenario_ID),
              position = position_dodge(4)
              ) +
   geom_line(aes(x = age,
-                y = Krs_tf_pred,
+                y = BoxCox_reverse(Krs_tf_pred, lambda_Krs),
                 color = Scenario_ID),
              # shape = 2,
              position = position_dodge(4)) +
+  
+  xlab("Age [d]") +
+  ylab(expr(K[rs] ~ "[" ~ m^{3} ~ MPa^{-1} ~ s^{-1} ~ "]"))     +
+  
   scale_color_manual(values = S_colors)+
   theme_few()
 
 grid.arrange(p1, p2)
+
+svg(filename = "./plots/CRB-MARSHAL/Krs_LM_predict.svg", width = 5, height = 4)
+p2
+dev.off()
 ```
 
 ## SUF
