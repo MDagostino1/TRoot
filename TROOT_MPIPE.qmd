@@ -364,64 +364,6 @@ roottypes <- tibble(order_id = c(1, 2),
 Conds.tot <- merge(Conds.tot, roottypes)
 ```
 
-Plot all together with a rectangle for MS
-
-```{r}
-# # Create rectangles
-# rect_data <- expand.grid(start = 0, end = 0, 
-#                          MS = c("En.CS-Ex.LC", "En.CS-Ex.Sub"), 
-#                          S_ID = unique(Conds.tot$S_ID))
-# 
-# age.max <- 30
-# 
-# # Define rectangle coordinates
-# rect_data$start[rect_data$S_ID == "WT" & rect_data$MS == "En.CS-Ex.LC"]  <- 1
-# rect_data$end[rect_data$S_ID   == "WT" & rect_data$MS == "En.CS-Ex.LC"]  <- 7
-# rect_data$start[rect_data$S_ID == "WT" & rect_data$MS == "En.CS-Ex.Sub"] <- 8
-# rect_data$end[rect_data$S_ID   == "WT" & rect_data$MS == "En.CS-Ex.Sub"] <- age.max
-# 
-# rect_data$start[rect_data$S_ID == "kAQP" & rect_data$MS == "En.CS-Ex.LC"] <- 1
-# rect_data$end[rect_data$S_ID   == "kAQP" & rect_data$MS == "En.CS-Ex.LC"] <- 7
-# rect_data$start[rect_data$S_ID == "kAQP" & rect_data$MS == "En.CS-Ex.Sub"] <- 8
-# rect_data$end[rect_data$S_ID   == "kAQP" & rect_data$MS == "En.CS-Ex.Sub"] <- age.max
-# 
-# rect_data$start[rect_data$S_ID == "Sub" & rect_data$MS == "En.CS-Ex.LC"]  <- 1
-# rect_data$end[rect_data$S_ID   == "Sub" & rect_data$MS == "En.CS-Ex.LC"]  <- age.max
-# rect_data$start[rect_data$S_ID == "Sub" & rect_data$MS == "En.CS-Ex.Sub"]  <- 0
-# rect_data$end[rect_data$S_ID   == "Sub" & rect_data$MS == "En.CS-Ex.Sub"]  <- 0
-# 
-# rect_data$start[rect_data$S_ID == "SubSG" & rect_data$MS == "En.CS-Ex.LC"]  <- 1
-# rect_data$end[rect_data$S_ID   == "SubSG" & rect_data$MS == "En.CS-Ex.LC"]  <- age.max
-# rect_data$start[rect_data$S_ID == "SubSG" & rect_data$MS == "En.CS-Ex.Sub"]  <- 0
-# rect_data$end[rect_data$S_ID   == "SubSG" & rect_data$MS == "En.CS-Ex.Sub"]  <- 0
-# 
-# # Create plot
-# S_full_plot <- ggplot(data = Conds.tot) +
-#   
-#   geom_rect(data = rect_data, 
-#             aes(xmin = start, xmax = end, 
-#                 ymin = -Inf, ymax = Inf, 
-#                 fill = MS
-#                 ),
-#     alpha = 0.2
-#   ) +
-#   
-#   # Display curves
-#   geom_line(aes(x = age, y = y),
-#             linewidth = 1) +
-#   
-#   # scale_color_manual(values = S_colors) +
-#   
-#   facet_grid(type~S_ID, scales = "free_y") +
-#   ylab("Value") +
-#   xlab("Root age [d]") +
-#   theme_few() 
-# 
-# S_full_plot
-# 
-# ggsave(plot = S_full_plot, filename = "./plots/CRB-MARSHAL/Scenarios_full.svg", device = "svg", width = 8, height = 5)
-```
-
 # LOOP MPIPE
 
 So we want to loop MARSHAL for each S_ID of Conds.tot
@@ -518,9 +460,12 @@ write.csv(x = Macro_full, file = paste0(path.results, "Macro_full.csv"), row.nam
 
 ```{r}
 RSHA_full  <- read.csv(paste0(path.results, "RSHA_full.csv")) %>% 
-  mutate(Scenario_ID = factor(Scenario_ID, levels = c("WT", "kAQP", "Sub", "SubSG")))
+  mutate(Scenario_ID = factor(Scenario_ID, 
+                              levels = c("WT", "kAQP", "Sub", "SubSG")))
+
 Macro_full <- read.csv(paste0(path.results, "Macro_full.csv")) %>% 
-  mutate(Scenario_ID = factor(Scenario_ID, levels = c("WT", "kAQP", "Sub", "SubSG")))
+  mutate(Scenario_ID = factor(Scenario_ID, 
+                              levels = c("WT", "kAQP", "Sub", "SubSG")))
 ```
 
 ```{r}
@@ -1157,6 +1102,8 @@ dev.off()
 
 ## SUF
 
+### Distributions
+
 ```{r}
 for(age_i in unique(SUF_df2$age[order(SUF_df2$age)])){
   
@@ -1173,7 +1120,7 @@ for(age_i in unique(SUF_df2$age[order(SUF_df2$age)])){
   
   distrib_WT     <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "WT"]
   distrib_kAQP   <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "kAQP"]
-  distrib_2      <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "Sub"]
+  distrib_Sub      <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "Sub"]
   distrib_SubSG  <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "SubSG"]
   
   # plot(distrib_WT)
@@ -1184,5 +1131,86 @@ for(age_i in unique(SUF_df2$age[order(SUF_df2$age)])){
 }
 ```
 
+### Layers comparisons 
+
+#### 30 days old
+
+```{r}
+data2plot <- RSHA_full %>% 
+  filter(age %in% c(10, 30, 60)) 
+
+SUF_df3 <- data2plot %>% 
+  # filter(age >= 30) %>%
+  select(c("SUF", "RSHA_id", "age", "Scenario_ID", "z1", "type")) %>% 
+  mutate(zr = round(z1/5, digits = 0)*5) %>% 
+  group_by(RSHA_id, zr, Scenario_ID, age) %>% 
+  summarise(SUF_sum = sum(SUF)) %>% 
+  ungroup() %>% 
+  group_by(zr, Scenario_ID, age) %>% 
+  summarise(SUF_sum_mean = mean(SUF_sum),
+            SUF_sum_sd   = sd(SUF_sum)
+            )
+
+SUF_plot2 <- ggplot(data = SUF_df3) +
+    
+  # geom_bar(aes(x = zr, y = SUF_sum_mean, fill = Scenario_ID),
+  #          stat = "identity", 
+  #          position = "dodge", 
+  #          alpha = 0.75) +
+
+  # geom_ribbon(aes(x = zr
+  #                 ,ymin = SUF_sum_mean-SUF_sum_sd
+  #                 ,ymax = SUF_sum_mean+SUF_sum_sd
+  #                 ,fill = Scenario_ID),
+  #             alpha = 0.5
+  #               ) +
+  
+  geom_point(aes(x = zr
+                 ,y = SUF_sum_mean
+                 ,color = Scenario_ID
+                 # ,shape = Scenario_ID
+                 )
+             # ,position = position_dodge(0.5)
+             ,size = 1
+             ) +
+
+  geom_errorbar(aes(x = zr
+                    ,ymin = SUF_sum_mean-SUF_sum_sd
+                    ,ymax = SUF_sum_mean+SUF_sum_sd
+                    ,color = Scenario_ID
+                    )
+                ,width = 0.4
+                ,size = 0.3
+                ,alpha = 0.5
+                # ,position = position_dodge(0.5)
+                ) +
+  
+  geom_line(aes(x = zr
+                ,y = SUF_sum_mean
+                ,color = Scenario_ID
+                # ,linetype = Scenario_ID
+                )
+            # ,position = position_dodge(0.5)
+            # ,size = 1
+            ) +
+  
+  scale_color_manual(values = S_colors) +
+  # scale_fill_manual(values = S_colors) +
+  # scale_fill_viridis(discrete = T) +
+
+  ylab("Standart Uptake Fractions [-]") +
+  xlab("depth [cm]") +
+  
+  facet_wrap(~age, 
+             scales = "free_x",
+             nrow = 1) +
+  coord_flip() +
+  # ggtitle(paste0("Sum of SUF per scenario")) +
+  theme_few() +
+  theme(axis.text.x  = element_text(size = 8, angle = 90, hjust = 1, vjust = 0.5)) +
+  theme(legend.position = "none")
+  
+SUF_plot2
+```
 
 
