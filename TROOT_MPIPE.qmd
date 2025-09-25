@@ -511,7 +511,9 @@ ggsave(filename = paste0(path.plots, "data2export_plot.png"),
 ```
 
 
-## Analyse Krs
+## Krs
+
+### Boxplot 
 
 ```{r}
 # ============================================================================ #
@@ -608,7 +610,131 @@ p2
 dev.off()
 ```
 
-## Analyse SUF
+### Statistics
+
+```{r}
+ages <- c(10, 20, 30, 60)
+
+for(age_i in ages){
+  cat("================= \n")
+  cat("Age = ", age_i, "\n")
+  cat("================= \n")
+  temp_df <- Macro_full %>% 
+    filter(age == age_i)
+    
+  temp_lm <- lm(temp_df, formula = Krs ~ Scenario_ID)
+  # plot(temp_lm)
+  pander(summary(temp_lm))
+  print(emmeans(temp_lm, ~Scenario_ID))
+  # anova(temp_lm)
+}
+```
+
+
+```{r}
+age_i <- 60
+cat("================= \n")
+cat("Age = ", age_i, "\n")
+cat("================= \n")
+temp_df <- Macro_full %>% filter(age == age_i)
+temp_lm <- lm(temp_df, formula = Krs ~ Scenario_ID)
+# plot(temp_lm)
+pander(summary(temp_lm))
+print(emmeans(temp_lm, ~Scenario_ID))
+# anova(temp_lm)
+
+```
+
+make a LM with Scenario_ID and age
+
+```{r}
+data2stat   <- Macro_full %>% 
+  filter(age >= 20)
+
+# CHECK NORMALITY
+par(mfrow = c(1, 2))
+qqnorm(data2stat$Krs)
+qqline(data2stat$Krs)
+hist(data2stat$Krs)  
+shapiro.test(data2stat$Krs)
+
+# NORMALIZE WITH BOX-COX
+bc         <- MASS::boxcox(lm(data2stat$Krs ~ 1))
+lambda_Krs <- bc$x[which(bc$y == max(bc$y))]
+
+data2stat$Krs_tf <- BoxCox(data2stat$Krs, lambda_Krs)
+# data2stat$kr_tf <- log(sqrt(data2stat$kr))
+
+# CHECK NORMALITY
+par(mfrow = c(1, 2))
+qqnorm(data2stat$Krs_tf)
+qqline(data2stat$Krs_tf)
+hist(data2stat$Krs_tf)  
+shapiro.test(data2stat$Krs_tf)
+
+# BUILD LM
+Krs_lm_full1 <- lm(data = data2stat, 
+                   formula = Krs ~ Scenario_ID + age + age:Scenario_ID
+                   )
+
+par(mfrow = c(2,2))
+plot(Krs_lm_full1)[1]
+summary(Krs_lm_full1)
+
+# PREDICT AND PLOT
+data2stat$Krs_pred <- predict(Krs_lm_full1, data2stat)
+p1 <- ggplot(data2stat) +
+  geom_point(aes(x = age,
+                 y = Krs,
+                 color = Scenario_ID),
+             position = position_dodge(4)
+             ) +
+  geom_line(aes(x = age, 
+                y = Krs_pred,
+                color = Scenario_ID),
+             # shape = 2,
+             position = position_dodge(4)) +
+  # geom_smooth(method = "lm") +
+  scale_color_manual(values = S_colors)+
+  theme_few()
+p1
+
+
+
+Krs_lm_full2 <- lm(data = data2stat, 
+                   formula = Krs_tf ~ Scenario_ID + age + age:Scenario_ID)
+par(mfrow = c(2,2))
+plot(Krs_lm_full2)[1]
+summary(Krs_lm_full2)
+
+data2stat$Krs_tf_pred    <- predict(Krs_lm_full2, data2stat)
+
+p2 <- ggplot(data2stat) +
+  geom_point(aes(x = age,
+                 y = BoxCox_reverse(Krs_tf, lambda_Krs),
+                 color = Scenario_ID),
+             position = position_dodge(4)
+             ) +
+  geom_line(aes(x = age,
+                y = BoxCox_reverse(Krs_tf_pred, lambda_Krs),
+                color = Scenario_ID),
+             # shape = 2,
+             position = position_dodge(4)) +
+  
+  xlab("Age [d]") +
+  ylab(expr(K[rs] ~ "[" ~ m^{3} ~ MPa^{-1} ~ s^{-1} ~ "]"))     +
+  
+  scale_color_manual(values = S_colors)+
+  theme_few()
+
+grid.arrange(p1, p2)
+
+svg(filename = "./plots/CRB-MARSHAL/Krs_LM_predict.svg", width = 5, height = 4)
+p2
+dev.off()
+```
+
+## SUF
 
 ```{r}
 # ============================================================================ #
@@ -617,7 +743,7 @@ dev.off()
 data2plot <- RSHA_full %>% 
   filter(age %in% c(10, 30, 60)) 
 
-SUF_df2 <- data2plot %>% 
+SUF_df <- data2plot %>% 
   # filter(age >= 30) %>%
   select(c("SUF", "RSHA_id", "age", "Scenario_ID", "z1", "type")) %>% 
   mutate(zr = round(z1/2, digits = 0)*2) %>% 
@@ -629,7 +755,7 @@ SUF_df2 <- data2plot %>%
             SUF_sum_sd   = sd(SUF_sum)
             )
 
-SUF_plot <- ggplot(data = SUF_df2) +
+SUF_plot <- ggplot(data = SUF_df) +
     
   # geom_bar(aes(x = zr, y = SUF_sum_mean, fill = Scenario_ID),
   #          stat = "identity", 
@@ -699,6 +825,114 @@ svg(filename = paste0(path.plots, "SUF_sum_full.svg"),
 SUF_plot
 dev.off()
 ```
+
+### Statistics
+
+```{r}
+for(age_i in unique(SUF_df$age[order(SUF_df$age)])){
+  
+  cat("================= \n")
+  cat("Age = ", age_i, "\n")
+  cat("================= \n")
+  
+  temp_SUF   <- SUF_df %>% filter(age == age_i)
+  p <- ggplot(temp_SUF) +
+    geom_point(aes(x = zr, y = SUF_sum_mean, color = Scenario_ID)) +
+    geom_line(aes(x = zr, y = SUF_sum_mean, color = Scenario_ID))
+  
+  plot(p)
+  
+  distrib_WT     <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "WT"]
+  distrib_kAQP   <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "kAQP"]
+  distrib_Sub      <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "Sub"]
+  distrib_SubSG  <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "SubSG"]
+  
+  # plot(distrib_WT)
+  # plot(distrib_SubSG)
+  
+  ks_test    <- ks.test(distrib_WT, distrib_SubSG)
+  print(ks_test)
+}
+```
+
+Layers comparisons 
+
+```{r}
+SUF_df2 <- data2plot %>% 
+  # filter(age >= 30) %>%
+  select(c("SUF", "RSHA_id", "age", "Scenario_ID", "z1", "type")) %>% 
+  mutate(zr = round(z1/10, digits = 0)*10) %>% 
+  group_by(RSHA_id, zr, Scenario_ID, age) %>% 
+  summarise(SUF_sum = sum(SUF)) %>% 
+  ungroup() %>% 
+  group_by(zr, Scenario_ID, age) %>% 
+  summarise(SUF_sum_mean = mean(SUF_sum),
+            SUF_sum_sd   = sd(SUF_sum)
+            )
+
+SUF_plot2 <- ggplot(data = SUF_df2) +
+    
+  # geom_bar(aes(x = zr, y = SUF_sum_mean, fill = Scenario_ID),
+  #          stat = "identity", 
+  #          position = "dodge", 
+  #          alpha = 0.75) +
+
+  # geom_ribbon(aes(x = zr
+  #                 ,ymin = SUF_sum_mean-SUF_sum_sd
+  #                 ,ymax = SUF_sum_mean+SUF_sum_sd
+  #                 ,fill = Scenario_ID),
+  #             alpha = 0.5
+  #               ) +
+  
+  geom_point(aes(x = zr
+                 ,y = SUF_sum_mean
+                 ,color = Scenario_ID
+                 # ,shape = Scenario_ID
+                 )
+             # ,position = position_dodge(0.5)
+             ,size = 1
+             ) +
+
+  geom_errorbar(aes(x = zr
+                    ,ymin = SUF_sum_mean-SUF_sum_sd
+                    ,ymax = SUF_sum_mean+SUF_sum_sd
+                    ,color = Scenario_ID
+                    )
+                ,width = 0.4
+                ,size = 0.3
+                ,alpha = 0.5
+                # ,position = position_dodge(0.5)
+                ) +
+  
+  geom_line(aes(x = zr
+                ,y = SUF_sum_mean
+                ,color = Scenario_ID
+                # ,linetype = Scenario_ID
+                )
+            # ,position = position_dodge(0.5)
+            # ,size = 1
+            ) +
+  
+  scale_color_manual(values = S_colors) +
+  # scale_fill_manual(values = S_colors) +
+  # scale_fill_viridis(discrete = T) +
+
+  ylab("Standart Uptake Fractions [-]") +
+  xlab("depth [cm]") +
+  
+  facet_wrap(~age, 
+             scales = "free_x",
+             nrow = 1) +
+  coord_flip() +
+  # ggtitle(paste0("Sum of SUF per scenario")) +
+  theme_few() +
+  theme(axis.text.x  = element_text(size = 8, angle = 90, hjust = 1, vjust = 0.5)) +
+  theme(legend.position = "none")
+  
+SUF_plot2
+```
+
+# OTHER PLOTS
 
 ## Compare all root systems
 
@@ -974,243 +1208,10 @@ ggsave(filename = "RSA_solo.svg", plot = p
        ,width = 4, height = 8)
 ```
 
-# STATISTICAL ANALYSIS
-
-## Krs
-
-```{r}
-ages <- c(10, 20, 30, 60)
-
-for(age_i in ages){
-  cat("================= \n")
-  cat("Age = ", age_i, "\n")
-  cat("================= \n")
-  temp_df <- Macro_full %>% 
-    filter(age == age_i)
-    
-  temp_lm <- lm(temp_df, formula = Krs ~ Scenario_ID)
-  # plot(temp_lm)
-  pander(summary(temp_lm))
-  print(emmeans(temp_lm, ~Scenario_ID))
-  # anova(temp_lm)
-}
-```
-
-
-```{r}
-age_i <- 60
-cat("================= \n")
-cat("Age = ", age_i, "\n")
-cat("================= \n")
-temp_df <- Macro_full %>% filter(age == age_i)
-temp_lm <- lm(temp_df, formula = Krs ~ Scenario_ID)
-# plot(temp_lm)
-pander(summary(temp_lm))
-print(emmeans(temp_lm, ~Scenario_ID))
-# anova(temp_lm)
-
-```
-
-make a LM with Scenario_ID and age
-
-```{r}
-data2stat   <- Macro_full %>% 
-  filter(age >= 20)
-
-# CHECK NORMALITY
-par(mfrow = c(1, 2))
-qqnorm(data2stat$Krs)
-qqline(data2stat$Krs)
-hist(data2stat$Krs)  
-shapiro.test(data2stat$Krs)
-
-# NORMALIZE WITH BOX-COX
-bc         <- MASS::boxcox(lm(data2stat$Krs ~ 1))
-lambda_Krs <- bc$x[which(bc$y == max(bc$y))]
-
-data2stat$Krs_tf <- BoxCox(data2stat$Krs, lambda_Krs)
-# data2stat$kr_tf <- log(sqrt(data2stat$kr))
-
-# CHECK NORMALITY
-par(mfrow = c(1, 2))
-qqnorm(data2stat$Krs_tf)
-qqline(data2stat$Krs_tf)
-hist(data2stat$Krs_tf)  
-shapiro.test(data2stat$Krs_tf)
-
-# BUILD LM
-Krs_lm_full1 <- lm(data = data2stat, 
-                   formula = Krs ~ Scenario_ID + age + age:Scenario_ID
-                   )
-
-par(mfrow = c(2,2))
-plot(Krs_lm_full1)[1]
-summary(Krs_lm_full1)
-
-# PREDICT AND PLOT
-data2stat$Krs_pred <- predict(Krs_lm_full1, data2stat)
-p1 <- ggplot(data2stat) +
-  geom_point(aes(x = age,
-                 y = Krs,
-                 color = Scenario_ID),
-             position = position_dodge(4)
-             ) +
-  geom_line(aes(x = age, 
-                y = Krs_pred,
-                color = Scenario_ID),
-             # shape = 2,
-             position = position_dodge(4)) +
-  # geom_smooth(method = "lm") +
-  scale_color_manual(values = S_colors)+
-  theme_few()
-p1
 
 
 
-Krs_lm_full2 <- lm(data = data2stat, 
-                   formula = Krs_tf ~ Scenario_ID + age + age:Scenario_ID)
-par(mfrow = c(2,2))
-plot(Krs_lm_full2)[1]
-summary(Krs_lm_full2)
 
-data2stat$Krs_tf_pred    <- predict(Krs_lm_full2, data2stat)
 
-p2 <- ggplot(data2stat) +
-  geom_point(aes(x = age,
-                 y = BoxCox_reverse(Krs_tf, lambda_Krs),
-                 color = Scenario_ID),
-             position = position_dodge(4)
-             ) +
-  geom_line(aes(x = age,
-                y = BoxCox_reverse(Krs_tf_pred, lambda_Krs),
-                color = Scenario_ID),
-             # shape = 2,
-             position = position_dodge(4)) +
-  
-  xlab("Age [d]") +
-  ylab(expr(K[rs] ~ "[" ~ m^{3} ~ MPa^{-1} ~ s^{-1} ~ "]"))     +
-  
-  scale_color_manual(values = S_colors)+
-  theme_few()
-
-grid.arrange(p1, p2)
-
-svg(filename = "./plots/CRB-MARSHAL/Krs_LM_predict.svg", width = 5, height = 4)
-p2
-dev.off()
-```
-
-## SUF
-
-### Distributions
-
-```{r}
-for(age_i in unique(SUF_df2$age[order(SUF_df2$age)])){
-  
-  cat("================= \n")
-  cat("Age = ", age_i, "\n")
-  cat("================= \n")
-  
-  temp_SUF   <- SUF_df2 %>% filter(age == age_i)
-  p <- ggplot(temp_SUF) +
-    geom_point(aes(x = zr, y = SUF_sum_mean, color = Scenario_ID)) +
-    geom_line(aes(x = zr, y = SUF_sum_mean, color = Scenario_ID))
-  
-  plot(p)
-  
-  distrib_WT     <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "WT"]
-  distrib_kAQP   <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "kAQP"]
-  distrib_Sub      <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "Sub"]
-  distrib_SubSG  <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "SubSG"]
-  
-  # plot(distrib_WT)
-  # plot(distrib_SubSG)
-  
-  ks_test    <- ks.test(distrib_WT, distrib_SubSG)
-  print(ks_test)
-}
-```
-
-### Layers comparisons 
-
-#### 30 days old
-
-```{r}
-data2plot <- RSHA_full %>% 
-  filter(age %in% c(10, 30, 60)) 
-
-SUF_df3 <- data2plot %>% 
-  # filter(age >= 30) %>%
-  select(c("SUF", "RSHA_id", "age", "Scenario_ID", "z1", "type")) %>% 
-  mutate(zr = round(z1/5, digits = 0)*5) %>% 
-  group_by(RSHA_id, zr, Scenario_ID, age) %>% 
-  summarise(SUF_sum = sum(SUF)) %>% 
-  ungroup() %>% 
-  group_by(zr, Scenario_ID, age) %>% 
-  summarise(SUF_sum_mean = mean(SUF_sum),
-            SUF_sum_sd   = sd(SUF_sum)
-            )
-
-SUF_plot2 <- ggplot(data = SUF_df3) +
-    
-  # geom_bar(aes(x = zr, y = SUF_sum_mean, fill = Scenario_ID),
-  #          stat = "identity", 
-  #          position = "dodge", 
-  #          alpha = 0.75) +
-
-  # geom_ribbon(aes(x = zr
-  #                 ,ymin = SUF_sum_mean-SUF_sum_sd
-  #                 ,ymax = SUF_sum_mean+SUF_sum_sd
-  #                 ,fill = Scenario_ID),
-  #             alpha = 0.5
-  #               ) +
-  
-  geom_point(aes(x = zr
-                 ,y = SUF_sum_mean
-                 ,color = Scenario_ID
-                 # ,shape = Scenario_ID
-                 )
-             # ,position = position_dodge(0.5)
-             ,size = 1
-             ) +
-
-  geom_errorbar(aes(x = zr
-                    ,ymin = SUF_sum_mean-SUF_sum_sd
-                    ,ymax = SUF_sum_mean+SUF_sum_sd
-                    ,color = Scenario_ID
-                    )
-                ,width = 0.4
-                ,size = 0.3
-                ,alpha = 0.5
-                # ,position = position_dodge(0.5)
-                ) +
-  
-  geom_line(aes(x = zr
-                ,y = SUF_sum_mean
-                ,color = Scenario_ID
-                # ,linetype = Scenario_ID
-                )
-            # ,position = position_dodge(0.5)
-            # ,size = 1
-            ) +
-  
-  scale_color_manual(values = S_colors) +
-  # scale_fill_manual(values = S_colors) +
-  # scale_fill_viridis(discrete = T) +
-
-  ylab("Standart Uptake Fractions [-]") +
-  xlab("depth [cm]") +
-  
-  facet_wrap(~age, 
-             scales = "free_x",
-             nrow = 1) +
-  coord_flip() +
-  # ggtitle(paste0("Sum of SUF per scenario")) +
-  theme_few() +
-  theme(axis.text.x  = element_text(size = 8, angle = 90, hjust = 1, vjust = 0.5)) +
-  theme(legend.position = "none")
-  
-SUF_plot2
-```
 
 
