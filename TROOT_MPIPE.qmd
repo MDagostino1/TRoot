@@ -746,7 +746,7 @@ data2plot <- RSHA_full %>%
 SUF_df <- data2plot %>% 
   # filter(age >= 30) %>%
   select(c("SUF", "RSHA_id", "age", "Scenario_ID", "z1", "type")) %>% 
-  mutate(zr = round(z1/2, digits = 0)*2) %>% 
+  mutate(zr = round(z1/2.5, digits = 0)*2.5) %>% 
   group_by(RSHA_id, zr, Scenario_ID, age) %>% 
   summarise(SUF_sum = sum(SUF)) %>% 
   ungroup() %>% 
@@ -838,13 +838,20 @@ for(age_i in unique(SUF_df$age[order(SUF_df$age)])){
   temp_SUF   <- SUF_df %>% filter(age == age_i)
   p <- ggplot(temp_SUF) +
     geom_point(aes(x = zr, y = SUF_sum_mean, color = Scenario_ID)) +
-    geom_line(aes(x = zr, y = SUF_sum_mean, color = Scenario_ID))
+    geom_line(aes(x = zr, y = SUF_sum_mean, color = Scenario_ID)) +
+    geom_errorbar(aes(x = zr, 
+                      ymin = SUF_sum_mean-SUF_sum_sd, 
+                      ymax = SUF_sum_mean+SUF_sum_sd,
+                      color = Scenario_ID)
+                  
+                  ) +
+    theme_bw()
   
   plot(p)
   
   distrib_WT     <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "WT"]
   distrib_kAQP   <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "kAQP"]
-  distrib_Sub      <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "Sub"]
+  distrib_Sub    <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "Sub"]
   distrib_SubSG  <- temp_SUF$SUF_sum_mean[temp_SUF$Scenario_ID == "SubSG"]
   
   # plot(distrib_WT)
@@ -856,6 +863,103 @@ for(age_i in unique(SUF_df$age[order(SUF_df$age)])){
 ```
 
 Layers comparisons 
+
+```{r}
+data2stat <- data2plot %>% 
+  # filter(age >= 30) %>%
+  select(c("SUF", "RSHA_id", "age", "Scenario_ID", "z1", "type")) %>% 
+  mutate(zr = round(z1/2, digits = 0)*2) %>% 
+  group_by(RSHA_id, Scenario_ID, age, zr) %>% 
+  summarise(SUF_sum = sum(SUF))
+
+p <- ggplot(data2stat) +
+  geom_boxplot(aes(x = as.factor(zr), y = SUF_sum, fill = Scenario_ID)) +
+  coord_flip() +
+  facet_wrap(~age, scales = "free_x") +
+  theme_few()
+
+p
+
+svg(filename = paste0(path.plots, "SUF_profiles.svg"), width = 10, height = 15)
+p
+dev.off()
+```
+
+Okey so now we can run a t.test for every soil layer 
+
+At 30 days old
+
+```{r}
+data2stat <- data2plot %>% 
+  # filter(age >= 30) %>%
+  select(c("SUF", "RSHA_id", "age", "Scenario_ID", "z1", "type")) %>% 
+  mutate(zr = round(z1/2, digits = 0)*2) %>% 
+  group_by(RSHA_id, Scenario_ID, age, zr) %>% 
+  summarise(SUF_sum = sum(SUF)) %>% 
+  filter(age == 30)
+
+for(zr_i in unique(data2stat$zr)[order(unique(data2stat$zr))]){
+  
+  cat("==================================================== \n")
+  cat("zr = ", zr_i, "\n")
+  cat("==================================================== \n")
+  
+  temp_df <- data2stat %>% filter(zr == zr_i)
+    
+  temp_lm <- lm(temp_df, formula = SUF_sum ~ Scenario_ID)
+  # plot(temp_lm)
+  pander(summary(temp_lm))
+  
+  e <- emmeans(temp_lm, specs = ~ Scenario_ID)
+  print(e)
+  means     <- as_tibble(e)
+  
+  mean_WT    <- means$emmean[means$Scenario_ID == "WT"]
+  mean_SubSG <- means$emmean[means$Scenario_ID == "SubSG"]
+  diff       <- (mean_SubSG - mean_WT)*100/mean_WT
+  
+  cat("SubSG is ", diff, " % higher than WT \n")
+  
+  # anova(temp_lm)
+}
+```
+
+
+```{r}
+data2stat <- data2plot %>% 
+  # filter(age >= 30) %>%
+  select(c("SUF", "RSHA_id", "age", "Scenario_ID", "z1", "type")) %>% 
+  mutate(zr = round(z1/2, digits = 0)*2) %>% 
+  group_by(RSHA_id, Scenario_ID, age, zr) %>% 
+  summarise(SUF_sum = sum(SUF)) %>% 
+  filter(age == 60)
+
+for(zr_i in unique(data2stat$zr)[order(unique(data2stat$zr))]){
+  
+  cat("==================================================== \n")
+  cat("zr = ", zr_i, "\n")
+  cat("==================================================== \n")
+  
+  temp_df <- data2stat %>% filter(zr == zr_i)
+    
+  temp_lm <- lm(temp_df, formula = SUF_sum ~ Scenario_ID)
+  # plot(temp_lm)
+  pander(summary(temp_lm))
+  
+  e <- emmeans(temp_lm, specs = ~ Scenario_ID)
+  # print(e)
+  means     <- as_tibble(e)
+  
+  mean_WT    <- means$emmean[means$Scenario_ID == "WT"]
+  mean_SubSG <- means$emmean[means$Scenario_ID == "SubSG"]
+  diff       <- (mean_SubSG - mean_WT)*100/mean_WT
+  
+  cat("==>> SubSG is ", diff, " % higher than WT \n")
+  
+  # anova(temp_lm)
+}
+```
+
 
 ```{r}
 SUF_df2 <- data2plot %>% 

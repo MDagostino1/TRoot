@@ -15,19 +15,17 @@ First we load the packages. NB : you may need to install some of them manually.
 
 -   *GRANAR* libraries : I advise to get them directly from GITHUB
 
--   Specific functions for this notebook : load all functions in FUNCTIONS/T-Root path
+-   Specific functions for this notebook : load all functions in *src/FUNCTIONS/T-Root/*.
 
 Other folders :
 
 -   *Data* : contains all data used in these scripts
 
--   *MECHA* : contains all codes to run MECHA
+-   *src/MECHA/* : contains all codes to run MECHA
 
--   *Params* : contains all quantified experimental cross sections in the form of GRANAR input parameters
+-   *src/Params/* : contains all quantified experimental cross sections in the form of GRANAR input parameters
 
--   *Virtual Anatomies* : contains generated virtual anatomies from Params, in the form of pdf for visualization and xm for structural data
-
--   *CRB-MARSHAL* : contains all codes and data to run CRootBox and MARSHAL
+-   *src/CRB-MARSHAL/* : contains all codes and data to run CRootBox and MARSHAL
 
 Here we load an convert quantification data (in the form of *xlsx* files in *Data/Quantifications* folder) into GRANAR parameters (params). The params will be stored both into single *xml* files (in the folder *Params*) directly usible into GRANAR, and into the big table Anatomy2. The file *Data_Preparation.R* automatically load and treat data from *Data/Quantifications*.
 
@@ -155,21 +153,15 @@ ggplot(data = Plants, aes(color = days2)) +
 
 ## Visualization of data per param
 
-*anatomy_visual()* is a function to plot quantifications per param. Each graph is a param, each line is a root, each point is a measure.
-
-In addition, we use the function *plot_correlations_data()* to plot correlations.
+*anatomy2* contains quantified anatomical traits for 43 cross-sections
 
 ```{r}
+summary(anatomy2)
+
 data2plot <- anatomy2 %>% 
   left_join(Parameters[c("name", "type", "param_id", "units")], by = "param_id") %>% 
   left_join(CrossSections[c("CS_id", "age", "plant_id")], by = "CS_id") %>% 
   mutate(Title = paste0(name, " ", type," [", units, "]"))
-
-# source("src/FUNCTIONS/T-Root/anatomy_stats_visu.R")
-# p1 <- anatomy_visual(data2plot, CrossSections)
-# svg(filename=paste0("Plots/Anatomy_data_visu_",Sys.Date(),".svg"), width = 12, height = 18)
-# p1
-# dev.off()
 
 cols <- c(
   "cortex_cell_diameter",
@@ -208,7 +200,7 @@ ggsave(filename = "plots/Anatomy_Quantifications.svg",
        device = "svg")
 ```
 
-Plot individual traits 
+Plot all individual quantified traits in *plots/anatomical_measurements/* 
 
 ```{r}
 # param_id_i <- cols[5]
@@ -234,7 +226,6 @@ for(i in seq(1, length(cols))){
          device = "svg")
 }
 ```
-
 
 ## Secondary Growth
 
@@ -369,7 +360,7 @@ prm <- c("cortex_n_layers",
          "radius",
          "age")
 
-svg(filename = "plots/Correlations_Data.svg", width = 6, height = 6)
+svg(filename = "plots/Anatomy_Correlations.svg", width = 6, height = 6)
 pcor <- corrplot(cor(Anatomy_Full[prm]), 
                  method = "color",
                  # type = "upper"
@@ -397,7 +388,7 @@ ggplot(Barriers_Timing) +
 Generate individual regressions
 
 ```{r}
-source("src/FUNCTIONS/T-Root/Functions.R")
+source("src/FUNCTIONS/T-Root/Functions_Misc.R")
 source("src/Regressions_Auto.R")
 ```
 
