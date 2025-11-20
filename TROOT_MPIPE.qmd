@@ -6,6 +6,10 @@ editor: source
 
 # SET UP
 
+Here we load functions and data.
+Simulations_ID, RSA.IDs and Scenarios_ID are mannually encoded XLXS containing metadata.
+We also define conversion rates from cm HPa-1 d-1 to m MPa-1 s-1.
+
 ```{r, include=F}
 # knitr::opts_chunk$set(echo = FALSE)
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path)) # Set working directory to the current file
@@ -81,6 +85,8 @@ Each RSA is associated with a RSA_id and we create a table `RSA_id`. \
 
 ## [ONLY DO IT ONCE!] Load and process raw RSA files
 
+We loop through each RSA in *.txt* format, we format it and than we store everything in one big table called *RSA.all.csv*
+ 
 ```{r}
 # process.RSA <- F
 # 
@@ -149,31 +155,9 @@ Each RSA is associated with a RSA_id and we create a table `RSA_id`. \
 #        width = 10, height = 5, dpi = 300)
 ```
 
-## Only plot 1
-
-```{r}
-# RSA_plot_solo <- ggplot(RSA.all %>% filter(RSA_id == "Tomato_60_1" & time <= 30)) +
-#   geom_segment(aes(x = x1, xend = x2, 
-#                    y = z1, yend = z2
-#                    # color = branchID
-#                    )
-#                ) +
-#   # facet_wrap(~RSA_id, nrow = 2) +
-#   scale_color_viridis(option = "plasma") +
-#   coord_fixed() +
-#   theme_void()
-# 
-# RSA_plot_solo
-
-# ggsave(filename = paste0(path.plots, "RSA_raw_solo.png"),
-#        plot = RSA_plot_solo, device = "png",
-#        width = 4 , height = 5, dpi = 300)
-```
-
-
 # Define conductivities
 
-Here we build and plot conductivities curves that we will apply in MARSHAL. \
+Here we build and plot conductivity curves that we will apply in MARSHAL. \
 First, load coefficients of kr and kx regressions computed in TROOT_ANALYSIS \
 * kr is converted from $m s^{-1} MPa^{-1}$ to $cm d^{-1} HPa^{-1}$ \
 * kx is converted from $m^4 s^{-1} MPa^{-1}$ to $cm^4 d^{-1} HPa^{-1}$ \
@@ -207,6 +191,7 @@ Let's define 3 scenarios :
 source("./src/CRB-MARSHAL/CRBM_functions.R")
 source("./src/FUNCTIONS/T-Root/Functions_Misc.R")
 
+# Load statistical models that we built in TROOT_ANALYSIS.qmd
 lm_kr <- readRDS("./Results/kr_model.rds")
 lm_kx <- readRDS("./Results/kx_model.rds")
 lm_r  <- readRDS("./Results/radius_model.rds")
@@ -425,7 +410,7 @@ for(S_ID_i in S_list){
 
 # PROCESS RESULTS
 
-## Load all files and create Macro table
+## Load all files and create a Macro table
 
 ```{r}
 # ============================================================================ #
@@ -458,6 +443,8 @@ write.csv(x = Macro_full, file = paste0(path.results, "Macro_full.csv"), row.nam
 
 # LOAD AND ANALYSE RESULTS
 
+## Load directly RSHA_full and Macro_full
+
 ```{r}
 RSHA_full  <- read.csv(paste0(path.results, "RSHA_full.csv")) %>% 
   mutate(Scenario_ID = factor(Scenario_ID, 
@@ -467,6 +454,8 @@ Macro_full <- read.csv(paste0(path.results, "Macro_full.csv")) %>%
   mutate(Scenario_ID = factor(Scenario_ID, 
                               levels = c("WT", "kAQP", "Sub", "SubSG")))
 ```
+
+A nice plot of k_r
 
 ```{r}
 data2export <- RSHA_full %>% 
@@ -509,7 +498,6 @@ p
 ggsave(filename = paste0(path.plots, "data2export_plot.png"),
        device = "png", plot = p, dpi = 300, width = 10, height = 7)
 ```
-
 
 ## Krs
 
@@ -612,10 +600,12 @@ dev.off()
 
 ### Statistics
 
+Here, for each RSA age, we conduct a linear model to investigate the effect of the scenario on K_rs
+
 ```{r}
 ages <- c(10, 20, 30, 60)
 
-for(age_i in ages){
+for(age_i in c(30, 60)){
   cat("================= \n")
   cat("Age = ", age_i, "\n")
   cat("================= \n")
@@ -625,54 +615,39 @@ for(age_i in ages){
   temp_lm <- lm(temp_df, formula = Krs ~ Scenario_ID)
   # plot(temp_lm)
   pander(summary(temp_lm))
-  print(emmeans(temp_lm, ~Scenario_ID))
+  
+  e <- as_tibble(emmeans(temp_lm, ~Scenario_ID))
+  
+  # print(e)
+  
+  mean_WT    <- e$emmean[e$Scenario_ID == "WT"]
+  mean_SubSG <- e$emmean[e$Scenario_ID == "SubSG"]
+  diff       <- (mean_WT - mean_SubSG)*100/mean_WT
+  
+  cat("==>> Krs : SubSG shows a reduction of ", diff, " % compared to WT \n \n")
+  
   # anova(temp_lm)
 }
 ```
 
-
-```{r}
-age_i <- 60
-cat("================= \n")
-cat("Age = ", age_i, "\n")
-cat("================= \n")
-temp_df <- Macro_full %>% filter(age == age_i)
-temp_lm <- lm(temp_df, formula = Krs ~ Scenario_ID)
-# plot(temp_lm)
-pander(summary(temp_lm))
-print(emmeans(temp_lm, ~Scenario_ID))
-# anova(temp_lm)
-
-```
-
 make a LM with Scenario_ID and age
+
+NB : We checked the normalization by lookind at the QQplot of the residuals of the fit.
+Despite having outliers, most of the data is normal and good.
 
 ```{r}
 data2stat   <- Macro_full %>% 
   filter(age >= 20)
 
-# CHECK NORMALITY
-par(mfrow = c(1, 2))
-qqnorm(data2stat$Krs)
-qqline(data2stat$Krs)
-hist(data2stat$Krs)  
-shapiro.test(data2stat$Krs)
+# CHECK NORMALITY -> to implement for each group !
+# par(mfrow = c(1, 2))
+# qqnorm(data2stat$Krs)
+# qqline(data2stat$Krs)
+# hist(data2stat$Krs)  
+# shapiro.test(data2stat$Krs)
 
-# NORMALIZE WITH BOX-COX
-bc         <- MASS::boxcox(lm(data2stat$Krs ~ 1))
-lambda_Krs <- bc$x[which(bc$y == max(bc$y))]
-
-data2stat$Krs_tf <- BoxCox(data2stat$Krs, lambda_Krs)
-# data2stat$kr_tf <- log(sqrt(data2stat$kr))
-
-# CHECK NORMALITY
-par(mfrow = c(1, 2))
-qqnorm(data2stat$Krs_tf)
-qqline(data2stat$Krs_tf)
-hist(data2stat$Krs_tf)  
-shapiro.test(data2stat$Krs_tf)
-
-# BUILD LM
+# ============================================================================ #
+# 1. LINEAR MODEL OF DIRECT K_RS
 Krs_lm_full1 <- lm(data = data2stat, 
                    formula = Krs ~ Scenario_ID + age + age:Scenario_ID
                    )
@@ -681,7 +656,6 @@ par(mfrow = c(2,2))
 plot(Krs_lm_full1)[1]
 summary(Krs_lm_full1)
 
-# PREDICT AND PLOT
 data2stat$Krs_pred <- predict(Krs_lm_full1, data2stat)
 p1 <- ggplot(data2stat) +
   geom_point(aes(x = age,
@@ -699,36 +673,7 @@ p1 <- ggplot(data2stat) +
   theme_few()
 p1
 
-
-
-Krs_lm_full2 <- lm(data = data2stat, 
-                   formula = Krs_tf ~ Scenario_ID + age + age:Scenario_ID)
-par(mfrow = c(2,2))
-plot(Krs_lm_full2)[1]
-summary(Krs_lm_full2)
-
-data2stat$Krs_tf_pred    <- predict(Krs_lm_full2, data2stat)
-
-p2 <- ggplot(data2stat) +
-  geom_point(aes(x = age,
-                 y = BoxCox_reverse(Krs_tf, lambda_Krs),
-                 color = Scenario_ID),
-             position = position_dodge(4)
-             ) +
-  geom_line(aes(x = age,
-                y = BoxCox_reverse(Krs_tf_pred, lambda_Krs),
-                color = Scenario_ID),
-             # shape = 2,
-             position = position_dodge(4)) +
-  
-  xlab("Age [d]") +
-  ylab(expr(K[rs] ~ "[" ~ m^{3} ~ MPa^{-1} ~ s^{-1} ~ "]"))     +
-  
-  scale_color_manual(values = S_colors)+
-  theme_few()
-
-grid.arrange(p1, p2)
-
+# Choose wich plot to export
 svg(filename = "./plots/CRB-MARSHAL/Krs_LM_predict.svg", width = 5, height = 4)
 p2
 dev.off()
@@ -862,29 +807,6 @@ for(age_i in unique(SUF_df$age[order(SUF_df$age)])){
 }
 ```
 
-Layers comparisons 
-
-```{r}
-data2stat <- data2plot %>% 
-  # filter(age >= 30) %>%
-  select(c("SUF", "RSHA_id", "age", "Scenario_ID", "z1", "type")) %>% 
-  mutate(zr = round(z1/2, digits = 0)*2) %>% 
-  group_by(RSHA_id, Scenario_ID, age, zr) %>% 
-  summarise(SUF_sum = sum(SUF))
-
-p <- ggplot(data2stat) +
-  geom_boxplot(aes(x = as.factor(zr), y = SUF_sum, fill = Scenario_ID)) +
-  coord_flip() +
-  facet_wrap(~age, scales = "free_x") +
-  theme_few()
-
-p
-
-svg(filename = paste0(path.plots, "SUF_profiles.svg"), width = 10, height = 15)
-p
-dev.off()
-```
-
 Okey so now we can run a t.test for every soil layer 
 
 At 30 days old
@@ -924,6 +846,7 @@ for(zr_i in unique(data2stat$zr)[order(unique(data2stat$zr))]){
 }
 ```
 
+And the same for 60 days old
 
 ```{r}
 data2stat <- data2plot %>% 
@@ -961,127 +884,8 @@ for(zr_i in unique(data2stat$zr)[order(unique(data2stat$zr))]){
 ```
 
 
-```{r}
-SUF_df2 <- data2plot %>% 
-  # filter(age >= 30) %>%
-  select(c("SUF", "RSHA_id", "age", "Scenario_ID", "z1", "type")) %>% 
-  mutate(zr = round(z1/10, digits = 0)*10) %>% 
-  group_by(RSHA_id, zr, Scenario_ID, age) %>% 
-  summarise(SUF_sum = sum(SUF)) %>% 
-  ungroup() %>% 
-  group_by(zr, Scenario_ID, age) %>% 
-  summarise(SUF_sum_mean = mean(SUF_sum),
-            SUF_sum_sd   = sd(SUF_sum)
-            )
-
-SUF_plot2 <- ggplot(data = SUF_df2) +
-    
-  # geom_bar(aes(x = zr, y = SUF_sum_mean, fill = Scenario_ID),
-  #          stat = "identity", 
-  #          position = "dodge", 
-  #          alpha = 0.75) +
-
-  # geom_ribbon(aes(x = zr
-  #                 ,ymin = SUF_sum_mean-SUF_sum_sd
-  #                 ,ymax = SUF_sum_mean+SUF_sum_sd
-  #                 ,fill = Scenario_ID),
-  #             alpha = 0.5
-  #               ) +
-  
-  geom_point(aes(x = zr
-                 ,y = SUF_sum_mean
-                 ,color = Scenario_ID
-                 # ,shape = Scenario_ID
-                 )
-             # ,position = position_dodge(0.5)
-             ,size = 1
-             ) +
-
-  geom_errorbar(aes(x = zr
-                    ,ymin = SUF_sum_mean-SUF_sum_sd
-                    ,ymax = SUF_sum_mean+SUF_sum_sd
-                    ,color = Scenario_ID
-                    )
-                ,width = 0.4
-                ,size = 0.3
-                ,alpha = 0.5
-                # ,position = position_dodge(0.5)
-                ) +
-  
-  geom_line(aes(x = zr
-                ,y = SUF_sum_mean
-                ,color = Scenario_ID
-                # ,linetype = Scenario_ID
-                )
-            # ,position = position_dodge(0.5)
-            # ,size = 1
-            ) +
-  
-  scale_color_manual(values = S_colors) +
-  # scale_fill_manual(values = S_colors) +
-  # scale_fill_viridis(discrete = T) +
-
-  ylab("Standart Uptake Fractions [-]") +
-  xlab("depth [cm]") +
-  
-  facet_wrap(~age, 
-             scales = "free_x",
-             nrow = 1) +
-  coord_flip() +
-  # ggtitle(paste0("Sum of SUF per scenario")) +
-  theme_few() +
-  theme(axis.text.x  = element_text(size = 8, angle = 90, hjust = 1, vjust = 0.5)) +
-  theme(legend.position = "none")
-  
-SUF_plot2
-```
 
 # OTHER PLOTS
-
-## Compare all root systems
-
-```{r}
-data2plot <- RSHA_full # %>% filter(age == 40)
-
-data2plot_main <- data2plot %>% filter(type == 1)
-data2plot_lat <- data2plot %>% filter(type == 2)
-
-p <- ggplot() +
-  
-  geom_segment(data = data2plot_main,
-               aes(x = x1, xend = x2,
-                   y = z1, yend = z2,
-                   size = radius),
-               color = "blue") +  
-  
-  geom_segment(data = data2plot_lat,
-               aes(x = x1, xend = x2,
-                   y = z1, yend = z2,
-                   color = SUF, size = radius)) +
-  
-  scale_size_continuous(range = c(0.5, 1), 
-                        limits = c(min(data2plot$radius), 
-                                   max(data2plot$radius))) +
-  
-  scale_color_viridis_c(option = "magma",
-                          breaks = c(min(data2plot_lat$SUF), 
-                                     max(data2plot_lat$SUF)),
-                          labels = c("low", "high"),
-                          direction = 1
-                          # , limits = c(0, max(RSHA.all$SUF[RSHA.all$RSA_id == RSA_id_i]))
-                          ) +
-  
-  facet_grid(Scenario_ID ~ RSA_id) +
-  coord_fixed() +
-  theme_classic() 
-
-p
-
-ggsave(filename = "RSHA_full.png", plot = p
-       ,device = "png"
-       ,path = path.plots
-       ,width = 17, height = 10)
-```
 
 ## Select only one to make a figure
 
@@ -1092,9 +896,6 @@ age_i <- 60
 
 data2plot <- RSHA_full %>% 
   filter(age == age_i & RSA_id == unique(RSA.IDs$RSA_id[1]) & Scenario_ID == "WT")
-
-# data2plot_main <- data2plot %>% filter(type == 1)
-# data2plot_lat <- data2plot %>% filter(type == 2)
 
 p <- ggplot() +
   
@@ -1113,13 +914,14 @@ p <- ggplot() +
                         limits = c(min(data2plot$radius), 
                                    max(data2plot$radius))) +
   
-  scale_color_viridis_c(option = "magma",
-                          breaks = c(min(data2plot_lat$SUF), 
-                                     max(data2plot_lat$SUF)),
-                          labels = c("low", "high"),
-                          direction = 1
-                          # , limits = c(0, max(RSHA.all$SUF[RSHA.all$RSA_id == RSA_id_i]))
-                          ) +
+  scale_color_viridis(option = "magma",
+                      breaks = c(min(data2plot$SUF),
+                                 max(data2plot$SUF)
+                                 ),
+                      labels = c("low", "high"),
+                      direction = 1
+                      # , limits = c(min(data2plot$SUF), max(data2plot$SUF))
+                      ) +
   
   # facet_wrap(~ Scenario_ID, nrow = 1) +
   coord_fixed() +
@@ -1204,118 +1006,5 @@ ggsave(filename = "RSHA_kx_example.png", plot = p
        ,path = path.plots
        ,width = 4, height = 4)
 ```
-
-## Plot only one
-
-```{r}
-## Select only one to make a figure
-data2plot <- RSHA_full %>% filter(RSHA_id == "Tomato_60_1_60_WT")
-
-data2plot_main <- data2plot %>% filter(type == 1)
-data2plot_lat <- data2plot %>% filter(type == 2)
-
-p <- ggplot() +
-  
-  geom_segment(data = data2plot_main,
-               aes(x = x1, xend = x2,
-                   y = z1, yend = z2,
-                   size = radius,
-                   color = SUF),
-               ) +  
-  
-  geom_segment(data = data2plot_lat,
-               aes(x = x1, xend = x2,
-                   y = z1, yend = z2,
-                   color = SUF,
-                   size = radius)) +
-  
-  scale_size_continuous(range = c(0.5, 2), 
-                        limits = c(min(data2plot$radius), 
-                                   max(data2plot$radius))) +
-  
-  scale_color_viridis_c(option = "magma",
-                          breaks = c(min(data2plot_lat$SUF),
-                                     max(data2plot_lat$SUF)),
-                          labels = c("low", "high"),
-                          direction = 1
-                          # , limits = c(0, max(RSHA.all$SUF[RSHA.all$RSA_id == RSA_id_i]))
-                          ) +
-  
-  # facet_wrap(~ Scenario_ID, nrow = 1) +
-  coord_fixed() +
-  theme_void() +
-  theme(legend.position = "none")
-
-p
-
-ggsave(filename = "RSA_visu_example_SUF.png", plot = p
-       ,device = "png"
-       ,path = path.plots
-       ,width = 4, height = 8, dpi = 400)
-
-ggsave(filename = "RSA_visu_example_suf.svg", plot = p
-       ,device = "svg"
-       ,path = path.plots
-       ,width = 4, height = 8)
-```
-
-## Plot only one as infography
-
-```{r}
-## Select only one to make a figure
-data2plot <- RSHA_full %>% filter(RSHA_id == "Tomato_60_1_30_WT" & time <= 20)
-
-data2plot_main <- data2plot %>% filter(type == 1)
-data2plot_lat <- data2plot %>% filter(type == 2)
-
-p <- ggplot() +
-  
-  geom_segment(data = data2plot_main,
-               aes(x = x1, xend = x2,
-                   y = z1, yend = z2,
-                   size = radius
-                   ),
-               ) +  
-  
-  geom_segment(data = data2plot_lat,
-               aes(x = x1, xend = x2,
-                   y = z1, yend = z2,
-                   size = radius)) +
-  
-  scale_size_continuous(range = c(0.5, 2), 
-                        limits = c(min(data2plot$radius), 
-                                   max(data2plot$radius))) +
-  
-  scale_color_viridis_c(option = "magma",
-                          breaks = c(min(data2plot_lat$SUF),
-                                     max(data2plot_lat$SUF)),
-                          labels = c("low", "high"),
-                          direction = 1
-                          # , limits = c(0, max(RSHA.all$SUF[RSHA.all$RSA_id == RSA_id_i]))
-                          ) +
-  
-  # facet_wrap(~ Scenario_ID, nrow = 1) +
-  coord_fixed() +
-  theme_void() +
-  theme(legend.position = "none")
-
-p
-
-ggsave(filename = "RSA_solo.png", plot = p
-       ,device = "png"
-       ,path = path.plots
-       ,width = 4, height = 8, dpi = 400)
-
-ggsave(filename = "RSA_solo.svg", plot = p
-       ,device = "svg"
-       ,path = path.plots
-       ,width = 4, height = 8)
-```
-
-
-
-
-
-
 
 
