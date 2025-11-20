@@ -934,8 +934,8 @@ mean_b4 <- BoxCox_reverse(Means$emmean[Means$Barrier_Name == "En.Sub"], lambda)
 mean_b5 <- BoxCox_reverse(Means$emmean[Means$Barrier_Name == "En.Sub-Ex.CS"], lambda)
 mean_b6 <- BoxCox_reverse(Means$emmean[Means$Barrier_Name == "En.Sub-Ex.Sub"], lambda)
 
-print(paste0("Difference between En.CS and En.CS-Ex.LC [%]         : ", round((mean_b1-mean_b2)*100/mean_b1, digits = 2)))
-print(paste0("Difference between En.CS and En.Sub [%]              : ", round((mean_b1-mean_b4)*100/mean_b1, digits = 2)))
+print(paste0("Difference En.CS / En.CS-Ex.LC [%]  : ", round((mean_b1-mean_b2)*100/mean_b1, digits = 2)))
+print(paste0("Difference En.CS / En.Sub [%]       : ", round((mean_b1-mean_b4)*100/mean_b1, digits = 2)))
 ```
 
 
