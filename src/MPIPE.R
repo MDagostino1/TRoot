@@ -9,17 +9,21 @@ if(dir.exists(path.out)){
 # LOAD CONDUCTIVITIES SCENARIOS
 # ==============================================================================
 
-cond_plot <- ggplot(Conds, aes(x = x, y = y, color = type, group = order_id)) +
-  geom_point() +
-  geom_line() +
-  facet_wrap(~type, ncol=1, scales = "free_y") +
-  theme_few()
+# cond_plot <- ggplot(Conds, aes(x = age, y = y, color = type, group = order_id)) +
+#   geom_point() +
+#   geom_line() +
+#   facet_wrap(~type, ncol=1, scales = "free_y") +
+#   theme_few()
+# 
+# cond_plot
+# ggsave(filename = paste0(S_ID, "_Conds.svg"), 
+#        plot = cond_plot, device = "svg", 
+#        path = path.out, 
+#        width = 4, height = 4)
 
-cond_plot
-ggsave(filename = paste0(S_ID, "_Conds.svg"), 
-       plot = cond_plot, device = "svg", 
-       path = path.out, 
-       width = 4, height = 4)
+# Convert to cm HPa d because MARSHAL counts in cm
+Conds$y[Conds$type == "kr"] <- Conds$y[Conds$type == "kr"] / kr.conv
+Conds$y[Conds$type == "kx"] <- Conds$y[Conds$type == "kx"] / kx.conv
 
 # ==============================================================================
 # LOOP MARSHAL
@@ -43,6 +47,11 @@ results <- run.MARSHAL.loop(RSA.all    = RSA.all,
 
 RSHA.all  <- results$RSHA.all
 Macro.all <- results$Macro.all
+
+# Convert back to m MPa s 
+RSHA.all$kr   <- RSHA.all$kr * kr.conv
+RSHA.all$kx   <- RSHA.all$kx * kx.conv
+Macro.all$Krs <- Macro.all$Krs * krs.conv 
 
 write.csv(RSHA.all, paste0(path.out, "RSHA_all.csv"), row.names = F)
 write.csv(Macro.all, paste0(path.out, "Macro_all.csv"), row.names = F)
@@ -89,48 +98,48 @@ image_write(image = img_animated,
 # ANALYSE SUF
 # ==============================================================================
 
-RSHA.all$type <- as.factor(RSHA.all$type)
-
-data2plot <- RSHA.all %>% filter(age == tmax) %>% 
-  mutate(zr = round(z1))%>% 
-  group_by(RSHA_id, zr, type) %>% 
-  summarise(SUF_sum = sum(SUF)) 
+# RSHA.all$type <- as.factor(RSHA.all$type)
+# 
+# data2plot <- RSHA.all %>% filter(age == tmax) %>% 
+#   mutate(zr = round(z1))%>% 
+#   group_by(RSHA_id, zr, type) %>% 
+#   summarise(SUF_sum = sum(SUF)) 
 
 # ggplot(data2plot) +
-#   geom_bar(aes(x = -zr, y = SUF_sum, fill = type), 
+#   geom_bar(aes(x = -zr, y = SUF_sum, fill = type),
 #            stat = "identity", position = position_dodge(width = 0.5),
 #            alpha = 1) +
 #   facet_wrap(~RSHA_id)
 
 # ==================================================
 
-data2plot2 <- data2plot %>% 
-  group_by(zr, type) %>% 
-  summarise(SUF_sum_mean = mean(SUF_sum),
-            SUF_sum_sd   = sd(SUF_sum))
-
-SUF_plot <- ggplot(data2plot2) +
-  
-  geom_bar(aes(x = -zr, 
-               y = SUF_sum_mean,
-               fill = type), stat = "identity", 
-           alpha = 1
-  ) +
-  
-  # geom_point(aes(x = -zr, y = SUF_sum_mean),color = "grey") +
-  
-  geom_errorbar(aes(x = -zr, 
-                    ymax = SUF_sum_mean+SUF_sum_sd, 
-                    ymin = SUF_sum_mean-SUF_sum_sd,
-  ),
-  color = "grey"
-  ) +
-  
-  facet_wrap(~type, ncol = 1) +
-  xlab("Soil depth [cm]") +
-  ylab("Standart Uptake Fraction [-]") +
-  theme_bw()
-
-ggsave(filename = paste0(S_ID, "_SUF.svg"), plot = SUF_plot, device = "svg", path = path.out, 
-       width = 4, height = 4)
+# data2plot2 <- data2plot %>% 
+#   group_by(zr, type) %>% 
+#   summarise(SUF_sum_mean = mean(SUF_sum),
+#             SUF_sum_sd   = sd(SUF_sum))
+# 
+# SUF_plot <- ggplot(data2plot2) +
+#   
+#   geom_bar(aes(x = -zr, 
+#                y = SUF_sum_mean,
+#                fill = type), stat = "identity", 
+#            alpha = 1
+#   ) +
+#   
+#   # geom_point(aes(x = -zr, y = SUF_sum_mean),color = "grey") +
+#   
+#   geom_errorbar(aes(x = -zr, 
+#                     ymax = SUF_sum_mean+SUF_sum_sd, 
+#                     ymin = SUF_sum_mean-SUF_sum_sd,
+#   ),
+#   color = "grey"
+#   ) +
+#   
+#   facet_wrap(~type, ncol = 1) +
+#   xlab("Soil depth [cm]") +
+#   ylab("Standart Uptake Fraction [-]") +
+#   theme_bw()
+# 
+# ggsave(filename = paste0(S_ID, "_SUF.svg"), plot = SUF_plot, device = "svg", path = path.out, 
+#        width = 4, height = 4)
 

@@ -1,5 +1,9 @@
 
-getSUF <- function(table_data, table_cond, table_soil, hetero = TRUE, Psi_collar = -15000){
+getSUF <- function(table_data, 
+                   table_cond, 
+                   table_soil, 
+                   hetero = TRUE, 
+                   Psi_collar = -15000){
   ####################################################
   #	Calculates Couvreur Macroscopic parameters   #
   ####################################################
@@ -36,13 +40,13 @@ getSUF <- function(table_data, table_cond, table_soil, hetero = TRUE, Psi_collar
   ####################################################
   # Input data
   ####################################################
-  prev <- table_data$node1ID 	  # mother segment
-  l <- table_data$length    	  # segment length
+  prev      <- table_data$node1ID 	  # mother segment
+  l         <- table_data$length    	  # segment length
   l[l == 0] <- 10e-9
-  r <- table_data$radius    	  # segment radius
-  z <- table_data$z2           # z-position
-  order <- table_data$type      # segment order
-  seg_age <- max(table_data$time) - table_data$time     # segment age
+  r         <- table_data$radius    	  # segment radius
+  z         <- table_data$z2           # z-position
+  order     <- table_data$type      # segment order
+  seg_age   <- max(table_data$time) - table_data$time     # segment age
   
   tot_length <- sum(l) # total length of the root system
   
@@ -62,7 +66,7 @@ getSUF <- function(table_data, table_cond, table_soil, hetero = TRUE, Psi_collar
   kr=matrix(0,Nseg,1) # radial conductivity of the segments
   kx=matrix(0,Nseg,1) # Axial conductance of the segments
   
-  # Linear interpolation
+  # Linear interpolation for each root type
   for ( i in 1:length(order_uni)) {
     
     pos = is.element(order,order_uni[i])

@@ -44,10 +44,10 @@ run.MARSHAL.loop <- function(RSA.all,
                              SG_timing,
                              hetero = F,
                              Psi_collar = -15000,
-                             tmin = 0,
+                             tmin = 1,
                              tmax = 30,
                              step = 1,
-                             radius.min = 0.1887,
+                             radius.min = 0.198,
                              radius.max = 1
                              ){
   
@@ -76,15 +76,16 @@ run.MARSHAL.loop <- function(RSA.all,
     
     # Subset RSA corresponding to timestep
     cat("Subsetting RSA...  \n")
-    RSA.all.ti <- RSA.all %>% filter(time <= ti)
+    RSA.all.ti     <- RSA.all %>% filter(time <= ti)
+    RSA.all.ti$age <- (ti - RSA.all.ti$time)
     
     # UPDATE RADIUS
     cat("Updating radius... \n")
-    RSA.all.ti$radius <- radius.lm(x          = max(RSA.all.ti$time) - RSA.all.ti$time,
-                                   timing     = SG_timing,
-                                   radius.min = radius.min,
-                                   radius.max = radius.max
-                                   )
+    RSA.all.ti$radius <- radius_pred(newdata = RSA.all.ti, radius_lm = lm_r)
+    RSA.all.ti$radius[RSA.all.ti$radius < rmin]                <- radius.min
+    RSA.all.ti$radius[RSA.all.ti$radius > rmax]                <- radius.max
+    RSA.all.ti$radius[which(is.na(RSA.all.ti$radius))]         <- radius.max
+    
     # ======================================================================== #
     # LOOP FOR EACH RSA_ID
     for(RSA_id_i in unique(RSA.all.ti$RSA_id)){
@@ -100,6 +101,7 @@ run.MARSHAL.loop <- function(RSA.all,
       # RECONNECT NODES
       RSA_temp <- suppressWarnings(reconnect.nodes(RSA_temp))
       
+      
       try({
         # ----------------------------------------------- #
         Marshal_temp <- getSUF(table_data  = RSA_temp,
@@ -112,7 +114,7 @@ run.MARSHAL.loop <- function(RSA.all,
         # Create output files        
         RSHA_temp         <- Marshal_temp$root_system
         RSHA_temp$kr      <- Marshal_temp$kr
-        RSHA_temp$Kx      <- Marshal_temp$kx
+        RSHA_temp$kx      <- Marshal_temp$kx
         RSHA_temp$SUF     <- Marshal_temp$suf
         RSHA_temp$RSHA_id <- RSHA_id_i
         RSHA_temp$RSA_id  <- RSA_id_i
@@ -180,14 +182,14 @@ plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max, radius.range 
     # ggtitle(paste0("kr | time : ", ti)) +
     
     # ggtitle("Kr") +
-    ggtitle(expression(k[r] ~ "[" ~ 10^{-8} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+    ggtitle(expression(k[r] ~ "[" ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
     
     theme_test()
   
   # ========================================================================== #
   p_kx <- ggplot(data2plot) +
     geom_segment(aes(x= x1, xend = x2, y = z1, yend = z2, 
-                     color = Kx, size = radius)) +
+                     color = kx, size = radius)) +
     xlim(-15, 15) +
     ylim(round(min(RSHA.all$z1)), 0) +
     
@@ -198,14 +200,14 @@ plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max, radius.range 
                           ) +
     
     scale_color_viridis_c(option = "D", 
-                          limits = c(min(RSHA.all$Kx), 
-                                     max(RSHA.all$Kx)
+                          limits = c(min(RSHA.all$kx), 
+                                     max(RSHA.all$kx)
                                      )
                           ) +
     coord_fixed() +
     # facet_wrap(~RSA_id, nrow = 2) +
-    # ggtitle(paste0("Kx | time : ", ti)) +
-    ggtitle(expression(K[x] ~ "[" ~ cm^{4} ~ hPa^{-1} ~ d^{-1} ~ "]")) +
+    # ggtitle(paste0("kx | time : ", ti)) +
+    ggtitle(expression(k[x] ~ "[" ~ m^{4} ~ MPa^{-1} ~ s^{-1} ~ "]")) +
     theme_test()
   
   # ========================================================================== #
@@ -250,7 +252,7 @@ plot.CRBM <- function(RSHA.all, Macro.all, ti, path.plot, Krs.max, radius.range 
     geom_point(data = macro2plot_i, aes(x = age, y = Krs), size = 4, color = "red") +
     xlim(0, max(macro2plot_all$age)) +
     ylim(0, Krs.max) +
-    ggtitle(expression(K[rs] ~ "[" ~ m^{3} ~ s^{-1} ~ MPa^{-1} ~ "]")) +
+    ggtitle(expression(K[rs] ~ "[" ~ m^{3} ~ MPa^{-1} ~ s^{-1} ~ "]")) +
     theme_bw()
   
   # ========================================================================== #
@@ -273,67 +275,60 @@ create.conds <- function(S_ID,
                          nmax, 
                          SG_timing, 
                          MS_timing,
-                         kr.coeff, 
-                         Kx.coeff,
-                         rmin         = 0.1887, 
+                         radius_pred_f,
+                         kr_pred, 
+                         kx_pred,
+                         rmin         = 0.1987, 
                          rmax         = 2,
                          kAQP_start   = 6.35e-7,
                          kAQP_end     = 6.35e-7,
-                         kr.min       = 1e-16, 
+                         kr.min       = 0, 
                          kr.max       = 1e-3,
-                         Kx.min       = 1e-16,
-                         Kx.max       = 1
+                         kx.min       = 0,
+                         kx.max       = 1
 )
 {
   
-  conds.out         <- tibble(x      = seq(nmin,nmax),
-                              S_ID   = S_ID,
-                              radius = NaN,
-                              MS     = NaN,
-                              kr     = NaN,
-                              kx     = NaN,
-                              kAQP   = NaN)
+  conds.out         <- tibble(age          = seq(nmin,nmax),
+                              S_ID         = S_ID,
+                              radius       = 0,
+                              Barrier_Name = 0,
+                              kr           = 0,
+                              kx           = 0,
+                              kAQP         = 0)
   
   # Set Radius
-  conds.out$radius  <- radius.lm(x          = conds.out$x,
-                                 timing     = SG_timing,
-                                 radius.min = rmin,
-                                 radius.max = rmax)
+  conds.out$radius                                  <- radius_pred(newdata = conds.out,
+                                                                   radius_lm = radius_pred_f)
+  conds.out$radius[conds.out$radius < rmin]         <- rmin
+  conds.out$radius[conds.out$radius > rmax]         <- rmax
+  conds.out$radius[which(is.na(conds.out$radius))]  <- rmax
   
   # Set Maturation Stages
-  conds.out$MS[conds.out$x <= MS_timing[1]] <- "T1"
-  conds.out$MS[conds.out$x > MS_timing[1] & conds.out$x <= MS_timing[2]] <- "T2"
-  conds.out$MS[conds.out$x > MS_timing[2]] <- "T3"
+  conds.out$Barrier_Name[conds.out$age <= MS_timing[1]]   <- "En.CS"
+  conds.out$Barrier_Name[conds.out$age > MS_timing[1] & 
+                         conds.out$age <= MS_timing[2]]   <- "En.CS-Ex.LC"
+  conds.out$Barrier_Name[conds.out$age > MS_timing[2]]    <- "En.CS-Ex.Sub"
   
   # Set kAQP as linear function of kAQP_start and kAQP_end
-  conds.out$kAQP <- kAQP_start + (conds.out$x * (kAQP_end - kAQP_start)/(max(conds.out$x) - min(conds.out$x)))
+  conds.out$kAQP <- kAQP_start + (conds.out$age * (kAQP_end - kAQP_start)/(max(conds.out$age) - min(conds.out$age)))
   
   # Set kr and kx
-  for(i in seq(1, nrow(conds.out))){
-    conds.out$kr[i] <- kr.lm(x            = conds.out$x[i],
-                             MS           = conds.out$MS[i], 
-                             radius       = conds.out$radius[i],
-                             timing       = SG_timing, 
-                             kAQP         = conds.out$kAQP[i], 
-                             coefficients = kr.coeff, 
-                             kr.min       = kr.min, 
-                             kr.max       = kr.max)
-    
-    conds.out$kx[i] <- Kx.lm(x      = conds.out$x[i], 
-                             radius = conds.out$radius[i],
-                             coefficients = Kx.coeff,
-                             Kx.min = Kx.min, 
-                             Kx.max = Kx.max
-    )
-  }
+  conds.out$kr                        <- kr_pred(newdata = conds.out, lm_kr = lm_kr)
+  conds.out$kr[conds.out$kr > kr.max] <- kr.max
+  conds.out$kr[conds.out$kr < kr.min] <- kr.min
+  conds.out$kr[which(is.na(conds.out$kr))]  <- kr.max
   
-  conds.out <- conds.out %>% gather(radius, 
-                                    kAQP, 
-                                    kr, kx, key = "type", value = "y")
+  conds.out$kx <- kx_pred(newdata = conds.out, lm_kx = lm_kx)
+  conds.out$kx[conds.out$kx > kx.max] <- kx.max
+  conds.out$kx[conds.out$kx < kx.min] <- kx.min
+  conds.out$kx[which(is.na(conds.out$kx))]  <- kr.max
+  
+  # # Gather
+  # conds.out <- conds.out %>% gather(radius, kAQP, kr, kx, 
+  #                                   key = "type", value = "y")
   
   return(conds.out)
 }
-
-
 
 

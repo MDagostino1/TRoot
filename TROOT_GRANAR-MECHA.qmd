@@ -15,19 +15,17 @@ First we load the packages. NB : you may need to install some of them manually.
 
 -   *GRANAR* libraries : I advise to get them directly from GITHUB
 
--   Specific functions for this notebook : load all functions in FUNCTIONS/T-Root path
+-   Specific functions for this notebook : load all functions in *src/FUNCTIONS/T-Root/*.
 
 Other folders :
 
 -   *Data* : contains all data used in these scripts
 
--   *MECHA* : contains all codes to run MECHA
+-   *src/MECHA/* : contains all codes to run MECHA
 
--   *Params* : contains all quantified experimental cross sections in the form of GRANAR input parameters
+-   *src/Params/* : contains all quantified experimental cross sections in the form of GRANAR input parameters
 
--   *Virtual Anatomies* : contains generated virtual anatomies from Params, in the form of pdf for visualization and xm for structural data
-
--   *CRB-MARSHAL* : contains all codes and data to run CRootBox and MARSHAL
+-   *src/CRB-MARSHAL/* : contains all codes and data to run CRootBox and MARSHAL
 
 Here we load an convert quantification data (in the form of *xlsx* files in *Data/Quantifications* folder) into GRANAR parameters (params). The params will be stored both into single *xml* files (in the folder *Params*) directly usible into GRANAR, and into the big table Anatomy2. The file *Data_Preparation.R* automatically load and treat data from *Data/Quantifications*.
 
@@ -41,6 +39,9 @@ Here we load an convert quantification data (in the form of *xlsx* files in *Dat
 ```{r, include=F}
 options(rstudio.help.showDataPreview = FALSE)
 rm(list = ls())
+
+# SET LOCATION
+path_MECHA <- "./src/MECHA/"
 
 # LOAD FUNCTIONS
 TRoot_path <- "src/FUNCTIONS/T-Root/"
@@ -127,23 +128,40 @@ Parameters$units[Parameters$param_id == "xylem_max_size" | Parameters$param_id =
 
 This part load and analyse the cross section quantifications.
 
-## Visualization of data per param
-
-*anatomy_visual()* is a function to plot quantifications per param. Each graph is a param, each line is a root, each point is a measure.
-
-In addition, we use the function *plot_correlations_data()* to plot correlations.
+## Root lengths
 
 ```{r}
+head(Plants)
+
+Plants$days2 <- as.factor(Plants$days)
+
+# LENGTHS
+ggplot(data = Plants, aes(color = days2)) +
+  geom_point(aes(x = days2, y = length)) +
+  geom_boxplot(aes(x = days2, y = length)) + 
+  # facet_wrap(~days) +
+  theme_bw() +
+  ggtitle("Root length (cm")
+
+#GROWTH RATE
+ggplot(data = Plants, aes(color = days2)) +
+  geom_point(aes(x = days2, y = growth_rate)) +
+  geom_boxplot(aes(x = days2, y = growth_rate)) +
+  theme_bw() +
+  ggtitle("Growth rate (cm/d)")
+```
+
+## Visualization of data per param
+
+*anatomy2* contains quantified anatomical traits for 43 cross-sections
+
+```{r}
+summary(anatomy2)
+
 data2plot <- anatomy2 %>% 
   left_join(Parameters[c("name", "type", "param_id", "units")], by = "param_id") %>% 
   left_join(CrossSections[c("CS_id", "age", "plant_id")], by = "CS_id") %>% 
   mutate(Title = paste0(name, " ", type," [", units, "]"))
-
-# source("src/FUNCTIONS/T-Root/anatomy_stats_visu.R")
-# p1 <- anatomy_visual(data2plot, CrossSections)
-# svg(filename=paste0("Plots/Anatomy_data_visu_",Sys.Date(),".svg"), width = 12, height = 18)
-# p1
-# dev.off()
 
 cols <- c(
   "cortex_cell_diameter",
@@ -182,7 +200,7 @@ ggsave(filename = "plots/Anatomy_Quantifications.svg",
        device = "svg")
 ```
 
-Plot individual traits 
+Plot all individual quantified traits in *plots/anatomical_measurements/* 
 
 ```{r}
 # param_id_i <- cols[5]
@@ -208,7 +226,6 @@ for(i in seq(1, length(cols))){
          device = "svg")
 }
 ```
-
 
 ## Secondary Growth
 
@@ -343,7 +360,7 @@ prm <- c("cortex_n_layers",
          "radius",
          "age")
 
-svg(filename = "plots/Correlations_Data.svg", width = 6, height = 6)
+svg(filename = "plots/Anatomy_Correlations.svg", width = 6, height = 6)
 pcor <- corrplot(cor(Anatomy_Full[prm]), 
                  method = "color",
                  # type = "upper"
@@ -371,7 +388,7 @@ ggplot(Barriers_Timing) +
 Generate individual regressions
 
 ```{r}
-source("src/FUNCTIONS/T-Root/Functions.R")
+source("src/FUNCTIONS/T-Root/Functions_Misc.R")
 source("src/Regressions_Auto.R")
 ```
 
@@ -519,7 +536,7 @@ Here we choose to compute scenarios 0, 1, 5 and 6. You can change the simulated 
 anatomy_path <- "Data/Virtual Anatomies/"
 anatomy_file <- "B04_B_To_C01_Z20_01.xml"
 
-# Quick look
+# Quick look at current_root
 test <- get_root_section(paste0(anatomy_path, anatomy_file))
 ggplot(test) +
     # geom_polygon(aes_string("x", "y", group="id_cell", fill=col), colour="white") +
@@ -534,669 +551,235 @@ ggplot(test) +
           axis.title.x=element_blank(),
           axis.title.y=element_blank())
 
-# Copy and paste anatomy to MECHA directory
-file.copy(anatomy_file, "MECHA/cellsetdata/")
-file.rename(paste0("MECHA/cellsetdata/", anatomy_file), 
-            "MECHA/cellsetdata/current_root.xml")
+source("./src/MECHA/MECHA_functions.R")
+
+MECHA.upload_anatomy(filename = "B04_B_To_C01_Z20_01.xml",
+                     filepath = "./Data/Virtual Anatomies/",
+                     path_MECHA = "./src/MECHA/")
+
 ```
 
-```{r, eval=FALSE}
-# Change current_root with the simulated anatomy
-# write_anatomy_xml(sim1, "MECHA/cellsetdata/current_root.xml")
+## Test MECHA for one anatomy
+
+```{r}
+# LOAD XML AS A BIG LIST
+read_path <- "./src/MECHA/Projects/in/"
+
+# Read XML input files as templates
+MECHA_inputs_list <- read_MECHA_inputs(read_path,
+                                       file_General = "Tomato_General.xml",
+                                       file_Hydraulics = "Tomato_Hydraulics.xml",
+                                       file_Hormones = "Tomato_Hormones_Carriers.xml",
+                                       file_BC = "Tomato_BC.xml",
+                                       file_Geometry = "Tomato_Geometry.xml"
+                                       ) 
+
+# RUN MODIFIER OF MECHA INPUTS
+
+MECHA_inputs_list$General$properties$Output$path        <- "out/"
+MECHA_inputs_list$Hydraulics$param$kAQPrange$kAQP$value <- 1.5e-4
+
+# WRITE XML's
+write_MECHA_inputs(input_list = MECHA_inputs_list, 
+                   path = paste0(path_MECHA, "Projects/in/"), 
+                   file_General    = "Tomato_General.xml",
+                   file_Hydraulics = "Tomato_Hydraulics.xml", 
+                   file_Hormones   = "Tomato_Hormones_Carriers.xml",
+                   file_BC         = "Tomato_BC.xml",
+                   file_Geometry   = "Tomato_Geometry.xml")
+```
+
+
+```{r}
+# ============================================================================ #
+# LAUNCH MECHA
+# ============================================================================ #
 
 library(reticulate)
 use_condaenv("GRANAR-MECHA") # choose python environment 
 sys <- import("sys", convert=T)
-# try(py_run_file("MECHA/MECHAv4_TRoot.py"))
+try(py_run_file("src/MECHA/MECHAv4_TRoot.py"))
 
-# ================== # 
-conds <- run_mecha()
-# ================== #
+# Get results
+Conds <- MECHA_get_results(output_path = "./src/MECHA/Projects/out/")
+```
 
-rp <- "MECHA/Projects/granar/out/Tomato/Root/Project_Test/results/"
-# Flux0 <- ApoSymp(paste0(rp,"Macro_prop_0,0.txt"))
-# Flux1 <- ApoSymp(paste0(rp,"Macro_prop_1,1.txt"))
-# Flux2 <- ApoSymp(paste0(rp,"Macro_prop_5,5.txt"))
-# Flux3 <- ApoSymp(paste0(rp,"Macro_prop_6,6.txt"))
-# Flux4 <- ApoSymp(paste0(rp,"Macro_prop_4,4.txt"))
-Flux5 <- ApoSymp(paste0(rp,"Macro_prop_5,5.txt")) # Endodermal & exodermal Casparian strips
-Flux8 <- ApoSymp(paste0(rp,"Macro_prop_8,8.txt")) # Exodermis full suberized and endodermis full suberized
-Flux9 <- ApoSymp(paste0(rp,"Macro_prop_9,9.txt")) # Lignin Cap
 
-# plot_water_flux(Flux0, apobar = 0)
-# plot_water_flux(Flux1, apobar = 1)
-# plot_water_flux(Flux2, apobar = 1)
-# plot_water_flux(Flux3, apobar = 1)
-# plot_water_flux(Flux4, apobar = 3)
-plot_water_flux(Flux5, apobar = 3)
-plot_water_flux(Flux8, apobar = 3)
+Visualization (in devlopment)
+
+```{r, eval=FALSE}
+rp <- "./src/MECHA/Projects/out/"
+
+Flux1 <- ApoSymp(paste0(rp,"Macro_prop_1,1.txt")) # En.CS
+Flux9 <- ApoSymp(paste0(rp,"Macro_prop_9,9.txt")) # En.CS-Ex.LC
+Flux6 <- ApoSymp(paste0(rp,"Macro_prop_6,6.txt")) # En.CS-Ex.Sub
+
+plot_water_flux(Flux1, apobar = 3)
 plot_water_flux(Flux9, apobar = 3)
+plot_water_flux(Flux6, apobar = 3)
 ```
 
 ## Run MECHA for all quantified anatomies
 
+We need to run MECHA for :
+
+* Each GRANAR anatomy
+
+* 10 values of kAQP (ranging from 1 to 10 e-4 cm HPa-1 d-1)
+
+* 10 values of PDM?
+
+Define parametric space
+
 ```{r, eval= F}
-# anat_path   <- "Virtual Anatomies/data 14-12-2023/"
-# list_anat   <- list.files(path= anat_path, pattern = ".xml")
-# output_path <- "MECHA/Projects/granar/out/Tomato/Root/Project_Test/results/"
-# 
-# Q_Conductivities <- tibble()
-# 
-# # Loop for anatomies
-# for(temp_name in list_anat){
-#   print(temp_name)
-#   temp_conds <- run_mecha(anatomy_file = temp_name, 
-#                           anatomy_path = anat_path, 
-#                           output_path = output_path)
-#   Q_Conductivities <- rbind(Q_Conductivities, temp_conds)  
-# }
+Anatomy_list <- list.files(path = "./Data/Virtual Anatomies/", pattern = ".xml")
 
+kAQP_list    <- seq(1:10)*1e-4  # Elhert et al. (2009) : 4.3e-4 [cm/HPa/d]
+kpl_list    <- 5.3e-12         # Bret-Harte 1994      : 5.3e-12 [cm^3/hPa/d/plasmodesmata]
+
+hydro_params  <- expand.grid(kAQP = kAQP_list, 
+                             kpl  = kpl_list)
+
+hydro_params <- hydro_params %>% 
+  mutate(Simu_ID = paste0(kAQP, "_", kpl))
 ```
 
-
-
-
-
-# 3) VIRTUAL ROOTS
-
-In order to study the influence of anatomy on conductivities, we need to generate virtual roots. Here we define *virtual root* as a set of values of each GRANAR parameters at a given age (day). One virtual root contains values of GRANAR parameters at different ages (one node is a set of GRANAR params corresponding to a given age in the root). Theses values are calculated based on a regression of quantifications and a random factor defined by the user. It can be a percentage of the regression value (alpha) or the standart error of the regression from the data (sigma).
-
-For that, we first compute stats to find regression equations with the function *Make_Regression()*. The file *Regressions* contains equations and sigmas for each param.
-
-Next, we generate virtual roots with the function *Make_Virtual_Roots()*. The file *Virtual_Roots* contains all generated virtual roots. *Make_Virtual_Roots()* take the regression functions for each param, compute the param value corresponding to each node, and ad a random residual corresponding to the standart error of the regression. E.G : for cortex_n_layers, the reg equation is : $-0.05407*X + 3.63181 + sd$ where X is the node, and $sd$ the random residual. $sd$ is drawn in a normal distribution of mean 0 and sigma the standart deviation of the regression of the param : $sd \sim R(0, \sigma_{param})$.
-
-NB : we can also add some randomness using the method $alpha$, which simply compute the value of the param per node and add a residual that is a percentage of the mean value of the param at that node.
-
-Finally, we can plot and save the results using the *Virtual_Roots_Visu()* function.
-
-To see full the statistical results and developments, see *Regressions.Rmd*.
-
-NB : there are 3 Make_Virtual_Root files in the R code folder :
-
--   *Make_Virtual_Roots_old.R* is the first code made. It generates fixed nodes along the root, and DOES NOT take into account causality between parameters (for ex xylem_max \< xylem_mean).\
-    This code works with an old version of *Regression* table that does not yet add sd into regression equations. Just don't use this version .
-
--   *Make_Virtual_Roots.R* generates **FIXED** nodes along the root and takes into account causality between parameters.
-
--   *Make_Virtual_Roots2.R* generates **RANDOM** nodes along the root, and takes into account causality between parameters.
-
-### Set simulation parameters
-
-```{r, eval = F}
-n_nodes <- 30   #30
-n_roots <- 50   #30
-method  <- "sigma"
-alpha   <- 0.15
-```
-
-### Create Regressions
 
 ```{r, include = F}
-source("src/Regressions_Auto.R")
+library(reticulate)
+source("./src/MECHA/MECHA_functions.R")
 
-# reg_plots <- wrap_plots(plot_list, ncol = 3)
-# 
-# print(reg_plots)
-# ggsave(filename = "plots/regressions/Regression_plots.svg", 
-#        plot = reg_plots, device = "svg", width = 10, height = 15, units = "in")
-```
+# Set up
+path_MECHA         <- "./src/MECHA/"
+read_path          <- paste0(path_MECHA, "Projects/in/")
+MECHA_file         <- "MECHAv4_TRoot.py"
+output_path        <- paste0(path_MECHA, "Projects/out/")
+write_results_path <- "./Results/MECHA_results/"
 
-### Generation of Virtual_Roots
+Results_list <- list.files(write_results_path)
 
-The principle here is that we build simple regression functions for each GRANAR parameter. For ex, the function *phloem_proportion()* returns a regressed value of phloem proportion for a given x.
+# use_condaenv("GRANAR-MECHA") # choose python environment
+# sys <- import("sys", convert=T)
 
-```{r, eval = F}
-source("src/FUNCTIONS/T-Root/Make_Virtual_Roots3.R")
-Virtual_Roots_test <- Make_Virtual_Roots3(Parameters,
-                                    n_nodes,
-                                    n_roots,
-                                    method,
-                                    alpha)
-
-# Quality checks -> correct xylem n cells 
-Virtual_Roots_test$y[Virtual_Roots_test$name == "xylem" &
-                       Virtual_Roots_test$type == "n_cells" &
-                       Virtual_Roots_test$y > 100] <- 100
-
-data2plot <- Virtual_Roots_test %>% 
-  # mutate(param_id = paste0(name, "_", type)) %>% 
-  left_join(Parameters, by = c("name", "type"))
-
-p <- ggplot(data2plot) +
-  geom_jitter(aes(x = x, y = y), size = 0.5, width = 0.3, height = 0) +
-  facet_wrap(~param_id, scales = "free") +
-  theme_few()
-
-p
-ggsave(filename = "plots/VirtualRoots_test.png", plot = p, device = "png", 
-       width = 15, height = 10, dpi = 200)
-
-# Virtual_Roots <- Virtual_Roots3
-# write.csv(Virtual_Roots3, paste0("Data/Virtual_Root_", Sys.Date(), "_", n_nodes,"x",n_roots,".csv"))
-```
-
-### Visualisation
-
-NB : You can add colors to points by changing code of *Virtual_Root_Visu.R* so that each virtual root has a color
-
-```{r}
-Virtual_Roots3 <- read.csv("Data/Virtual Roots/Virtual_Root_2023-07-31_30x50.csv")
-
-source("src/FUNCTIONS/T-Root/Virtual_Roots_Visu.R")
-p3_3 <- Virtual_Roots_Visu2(Virtual_Roots3)
-
-p3_3
-ggsave(filename=paste0("plots/Virtual_Root_2023-07-31_30x50.png"), 
-       plot = p3_3,
-       width = 8, height = 12, device = "png", units = "in", dpi = 300)
-```
-
-```{r}
-pl <- c("stele_cell_diameter",
-        "stele_layer_diameter",
-        "stele_n_layers",
-        "stele_SD",
-        "xylem_cell_diameter",
-        "xylem_max_size",
-        "xylem_n_cells",
-        "phloem_cell_diameter",
-        "phloem_n_layers",
-        "phloem_proportion",
-        "pericycle_cell_diameter", 
-        "endodermis_cell_diameter", 
-        "cortex_n_layers",
-        "exodermis_cell_diameter"
-        )
-
-data2plot <- Virtual_Roots3 %>% 
-  left_join(Parameters, by = c("name", "type")) %>% 
-  mutate(Title = paste0(param_id, " [ ", units, " ]")) %>% 
-  filter(param_id %in% pl)
-
-p <- ggplot(data = data2plot) +
-  geom_point(aes(x = x, y = y, group = root), alpha = 0.4) +
-  facet_wrap(~Title, scales = "free", ncol = 3) +
-  theme_few()
-
-ggsave(filename=paste0("plots/Virtual_Root_2023-07-31_30x50.png"), 
-       plot = p,
-       width = 8, height = 12, device = "png", units = "in", dpi = 300)
-
-```
-
-Plot individually
-
-```{r}
-for(i in seq(1, length(pl))){
+# ============================================================================ #
+# LOOP FOR ANATOMY
+Conds_full <- tibble()
+sim_count <- 0
+sim_tot   <- length(Anatomy_list) * nrow(hydro_params)
+for(anatomy in Anatomy_list){
   
-  param_id_i <- pl[i]
-  title_i <- data2plot$Title[data2plot$param_id == param_id_i]
+  CS_id <- unlist(strsplit(anatomy, split = ".xml"))[1]
   
-  p_temp <- ggplot(data = data2plot %>% filter(param_id == param_id_i)) +
-    geom_point(aes(x = x, y = y, group = root), alpha = 0.4) +
-    # facet_wrap(~Title, scales = "free", ncol = 3) +
-    ggtitle(title_i) + 
-    theme_few() +
-    theme(plot.title = element_text(size=9))
+  # Move anatomy to folder
+  MECHA.upload_anatomy(filename = anatomy,
+                       filepath = "./Data/Virtual Anatomies/",
+                       path_MECHA = "./src/MECHA/")
+  
+  # ============================= #
+  # LOOP FOR HYDRAULIC PARAMETERS
+  for(i in seq(1, nrow(hydro_params))){
     
-  ggsave(filename=paste0("plots/GRANAR_measurements/", param_id_i, ".svg"), 
-     plot = p_temp,
-     width = 2.5, height = 2.5, device = "svg", units = "in", dpi = 300)
-}
-```
-
-
-# 4) GRANAR-MECHA LOCAL
-
-The final results of this project were generated with this chunk
-
-Here we generate GRANAR anatomies for each node of the virtual roots and run MECHA.\
-This is done with the function *Make_Virtual_Anatomies()*.
-
-We enter a table of Virtual_Roots, and the function outputs a table of computed conductivities per cross-section and per scenario.
-
-```{r, echo = F, include = F}
-# LOAD VIRTUAL ROOTS
-Virtual_Roots3 <- read.csv("Data/Virtual Roots/")
-# Virtual_Roots_test <- Virtual_Roots3%>%filter(root == "root1", x == 0)
-
-# SET DIRECTORIES
-mecha <- "MECHA/MECHAv4_TRoot.py"
-output <- "MECHA/Projects/granar/out/Tomato/Root/Project_Test/results/"
-
-#==================================================================================
-#==================================================================================
-use_condaenv("GRANAR-MECHA")
-source("FUNCTIONS/T-Root/Make_Virtual_Anatomies.R")
-# source("GRANAR/R/T-Root/Make_Virtual_Anatomies_light.R")
-
-VR_conductivities <- Make_Virtual_Anatomies(Virtual_Roots3,
-                                            MECHA_path = mecha,
-                                            output_path = output,
-                                            anatomy_path = "Results/12-01-2023/Anatomies/",
-                                            result_path = "Results/12-01-2023/Conductivities/",
-                                            done_path = "Results/12-01-2023/done/")
-#==================================================================================
-#==================================================================================
-
-# write.csv(VR_conductivities, paste0("Data/VR_conductivities_", date, "_n", nodes, "_r", roots, "_a", a*100,".csv"))
-
-```
-
-## Generate GRANAR anatomies :
-
-```{r}
-# LOAD VIRTUAL ROOTS
-Virtual_Roots <- read.csv("Data/Virtual Roots/Virtual_Root_2023-07-17_30x20.csv")
-# Virtual_Roots_test <- Virtual_Roots%>%filter(root == "root1", x == 1 | x == 3)
-```
-
-Run all GRANAR anatomies and save XML files :
-
-```{r, include = F}
-source("FUNCTIONS/T-Root/Make_Virtual_Anatomies_G.R")
-Make_Virtual_Anatomies_G(Virtual_Roots = Virtual_Roots,
-                         template = "Data/template.xml", 
-                         export_path_xml = "Results/12-01-2023/Anatomies/",
-                         export_path_pdf = "Results/12-01-2023/Anatomies_PDF/"
-                         )
-```
-
-Then run MECHA for each Cross Section and kAQP scenarios
-
-```{r, eval = F}
-# Setup
-mecha  <- "MECHA/MECHAv4_TRoot.py"
-output <- "MECHA/Projects/granar/out/Tomato/Root/Project_Test/results/"
-h_path <- "MECHA/Projects/granar/in/Tomato_Hydraulics.xml"
-AQP_list <- seq(from = 0.0001, to = 0.001, length.out = 10)
-# AQP_list <- c(0.00043)
-
-use_condaenv("GRANAR-MECHA") # choose MECHA environment
-
-source("FUNCTIONS/T-Root/Make_Virtual_Anatomies_M.R")
-Make_Virtual_Anatomies_M(Virtual_Roots = Virtual_Roots,
-                         anatomy_path = "Results/12-01-2023/Anatomies/", 
-                         MECHA_path = "MECHA/MECHAv4_TRoot.py", 
-                         output_path = output,
-                         conds_path = "Results/12-01-2023/Conductivities/",
-                         done_path = "Results/12-01-2023/done/",
-                         hydraulic_path = h_path, 
-                         AQP_list = AQP_list)
-```
-
-# 5) GRANAR-MECHA CECI
-
-In this part we create jobs to send to HPC, and load result data. We used that method because GRANAR was 10x slower than before optimized update.
-
-## Instructions, computing and data extraction
- 
-global scratch : */auto/globalscratch/users/m/d/mdago/\
-*main dir : */home/users/m/d/mdago/*
-
-Instructions :
-
--   Create a table Virtual_Roots with the code above, with the desired parameters (n_roots and n_nodes)
-
--   Then execute in local the script Make_my_jobs.R to generate the job files, the R files and the data that will be used.
-
-```{r, eval = F}
-# Virtual_Roots <- Virtual_Roots3
-source("FUNCTIONS/T-Root/Make_my_jobs2.R")
-```
-
--   Each job will run one script R that will call one csv table. Here we generate 2x50 jobs that will compute 1 roots each (total of 50 roots).
--   Load the data from VR_loop to the folder of the CISM.
--   Load the jobs and R files to the CISM.
--   Then run on the CISM the job "Loop_jobs.sh" like this: **sbatch Loop_jobs.sh** .
--   Don't forget to be in the right directory, and if necessary to convert Loop_jobs into unix (with dos2unix). Tips : you can convert all files at once using "dos2unix \*.job"
--   To cancel a job : *scancel jobid* or *scancel -u login*
--   Once computing is done, download the file Results
-
-Analyse results of simulation (deprecated)
-
-```{r, eval=FALSE}
-rpath <- "results/02-06-2023/"
-
-res <- c()
-rlist <- list.files(paste0(rpath), pattern = ".out")
-for (i in rlist) {
-  # print(i)
-  temp_r <- read_file(paste0(rpath, i))
-  temp_r <- str_split(temp_r, pattern = "\n")
-  temp_r <- temp_r[1]
-
-  temp_r2 <- NULL
-  for (j in seq(1, length(temp_r[[1]]))) {
-    # print(row)
-    row <- temp_r[[1]][j]
-    if(row == "`summarise()` ungrouping output (override with `.groups` argument)"){
-      # print(row)
-    }else{
-      temp_r2 <- c(temp_r2, row)
+    sim_count <- sim_count + 1
+    cat("Simulating ", sim_count, "/", sim_tot, "\n")
+    
+    Simu_ID <- hydro_params$Simu_ID[i]
+    kAQP    <- hydro_params$kAQP[i]
+    kpl     <- hydro_params$kpl[i]
+    
+    # Check if the Result_ID has already been simulated
+    Result_ID <- paste0(CS_id, "_", Simu_ID)
+    if(paste0(Result_ID, ".csv") %in% Results_list){
+      cat("Already simulated, skip to next ... \n")
+      next
     }
-  }
-
-  res <- c(res, temp_r2)
-}
-
-sink(paste0(rpath, "results.txt"))
-print(res)
-sink()
-```
-
-Open all results files and merged them into *Conductivities* (to do the first time after running a simulation) :
-
-```{r, eval = F}
-rpath <- "results/31-07-2023/"  # Most recent results
-clist <- list.files(paste0(rpath), pattern = ".csv")
-Conductivities <- data.frame()
-for (c in seq(1, length(clist))) {
-  print(c)
-  temp_c <- read.csv(paste0(rpath,clist[c]))[,-1]
-  Conductivities <- rbind(Conductivities, temp_c)
-}
-
-write.csv(Conductivities, paste0("Data/Conductivities_", date,".csv"), row.names = F)
-```
-
-Extract data from VR_loop to re-build Virtual_Roots
-
-```{r, eval=FALSE}
-# Recreate Virtual_Roots table from csv data files in VR_loop/
-Virtual_Roots <- data.frame()
-ls <- list.files("Data/VR_loop", pattern = "csv")
-for (file in ls) {
-  temp_df <- read.csv(paste0("Data/VR_loop/", file))[,-1]
-  Virtual_Roots <- rbind(Virtual_Roots, temp_df)
-}
-
-# write.csv(Virtual_Roots, paste0("Data/Virtual_Roots3_",date,".csv"))
-```
-
-# Root lengths
-
-```{r}
-head(Plants)
-
-Plants$days2 <- as.factor(Plants$days)
-
-# LENGTHS
-ggplot(data = Plants, aes(color = days2)) +
-  geom_point(aes(x = days2, y = length)) +
-  geom_boxplot(aes(x = days2, y = length)) + 
-  # facet_wrap(~days) +
-  theme_bw() +
-  ggtitle("Root length (cm")
-
-#GROWTH RATE
-ggplot(data = Plants, aes(color = days2)) +
-  geom_point(aes(x = days2, y = growth_rate)) +
-  geom_boxplot(aes(x = days2, y = growth_rate)) +
-  theme_bw() +
-  ggtitle("Growth rate (cm/d)")
-```
-
-# CellSet vs GRANAR
-
-## Collect all CellSet anatomies
-
-```{r}
-path.cellset <- "data/CellSet/Anatomies Clean/"
-
-CellSet_full <- tibble()
-for(i in list.files(path.cellset, pattern = ".xml")){
-  print(i)
-  temp <- get_root_section(paste0(path.cellset, i))
-  id <- strsplit(i, split = ".xml")[[1]]
-  temp$CS_id <- id
-  CellSet_full <- rbind(CellSet_full, temp)
-}
-
-# Merge with identifyers
-CellSet_full         <- left_join(CellSet_full, CrossSections, by = "CS_id")
-CellSet_full$id_cell <- as.character(CellSet_full$id_cell)
-
-# Replace names
-CellSet_full <- CellSet_full %>% 
-  mutate(type = recode(type, 
-                       "columella3" = "xylem",
-                       "general"    = "exodermis",
-                       "rootcapl2"  = "intercellular"))
-
-# Add mannual corrections
-CellSet_full$type[CellSet_full$CS_id == "B11_D_To_C01_Z20_01" & 
-                    CellSet_full$id_cell %in% c(264, 267, 262)] <- "stele"
-
-# Export
-write.csv(x = CellSet_full, file = "data/CellSet/CellSet_full.csv", row.names = F)
-```
-
-## Load pre-process CellSet data
-
-```{r}
-CellSet_full <- read.csv(file = "data/CellSet/CellSet_full.csv")
-
-# plot_anatomy(test, col = "type")
-g <- ggplot(data = CellSet_full) +
-  geom_polygon(aes_string("x", "y", group="id_cell", fill="type"), colour="white") +
-  scale_fill_manual(
-    values = c("cambium"        = "#f8766dff",
-               "companion_cell" = "#d89000ff",
-               "cortex"         = "#a3a500ff",
-               "endodermis"     = "#39b600ff",
-               "epidermis"      = "#00bf7dff",
-               "exodermis"      = "#00bfc4ff",
-               "pericycle"      = "#00b0f6ff",
-               "phloem"         = "#9590ffff",
-               "stele"          = "#e76bf3ff",
-               "xylem"          = "#ff62bcff",
-               "intercellular"  = "grey")
-  ) +
-  facet_wrap(~CS_id) +
-  coord_fixed() +
-  theme_few()
-
-g
-ggsave(filename = "plots/CellSet.png", 
-       plot = g, device = "png", 
-       width = 15, height = 15, dpi = 300)
-```
-
-## Investigate and merge individual xylem cells
-
-```{r}
-CS_id_i   <- unique(CellSet_full$CS_id)[8]
-data2plot <- CellSet_full %>% 
-  mutate(id_cell_num = as.numeric(id_cell)) %>% 
-  filter(CS_id == CS_id_i)
-
-g2 <- ggplot(data = data2plot) +
-  geom_polygon(aes_string("x", "y", group = "id_cell", fill = "id_cell_num")) +
-  scale_fill_viridis() +
-  coord_fixed() +
-  facet_wrap(~CS_id) 
-  # theme(legend.position = "none")
-
-ggplotly(g2)
-```
-
-CellSet has a limit of cell size, so some xylem files were quantified as multiple cells.\
-To correct that, we need to mannually spot which cells are together, and merge them.\
-First, lets identify the cells to merge :
-
-```{r}
-cell2merge <- list()
-cell2merge[["B04_B_To_C01_Z20_01"]] <- list(c(139, 150))
-cell2merge[["B05_A_To_C03_Z20_01"]] <- list(c(181, 193), c(204, 216), c(309, 313))
-cell2merge[["B05_C_To_C01_Z20_01"]] <- list(c(230, 253))
-cell2merge[["B05_D_To_C03_Z20_01"]] <- list(c(147, 144, 172, 226), c(305, 308), c(482, 485))
-cell2merge[["B11_D_To_C01_Z20_01"]] <- list(c(158, 147, 188))
-cell2merge[["P04_B_BH_C01_Z20_05"]] <- list(c(175, 176), c(24, 16), c(305, 308))
-cell2merge[["P04_D_To_C01_Z20_01"]] <- list(c(203, 184), c(215, 210),
-                                            c(188, 162), c(315, 316))
-cell2merge[["B11_F_To_C01_Z10_01"]] <- list(c(495, 572), c(719, 661), 
-                                            c(580, 676), c(371, 380, 423), 
-                                            c(271, 266), c(408, 440),
-                                            c(277, 290), c(530, 575), 
-                                            c(613, 627), c(692, 714), 
-                                            c(763, 821), c(177, 178),
-                                            c(486, 513), c(1077, 1086),
-                                            c(1095, 1093),
-                                            c(509, 554)
-                                            )
-cell2merge[["P01_A_To_C04_Z20_03"]] <- list(c(118, 120), c(175, 172), c(211, 246), c(195, 207), c(240, 236))
-
-# 
-```
-
-```{r}
-source("./src/FUNCTIONS/T-Root/Functions.R")
-# Convert DF to SF
-CellSet_sf <- CellSet_full %>%
-  st_as_sf(coords = c("x", "y")) %>%
-  group_by(CS_id, id_cell) %>%
-  summarise(geometry = st_combine(geometry)) %>%
-  st_cast("POLYGON")
-
-# Merge Cells
-CellSet_clean <- merge_cells(CellSet_sf, cell2merge)
-```
-
-```{r}
-# Convert SF object to dataframe
-CellSet_clean_df <- sf_to_df(CellSet_clean)
-CellSet_clean_df <- left_join(CellSet_clean_df, unique(CellSet_full[c("id_cell", "CS_id", "type")]))
-write.csv(x = CellSet_clean_df, file = "./Data/CellSet/CellSet_clean.csv", row.names = F)
-```
-
-## Load merged CellSet Data
-
-```{r}
-CellSet_clean_df <- read.csv("./Data/CellSet/CellSet_clean.csv")
-g <- ggplot(data = CellSet_clean_df) +
-  geom_polygon(aes_string("x", "y", group="id_cell", fill="type"), colour="white") +
-  # scale_fill_manual(
-  #   values = c("cambium"        = "#f8766dff",
-  #              "companion_cell" = "#d89000ff",
-  #              "cortex"         = "#a3a500ff",
-  #              "endodermis"     = "#39b600ff",
-  #              "epidermis"      = "#00bf7dff",
-  #              "exodermis"      = "#00bfc4ff",
-  #              "pericycle"      = "#00b0f6ff",
-  #              "phloem"         = "#9590ffff",
-  #              "stele"          = "#e76bf3ff",
-  #              "xylem"          = "#ff62bcff",
-  #              "intercellular"  = "grey")
-  # ) +
-  facet_wrap(~CS_id) +
-  coord_fixed() +
-  theme_few()
-
-g
-ggsave(filename = "plots/CellSet_clean.png", 
-       plot = g, device = "png", 
-       width = 15, height = 15, dpi = 300)
-```
-
-## Phloem definition?
-
-Why is there no phloem?
-
-Solution ; set phloem cells in function of position to center. 
-
-```{r}
-# Function to check if a point is inside the ellipse
-is_point_inside_ellipse <- function(x, y, h = 1025, k = 800, a = 275, b = 300) {
-  
-  # Calculate the ellipse inequality
-  value <- ((x - h)^2 / a^2) + ((y - k)^2 / b^2)
-  return(value <= 1)
-}
-
-# Function to check if any coordinate of a polygon is inside the ellipse
-check_polygon_coordinates <- function(polygon_df, 
-                                      h = 1025, 
-                                      k = 800, 
-                                      a = 275, 
-                                      b = 300) {
-  # Get unique polygon IDs
-  polygon_ids <- unique(polygon_df$id_cell)
-
-  # Initialize a logical vector to store results
-  results <- logical(length(polygon_ids))
-
-  # Loop through each polygon ID
-  for (i in seq_along(polygon_ids)) {
-    id <- polygon_ids[i]
-
-    # Subset the dataframe for the current polygon
-    polygon_coords <- polygon_df[polygon_df$id_cell == id, ]
-
-    # Initialize a logical variable to check if any point is inside the ellipse
-    any_inside <- FALSE
-
-    # Loop through each coordinate of the polygon
-    for (j in 1:nrow(polygon_coords)) {
-      if (is_point_inside_ellipse(polygon_coords$x[j], 
-                                  polygon_coords$y[j],
-                                  h = h,
-                                  k = k,
-                                  a = a,
-                                  b = b)
-          ) {
-        any_inside <- TRUE
-        break # Exit the loop if any point is inside the ellipse
-      }
+    
+    # ======================== #
+    # UPDATE MECHA PARAMS
+    # ======================== #
+    
+    # Load MECHA parameters
+    MECHA_inputs_list <- read_MECHA_inputs(read_path,
+                                           file_General    = "Tomato_General.xml",
+                                           file_Hydraulics = "Tomato_Hydraulics.xml",
+                                           file_Hormones   = "Tomato_Hormones_Carriers.xml",
+                                           file_BC         = "Tomato_BC.xml",
+                                           file_Geometry   = "Tomato_Geometry.xml"
+                                           ) 
+    
+    # Modify Inputs
+    MECHA_inputs_list$General$properties$Output$path        <- "out/"
+    MECHA_inputs_list$Hydraulics$param$kAQPrange$kAQP$value <- kAQP
+    MECHA_inputs_list$Hydraulics$param$Kplrange$Kpl$value   <- kpl
+    
+    # WRITE XML's
+    write_MECHA_inputs(input_list = MECHA_inputs_list, 
+                       path = paste0(path_MECHA, "Projects/in/"), 
+                       file_General    = "Tomato_General.xml",
+                       file_Hydraulics = "Tomato_Hydraulics.xml", 
+                       file_Hormones   = "Tomato_Hormones_Carriers.xml",
+                       file_BC         = "Tomato_BC.xml",
+                       file_Geometry   = "Tomato_Geometry.xml")
+    
+    # ======================== #
+    # LAUNCH MECHA
+    # ======================== #
+    
+    # Clean output path
+    unlink(output_path, recursive = T)
+    dir.create(output_path)
+    
+    # Unleash MECHA
+    try(expr = {
+      py_run_file(paste0(path_MECHA, MECHA_file))
+    
+      # ======================== #
+      # COLLECT RESULTS
+      # ======================== #
+      Conds_temp <- MECHA_get_results(output_path = output_path)
+      Conds_temp$CS_id   <- CS_id
+      Conds_temp$kAQP    <- kAQP
+      Conds_temp$kpl     <- kpl
+      Conds_temp$Simu_ID <- Simu_ID
+      
+      # write temp
+      write.csv(x = Conds_temp, 
+                file = paste0(write_results_path, Result_ID, ".csv"), 
+                row.names = F)
+      
+      Conds_full <- rbind(Conds_full, Conds_temp)
     }
-
-    # Store the result
-    results[i] <- !any_inside
+    )
   }
-
-  # Return the results
-  return(tibble(id_cell = polygon_ids, in_ellipse = results))
 }
 ```
 
+Collect all results
 
 ```{r}
-data_temp <- CellSet_clean_df %>% 
-  filter(CS_id == "B11_F_To_C01_Z10_01" & type == "stele")
+list_results <- list.files("./Results/MECHA_results/")
+MECHA_results <- tibble()
+for(i in list_results){
+  results_temp <- read.csv(file = paste0("./Results/MECHA_results/", i))
+  MECHA_results <- rbind(MECHA_results, results_temp)
+}
 
-ggplot(data_temp) +
-  geom_polygon(aes(x = x, y = y, group = id_cell, fill = id_cell), color = "white") +
-  coord_fixed()
-
-test <- check_polygon_coordinates(polygon_df = data_temp, 
-                                  h = 1010, k = 800, a = 250, b = 290)
-
-data_temp <- data_temp %>% 
-  left_join(test, by = "id_cell") 
-
-data_temp$type[data_temp$in_ellipse == T] <- "phloem"
-
-ggplot(data_temp) +
-  geom_polygon(aes(x = x, y = y, group = id_cell, fill = type), color = "white") +
-  coord_fixed()
+write.csv(x = MECHA_results, file = "./Results/MECHA_results.csv", row.names = F)
 ```
 
 ```{r}
-library(plotly)
-CS_id_i <- unique(CellSet_clean_df$CS_id)[8]
-print(CS_id_i)
+data2plot <- MECHA_results %>% 
+  left_join(Anatomy_Full, by = "CS_id") %>% 
+  # filter(kAQP == 4e-4) %>% 
+  filter(Barrier %in% c("b1", "b9", "b6"))
 
-data2plot <- CellSet_clean_df %>% 
-  filter(CS_id == CS_id_i & type %in% c("stele", "xylem"))
-p <- ggplot(data = data2plot) +
-  geom_polygon(aes_string("x", "y", group="id_cell", fill="id_cell", colour="type")) +
-  scale_fill_viridis() +
-  facet_wrap(~CS_id) +
-  coord_fixed() +
+ggplot(data2plot, 
+       aes(x = age, 
+           y = kr, 
+           color = Barrier)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~kAQP) +
   theme_few()
-
-ggplotly(p)
 ```
-
 
 
