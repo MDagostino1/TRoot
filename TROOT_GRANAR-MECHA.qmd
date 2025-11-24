@@ -431,7 +431,7 @@ Examples of parameter files are in \*/Params/.
 
 ```{r}
 # xml <- "Params/examples/B73_taproot_2021.xml"
-xml <- "src/Params/B11_F_To_C02_Z10_01.xml"
+xml <- "src/Params/B04_B_To_C01_Z20_01.xml"
 
 param1 <- read_param_xml(xml)
 
@@ -444,6 +444,25 @@ param1$value[param1$name == "param" & param1$type == "randomness"]        <- 0
 # param1$value[param1$name == "epidermis" & param1$type == "cell_diameter"] <- 0.005
 # param1$value[param1$name == "exodermis" & param1$type == "cell_diameter"] <- 0.005
 ```
+
+```{r}
+test <- get_root_section("Data/Virtual Anatomies/B04_B_To_C01_Z20_01.xml")
+
+p <- test %>% 
+  ggplot() +
+  geom_polygon(aes_string("x", "y", group="id_cell", fill="type"), colour="white") +
+      theme_classic() +
+      coord_fixed() +
+      theme(axis.line=element_blank(),
+            axis.text.x=element_blank(),
+            axis.text.y=element_blank(),
+            axis.ticks=element_blank(),
+            axis.title.x=element_blank(),
+            axis.title.y=element_blank())
+
+ggplotly(p)
+```
+
 
 ## Play with GRANAR
 
