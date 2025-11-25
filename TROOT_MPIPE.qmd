@@ -455,7 +455,7 @@ Macro_full <- read.csv(paste0(path.results, "Macro_full.csv")) %>%
                               levels = c("WT", "kAQP", "Sub", "SubSG")))
 ```
 
-A nice plot of k_r
+### A nice plot of k_r
 
 ```{r}
 data2export <- RSHA_full %>% 
@@ -892,47 +892,59 @@ for(zr_i in unique(data2stat$zr)[order(unique(data2stat$zr))]){
 ### Plot SUF
 
 ```{r}
+plot_SUF <- function(data2plot){
+  p <- ggplot() +
+    
+    # geom_segment(data = data2plot_main,
+    #              aes(x = x1, xend = x2,
+    #                  y = z1, yend = z2,
+    #                  size = radius),
+    #              color = "blue") +  
+    
+    geom_segment(data = data2plot,
+                 aes(x = x1, xend = x2,
+                     y = z1, yend = z2,
+                     color = SUF, size = radius)) +
+    
+    scale_size_continuous(range = c(0.5, 1), 
+                          limits = c(min(data2plot$radius), 
+                                     max(data2plot$radius))) +
+    
+    scale_color_viridis(option = "magma",
+                        breaks = c(min(data2plot$SUF),
+                                   max(data2plot$SUF)
+                                   ),
+                        labels = c("low", "high"),
+                        direction = 1
+                        # , limits = c(min(data2plot$SUF), max(data2plot$SUF))
+                        ) +
+    
+    # facet_wrap(~ Scenario_ID, nrow = 1) +
+    coord_fixed() +
+    # theme_few() 
+    theme_void()
+  
+  return(p)  
+}
+```
+
+Plot for WT and SubSG
+
+```{r}
 age_i <- 60
 
-data2plot <- RSHA_full %>% 
-  filter(age == age_i & RSA_id == unique(RSA.IDs$RSA_id[1]) & Scenario_ID == "WT")
-
-p <- ggplot() +
+for(S_id in unique(RSHA_full$Scenario_ID)){
   
-  # geom_segment(data = data2plot_main,
-  #              aes(x = x1, xend = x2,
-  #                  y = z1, yend = z2,
-  #                  size = radius),
-  #              color = "blue") +  
-  
-  geom_segment(data = data2plot,
-               aes(x = x1, xend = x2,
-                   y = z1, yend = z2,
-                   color = SUF, size = radius)) +
-  
-  scale_size_continuous(range = c(0.5, 1), 
-                        limits = c(min(data2plot$radius), 
-                                   max(data2plot$radius))) +
-  
-  scale_color_viridis(option = "magma",
-                      breaks = c(min(data2plot$SUF),
-                                 max(data2plot$SUF)
-                                 ),
-                      labels = c("low", "high"),
-                      direction = 1
-                      # , limits = c(min(data2plot$SUF), max(data2plot$SUF))
-                      ) +
-  
-  # facet_wrap(~ Scenario_ID, nrow = 1) +
-  coord_fixed() +
-  theme_void() 
-
-p
-
-ggsave(filename = paste0("RSHA_suf_example_", age_i, ".png"), plot = p
+  data2plot <- RSHA_full %>% 
+    filter(age == age_i & RSA_id == unique(RSA.IDs$RSA_id[1]) & Scenario_ID == S_id)
+  p <- plot_SUF(data2plot)
+  plot(p)
+  ggsave(filename = paste0("RSHA_suf_example_", age_i, "_", S_id, ".png"), plot = p
        ,device = "png"
        ,path = path.plots
        ,width = 4, height = 4)
+  
+}
 ```
 
 ### Plot kr

@@ -595,8 +595,11 @@ lm_kr <- readRDS(file = "./Results/kr_model.rds")
 
 ## - Radial conductivity & conductance at fixed kAQP
 
+NB : radial conductance is expressed per unit of length, because we only multiply kr by the perimeter.
+
 ```{r}
 radius_mean <- mean(Anatomy_Full$radius[Anatomy_Full$age < 25])
+radius_lm <- readRDS("./Results/radius_model.rds")
 
 color_scale <- c("En.CS"        = "black", 
                  "En.CS-Ex.LC"  = "#C71AB7", 
@@ -700,7 +703,7 @@ p_Kr <- ggplot(data2plot) +
   scale_fill_manual(values = color_scale) +
   
   xlab("Age [d]") +
-  ylab(expression(K[r] ~ "[" ~ m^{3} ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  ylab(expression(K[r] ~ "[" ~ m^{3} ~ m^{-1} ~ MPa^{-1} ~ s^{-1} ~ "]")) +
   
   # facet_wrap(~Variable, scales = "free") +
   # facet_grid(Variable~kAQP) +
@@ -825,13 +828,16 @@ ggplot(data2stat) +
 
 p_kx <- ggplot(data2stat) +
   
-  geom_line(aes(x = age, y = ln(kx_pred)), 
+  geom_line(aes(x = age, y = kx_pred), 
             color = "orange",
             linewidth =2)+
   
-  geom_point(aes(x = age, y = ln(kx))) +
+  geom_point(aes(x = age, y = kx)) +
   
-  ylab(expression(ln(k)[x] ~ "[" ~ m^{4} ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  # scale_y_continuous(trans='log2') +
+  scale_y_log10() +
+  
+  ylab(expression(k[x] ~ "[" ~ m^{4} ~ MPa^{-1} ~ s^{-1} ~ "]")) +
   
   theme_few()
 
@@ -1009,14 +1015,14 @@ p_Barriers <- ggplot(data = data2plot,
                      ) +
   
   # # ADD VIOLINS
-  geom_violin(aes(fill  = Barrier_Name),
+  geom_violin(aes(fill  = Barrier_Name, color = Barrier_Name),
               # fill  = "lightgrey",
-              color = "white",
+              # color = "white",
               alpha = 0.2) +
 
   # ADD BOXPLOTS
-  geom_boxplot(width = 0.5,
-               alpha = 1) +
+  # geom_boxplot(width = 0.5,
+  #              alpha = 1) +
   
   # ADD POINTS
   geom_jitter(aes(x = Exodermis, 
@@ -1029,15 +1035,15 @@ p_Barriers <- ggplot(data = data2plot,
   facet_wrap(~Endodermis, scales = "free") +
   
   # ADD SIGNIFICANTS
-  geom_signif(comparisons = list(c("none", "LC"),
-                                 c("none", "Sub"),
-                                 c("LC", "Sub")
-                                 ),
-              map_signif_level = F,
-              test = "wilcox.test",
-              # test.args = list(formula = "kr ~ Barrier_Name"),
-              y_position = c(15, 17, 19)
-              ) +
+  # geom_signif(comparisons = list(c("none", "LC"),
+  #                                c("none", "Sub"),
+  #                                c("LC", "Sub")
+  #                                ),
+  #             map_signif_level = F,
+  #             test = "wilcox.test",
+  #             # test.args = list(formula = "kr ~ Barrier_Name"),
+  #             y_position = c(15, 17, 19)
+  #             ) +
   
   # CUSTOM LABELS
   xlab("Exodermis") +
@@ -1059,6 +1065,7 @@ p_Barriers <- ggplot(data = data2plot,
 
 # =========================================================================== #
 p_Barriers
+get_legend(p_Barriers)
 
 # ggsave(filename = "plots/MECHA/MECHA_Barriers_comparison.svg", 
 #        plot = p_Barriers, 
