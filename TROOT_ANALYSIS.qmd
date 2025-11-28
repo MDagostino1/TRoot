@@ -359,6 +359,8 @@ dev.off()
 ```{r}
 radius_mean <- mean(Anatomy_Full$radius[Anatomy_Full$age < 25])
 radius_sd   <- sd(Anatomy_Full$radius[Anatomy_Full$age < 25])
+cat("\n Mean radius : ", radius_mean, 
+    "\n SD radius : ", radius_sd, "\n")
 
 data2stat <- Anatomy_Full[c("age", "radius")] %>% 
   filter(age >= 25)
@@ -720,6 +722,45 @@ svg(filename = "plots/MECHA/MECHA_Predicted_kr-Kr.svg", width = 6, height = 3)
 grid.arrange(p_kr, p_Kr, nrow = 1)
 dev.off()
 ```
+
+Quantify the drop of kr and jump of Kr :
+
+```{r}
+age1 <- 15
+age2 <- 25
+b    <- c("En.CS", "En.CS-Ex.LC", "En.CS-Ex.Sub")
+
+for(b_i in b){
+  cat("\n-BARRIER : ", b_i, "\n")
+  kr_m1 <- mean(data2plot$kr[data2plot$age >= age1 & data2plot$age < age2 & data2plot$Barrier_Name %in% b_i])
+  kr_m2 <- mean(data2plot$kr[data2plot$age >= age2 & data2plot$Barrier_Name %in% b_i])
+  cat("kr decreases by ", (kr_m1-kr_m2)*100/kr_m1, " % \n")
+  
+  Kr_m1 <- mean(data2plot$Kr[data2plot$age >= age1 & data2plot$age < age2 & data2plot$Barrier_Name %in% b_i])
+  Kr_m2 <- mean(data2plot$Kr[data2plot$age >= age2 & data2plot$Barrier_Name %in% b_i])
+  cat("Kr decreases by ", (Kr_m1-Kr_m2)*100/Kr_m1, " % \n")
+}
+
+# Compute averages :
+df1 <- data2plot[c("age", "kr", "Kr", "Barrier_Name")] %>% 
+  gather(kr, Kr, key = "Variable", value = "Value") %>% 
+  mutate(Period = 
+           case_when(age >= age1 & age < age2 ~ "before",
+                     age > age2 ~ "after")) %>% 
+  na.omit() %>% 
+  group_by(Barrier_Name, Variable, Period) %>% 
+  summarise(mean = mean(Value)) %>% 
+  spread(key = Period, value = mean) %>% 
+  mutate(Diff = (before-after)*100/before)
+
+df2 <- df1 %>% 
+  group_by(Variable) %>% 
+  summarise(Diff_mean = mean(Diff),
+            Diff_sd   = sd(Diff))
+
+pander(df2)
+```
+
 
 ## - Axial conductance
 
