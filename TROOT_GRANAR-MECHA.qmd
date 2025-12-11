@@ -681,7 +681,6 @@ for(anatomy in Anatomy_list){
                        filepath = "./Data/Virtual Anatomies/",
                        path_MECHA = "./src/MECHA/")
   
-  # ============================= #
   # LOOP FOR HYDRAULIC PARAMETERS
   for(i in seq(1, nrow(hydro_params))){
     
@@ -704,13 +703,14 @@ for(anatomy in Anatomy_list){
     # ======================== #
     
     # Load MECHA parameters
-    MECHA_inputs_list <- read_MECHA_inputs(read_path,
-                                           file_General    = "Tomato_General.xml",
-                                           file_Hydraulics = "Tomato_Hydraulics.xml",
-                                           file_Hormones   = "Tomato_Hormones_Carriers.xml",
-                                           file_BC         = "Tomato_BC.xml",
-                                           file_Geometry   = "Tomato_Geometry.xml"
-                                           ) 
+    MECHA_inputs_list <- read_MECHA_inputs(
+      read_path,
+      file_General    = "Tomato_General.xml",
+      file_Hydraulics = "Tomato_Hydraulics.xml",
+      file_Hormones   = "Tomato_Hormones_Carriers.xml",
+      file_BC         = "Tomato_BC.xml",
+      file_Geometry   = "Tomato_Geometry.xml"
+      ) 
     
     # Modify Inputs
     MECHA_inputs_list$General$properties$Output$path        <- "out/"
@@ -718,13 +718,15 @@ for(anatomy in Anatomy_list){
     MECHA_inputs_list$Hydraulics$param$Kplrange$Kpl$value   <- kpl
     
     # WRITE XML's
-    write_MECHA_inputs(input_list = MECHA_inputs_list, 
-                       path = paste0(path_MECHA, "Projects/in/"), 
-                       file_General    = "Tomato_General.xml",
-                       file_Hydraulics = "Tomato_Hydraulics.xml", 
-                       file_Hormones   = "Tomato_Hormones_Carriers.xml",
-                       file_BC         = "Tomato_BC.xml",
-                       file_Geometry   = "Tomato_Geometry.xml")
+    write_MECHA_inputs(
+      input_list = MECHA_inputs_list, 
+      path = paste0(path_MECHA, "Projects/in/"), 
+      file_General    = "Tomato_General.xml",
+      file_Hydraulics = "Tomato_Hydraulics.xml", 
+      file_Hormones   = "Tomato_Hormones_Carriers.xml",
+      file_BC         = "Tomato_BC.xml",
+      file_Geometry   = "Tomato_Geometry.xml"
+      )
     
     # ======================== #
     # LAUNCH MECHA
@@ -736,22 +738,24 @@ for(anatomy in Anatomy_list){
     
     # Unleash MECHA
     try(expr = {
+      
+      ##################################################
       py_run_file(paste0(path_MECHA, MECHA_file))
+      ##################################################
     
-      # ======================== #
       # COLLECT RESULTS
-      # ======================== #
       Conds_temp <- MECHA_get_results(output_path = output_path)
       Conds_temp$CS_id   <- CS_id
       Conds_temp$kAQP    <- kAQP
       Conds_temp$kpl     <- kpl
       Conds_temp$Simu_ID <- Simu_ID
       
-      # write temp
+      # write temp result file
       write.csv(x = Conds_temp, 
                 file = paste0(write_results_path, Result_ID, ".csv"), 
                 row.names = F)
       
+      # Bind to all results
       Conds_full <- rbind(Conds_full, Conds_temp)
     }
     )
@@ -759,7 +763,7 @@ for(anatomy in Anatomy_list){
 }
 ```
 
-Collect all results
+Collect and process all results
 
 ```{r}
 list_results  <- list.files("./Results/MECHA_results/")
