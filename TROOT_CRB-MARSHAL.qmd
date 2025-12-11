@@ -679,7 +679,7 @@ data2plot <- RSHA_full %>%
 SUF_df <- data2plot %>% 
   # filter(age >= 30) %>%
   select(c("SUF", "RSHA_id", "age", "Scenario_ID", "z1", "type")) %>% 
-  mutate(zr = round(z1/2.5, digits = 0)*2.5) %>% 
+  mutate(zr = round(z1/2.5, digits = 0)*2) %>% 
   group_by(RSHA_id, zr, Scenario_ID, age) %>% 
   summarise(SUF_sum = sum(SUF)) %>% 
   ungroup() %>% 
@@ -909,7 +909,7 @@ plot_SUF <- function(data2plot){
     
     # facet_wrap(~ Scenario_ID, nrow = 1) +
     coord_fixed() +
-    # theme_few() 
+    # theme_few()
     theme_void()
   
   return(p)  

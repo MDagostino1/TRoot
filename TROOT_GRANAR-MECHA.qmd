@@ -62,7 +62,6 @@ pkg_list <- c("fmsb",
               "reticulate", 
               "xml2", 
               "tidyverse", 
-              # "plyr", 
               "deldir", 
               "viridis", 
               "Hmisc", 
@@ -98,7 +97,7 @@ Segments       <- read.csv("Data/Anatomy/Segments.csv")
 CrossSections  <- read.csv("Data/Anatomy/CrossSections.csv")
 anatomy1       <- read.csv("Data/Anatomy/anatomy1.csv")
 anatomy2       <- read.csv("Data/Anatomy/anatomy2.csv")
-Parameters     <- read.csv("Data/Anatomy/Parameters.csv")[,-1]
+Parameters     <- read.csv("Data/Anatomy/Parameters.csv")
 Anatomy_Full   <- read.csv("Data/Anatomy/Anatomy_Full.csv")
 Barriers_Types <- read_xlsx("Data/Barriers_Types.xlsx")
 
@@ -128,6 +127,10 @@ Parameters$units[Parameters$param_id == "xylem_max_size" | Parameters$param_id =
 # 0) Analysis of quantifications
 
 This part load and analyse the cross section quantifications.
+
+First let's have a look at metadata. 
+
+So we had 
 
 ## Root lengths
 
