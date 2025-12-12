@@ -62,7 +62,6 @@ pkg_list <- c("fmsb",
               "reticulate", 
               "xml2", 
               "tidyverse", 
-              # "plyr", 
               "deldir", 
               "viridis", 
               "Hmisc", 
@@ -85,6 +84,7 @@ library(ggthemes)
 
 # LOAD GRANAR FUNCTIONS
 GRANAR_path <- "C:/Users/mdagostino/Desktop/GITHUB/granar/R/" # change with your directory
+GRANAR_path <- "../granar/R/" # change with your directory
 for (i in list.files(GRANAR_path, pattern = ".R")) {
   print(i)
   source(paste0(GRANAR_path, i))
@@ -97,7 +97,7 @@ Segments       <- read.csv("Data/Anatomy/Segments.csv")
 CrossSections  <- read.csv("Data/Anatomy/CrossSections.csv")
 anatomy1       <- read.csv("Data/Anatomy/anatomy1.csv")
 anatomy2       <- read.csv("Data/Anatomy/anatomy2.csv")
-Parameters     <- read.csv("Data/Anatomy/Parameters.csv")[,-1]
+Parameters     <- read.csv("Data/Anatomy/Parameters.csv")
 Anatomy_Full   <- read.csv("Data/Anatomy/Anatomy_Full.csv")
 Barriers_Types <- read_xlsx("Data/Barriers_Types.xlsx")
 
@@ -127,6 +127,10 @@ Parameters$units[Parameters$param_id == "xylem_max_size" | Parameters$param_id =
 # 0) Analysis of quantifications
 
 This part load and analyse the cross section quantifications.
+
+First let's have a look at metadata. 
+
+So we had 
 
 ## Root lengths
 
@@ -195,7 +199,7 @@ p <- ggplot(data = data2plot %>% filter(param_id %in% cols)) +
   theme(strip.text = element_text(size = 8))
 
 p
-ggsave(filename = "plots/Anatomy_Quantifications.svg", 
+ggsave(filename = "plots/Anatomy/Anatomy_Quantifications.svg", 
        plot = p, width = 10, height = 7, units = "in",
        device = "svg")
 ```
@@ -209,7 +213,7 @@ for(i in seq(1, length(cols))){
   
   param_id_i <- cols[i]
   title_i <- unique(data2plot$Title[data2plot$param_id == param_id_i])
-  
+  2
   p_temp <- ggplot(data = data2plot %>% filter(param_id == param_id_i)) +
     geom_point(aes(x = age, y = value)) +
     # facet_wrap(~Title, scales = "free", ncol = 4) +
@@ -221,7 +225,7 @@ for(i in seq(1, length(cols))){
     ) +
     theme(plot.title = element_text(size=9))
 
-  ggsave(filename = paste0("plots/anatomical_measurements/", param_id_i, ".svg"), 
+  ggsave(filename = paste0("plots/Anatomy/measurements/", param_id_i, ".svg"), 
          plot = p_temp, width = 2.5, height = 2.5, units = "in",
          device = "svg")
 }
@@ -253,7 +257,7 @@ p <- ggplot(data = SG_data) +
   theme_few()
 
 p
-ggsave(filename = "plots/SG_probability.svg", 
+ggsave(filename = "plots/Anatomy/SG_probability.svg", 
        plot = p, width = 3, height = 2, units = "in",
        device = "svg")
 ```
@@ -335,7 +339,7 @@ radius_plot <- ggplot() +
   theme_bw()
 
 radius_plot
-svg("Plots/Radius_Plot.svg", width = 3, height = 2)
+svg("Plots/Anatomy/Radius_Plot.svg", width = 3, height = 2)
 radius_plot
 dev.off()
 ```
@@ -360,7 +364,7 @@ prm <- c("cortex_n_layers",
          "radius",
          "age")
 
-svg(filename = "plots/Anatomy_Correlations.svg", width = 6, height = 6)
+svg(filename = "plots/Anatomy/Anatomy_Correlations.svg", width = 6, height = 6)
 pcor <- corrplot(cor(Anatomy_Full[prm]), 
                  method = "color",
                  # type = "upper"
@@ -431,7 +435,7 @@ Examples of parameter files are in \*/Params/.
 
 ```{r}
 # xml <- "Params/examples/B73_taproot_2021.xml"
-xml <- "src/Params/B11_F_To_C02_Z10_01.xml"
+xml <- "src/Params/B04_B_To_C01_Z20_01.xml"
 
 param1 <- read_param_xml(xml)
 
@@ -444,6 +448,8 @@ param1$value[param1$name == "param" & param1$type == "randomness"]        <- 0
 # param1$value[param1$name == "epidermis" & param1$type == "cell_diameter"] <- 0.005
 # param1$value[param1$name == "exodermis" & param1$type == "cell_diameter"] <- 0.005
 ```
+
+
 
 ## Play with GRANAR
 
@@ -551,8 +557,10 @@ ggplot(test) +
           axis.title.x=element_blank(),
           axis.title.y=element_blank())
 
+# Load MECHA functions
 source("./src/MECHA/MECHA_functions.R")
 
+# Upload current anatomy to MECHA folder
 MECHA.upload_anatomy(filename = "B04_B_To_C01_Z20_01.xml",
                      filepath = "./Data/Virtual Anatomies/",
                      path_MECHA = "./src/MECHA/")
@@ -574,8 +582,7 @@ MECHA_inputs_list <- read_MECHA_inputs(read_path,
                                        file_Geometry = "Tomato_Geometry.xml"
                                        ) 
 
-# RUN MODIFIER OF MECHA INPUTS
-
+# MODIFY MECHA INPUTS BY HAND
 MECHA_inputs_list$General$properties$Output$path        <- "out/"
 MECHA_inputs_list$Hydraulics$param$kAQPrange$kAQP$value <- 1.5e-4
 
@@ -589,21 +596,18 @@ write_MECHA_inputs(input_list = MECHA_inputs_list,
                    file_Geometry   = "Tomato_Geometry.xml")
 ```
 
+Launch MECHA
 
 ```{r}
-# ============================================================================ #
-# LAUNCH MECHA
-# ============================================================================ #
-
 library(reticulate)
 use_condaenv("GRANAR-MECHA") # choose python environment 
 sys <- import("sys", convert=T)
-try(py_run_file("src/MECHA/MECHAv4_TRoot.py"))
 
-# Get results
+# ============================================================================ #
+py_run_file("src/MECHA/MECHAv4_TRoot.py")
 Conds <- MECHA_get_results(output_path = "./src/MECHA/Projects/out/")
-```
 
+```
 
 Visualization (in devlopment)
 
@@ -632,29 +636,29 @@ We need to run MECHA for :
 Define parametric space
 
 ```{r, eval= F}
+# List files of GRANAR anatomies
 Anatomy_list <- list.files(path = "./Data/Virtual Anatomies/", pattern = ".xml")
 
+# Set hydraulic parameters
 kAQP_list    <- seq(1:10)*1e-4  # Elhert et al. (2009) : 4.3e-4 [cm/HPa/d]
-kpl_list    <- 5.3e-12         # Bret-Harte 1994      : 5.3e-12 [cm^3/hPa/d/plasmodesmata]
+kpl_list     <- 5.3e-12         # Bret-Harte 1994      : 5.3e-12 [cm^3/hPa/d/plasmodesmata]
 
-hydro_params  <- expand.grid(kAQP = kAQP_list, 
-                             kpl  = kpl_list)
+hydro_params  <- expand.grid(kAQP = kAQP_list, kpl  = kpl_list)
 
 hydro_params <- hydro_params %>% 
   mutate(Simu_ID = paste0(kAQP, "_", kpl))
 ```
-
 
 ```{r, include = F}
 library(reticulate)
 source("./src/MECHA/MECHA_functions.R")
 
 # Set up
-path_MECHA         <- "./src/MECHA/"
-read_path          <- paste0(path_MECHA, "Projects/in/")
-MECHA_file         <- "MECHAv4_TRoot.py"
-output_path        <- paste0(path_MECHA, "Projects/out/")
-write_results_path <- "./Results/MECHA_results/"
+path_MECHA         <- "./src/MECHA/"                       # Path to MECHA folder
+read_path          <- paste0(path_MECHA, "Projects/in/")   # Path to MECHA inputs
+MECHA_file         <- "MECHAv4_TRoot.py"                   # MECHA file
+output_path        <- paste0(path_MECHA, "Projects/out/")  # Path to MECHA outputs
+write_results_path <- "./Results/MECHA_results/"           # Path to results
 
 Results_list <- list.files(write_results_path)
 
@@ -662,20 +666,21 @@ Results_list <- list.files(write_results_path)
 # sys <- import("sys", convert=T)
 
 # ============================================================================ #
-# LOOP FOR ANATOMY
+# INITIALIZATION
 Conds_full <- tibble()
-sim_count <- 0
-sim_tot   <- length(Anatomy_list) * nrow(hydro_params)
+sim_count  <- 0
+sim_tot    <- length(Anatomy_list) * nrow(hydro_params)
+
+# LOOP FOR ANATOMY
 for(anatomy in Anatomy_list){
   
   CS_id <- unlist(strsplit(anatomy, split = ".xml"))[1]
   
-  # Move anatomy to folder
+  # Move anatomy to MECHA folder
   MECHA.upload_anatomy(filename = anatomy,
                        filepath = "./Data/Virtual Anatomies/",
                        path_MECHA = "./src/MECHA/")
   
-  # ============================= #
   # LOOP FOR HYDRAULIC PARAMETERS
   for(i in seq(1, nrow(hydro_params))){
     
@@ -698,13 +703,14 @@ for(anatomy in Anatomy_list){
     # ======================== #
     
     # Load MECHA parameters
-    MECHA_inputs_list <- read_MECHA_inputs(read_path,
-                                           file_General    = "Tomato_General.xml",
-                                           file_Hydraulics = "Tomato_Hydraulics.xml",
-                                           file_Hormones   = "Tomato_Hormones_Carriers.xml",
-                                           file_BC         = "Tomato_BC.xml",
-                                           file_Geometry   = "Tomato_Geometry.xml"
-                                           ) 
+    MECHA_inputs_list <- read_MECHA_inputs(
+      read_path,
+      file_General    = "Tomato_General.xml",
+      file_Hydraulics = "Tomato_Hydraulics.xml",
+      file_Hormones   = "Tomato_Hormones_Carriers.xml",
+      file_BC         = "Tomato_BC.xml",
+      file_Geometry   = "Tomato_Geometry.xml"
+      ) 
     
     # Modify Inputs
     MECHA_inputs_list$General$properties$Output$path        <- "out/"
@@ -712,13 +718,15 @@ for(anatomy in Anatomy_list){
     MECHA_inputs_list$Hydraulics$param$Kplrange$Kpl$value   <- kpl
     
     # WRITE XML's
-    write_MECHA_inputs(input_list = MECHA_inputs_list, 
-                       path = paste0(path_MECHA, "Projects/in/"), 
-                       file_General    = "Tomato_General.xml",
-                       file_Hydraulics = "Tomato_Hydraulics.xml", 
-                       file_Hormones   = "Tomato_Hormones_Carriers.xml",
-                       file_BC         = "Tomato_BC.xml",
-                       file_Geometry   = "Tomato_Geometry.xml")
+    write_MECHA_inputs(
+      input_list = MECHA_inputs_list, 
+      path = paste0(path_MECHA, "Projects/in/"), 
+      file_General    = "Tomato_General.xml",
+      file_Hydraulics = "Tomato_Hydraulics.xml", 
+      file_Hormones   = "Tomato_Hormones_Carriers.xml",
+      file_BC         = "Tomato_BC.xml",
+      file_Geometry   = "Tomato_Geometry.xml"
+      )
     
     # ======================== #
     # LAUNCH MECHA
@@ -730,22 +738,24 @@ for(anatomy in Anatomy_list){
     
     # Unleash MECHA
     try(expr = {
+      
+      ##################################################
       py_run_file(paste0(path_MECHA, MECHA_file))
+      ##################################################
     
-      # ======================== #
       # COLLECT RESULTS
-      # ======================== #
       Conds_temp <- MECHA_get_results(output_path = output_path)
       Conds_temp$CS_id   <- CS_id
       Conds_temp$kAQP    <- kAQP
       Conds_temp$kpl     <- kpl
       Conds_temp$Simu_ID <- Simu_ID
       
-      # write temp
+      # write temp result file
       write.csv(x = Conds_temp, 
                 file = paste0(write_results_path, Result_ID, ".csv"), 
                 row.names = F)
       
+      # Bind to all results
       Conds_full <- rbind(Conds_full, Conds_temp)
     }
     )
@@ -753,11 +763,12 @@ for(anatomy in Anatomy_list){
 }
 ```
 
-Collect all results
+Collect and process all results
 
 ```{r}
-list_results <- list.files("./Results/MECHA_results/")
+list_results  <- list.files("./Results/MECHA_results/")
 MECHA_results <- tibble()
+
 for(i in list_results){
   results_temp <- read.csv(file = paste0("./Results/MECHA_results/", i))
   MECHA_results <- rbind(MECHA_results, results_temp)
@@ -766,7 +777,11 @@ for(i in list_results){
 write.csv(x = MECHA_results, file = "./Results/MECHA_results.csv", row.names = F)
 ```
 
+Simple preview
+
 ```{r}
+MECHA_results <- read.csv("./Results/MECHA_results.csv")
+
 data2plot <- MECHA_results %>% 
   left_join(Anatomy_Full, by = "CS_id") %>% 
   # filter(kAQP == 4e-4) %>% 

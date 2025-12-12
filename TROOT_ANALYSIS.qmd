@@ -277,8 +277,8 @@ svg(filename = "plots/Anatomy/Anatomy_important_traits.svg", width = 5, height =
 Anatomy_plot
 dev.off()
 
-ggsave(filename = "plots/Anatomy/Anatomy_important_traits.png", plot = Anatomy_plot, 
-       device = "png", width = 6, height = 4, dpi = 300)
+# ggsave(filename = "plots/Anatomy/Anatomy_important_traits.png", plot = Anatomy_plot, 
+#        device = "png", width = 6, height = 4, dpi = 300)
 ```
 
 ## - Secondary growth
@@ -359,6 +359,8 @@ dev.off()
 ```{r}
 radius_mean <- mean(Anatomy_Full$radius[Anatomy_Full$age < 25])
 radius_sd   <- sd(Anatomy_Full$radius[Anatomy_Full$age < 25])
+cat("\n Mean radius : ", radius_mean, 
+    "\n SD radius : ", radius_sd, "\n")
 
 data2stat <- Anatomy_Full[c("age", "radius")] %>% 
   filter(age >= 25)
@@ -595,7 +597,12 @@ lm_kr <- readRDS(file = "./Results/kr_model.rds")
 
 ## - Radial conductivity & conductance at fixed kAQP
 
+NB : radial conductance is expressed per unit of length, because we only multiply kr by the perimeter.
+
 ```{r}
+radius_mean <- mean(Anatomy_Full$radius[Anatomy_Full$age < 25])
+radius_lm <- readRDS("./Results/radius_model.rds")
+
 color_scale <- c("En.CS"        = "black", 
                  "En.CS-Ex.LC"  = "#C71AB7", 
                  "En.CS-Ex.Sub" = "#4E3CA5")
@@ -698,7 +705,7 @@ p_Kr <- ggplot(data2plot) +
   scale_fill_manual(values = color_scale) +
   
   xlab("Age [d]") +
-  ylab(expression(K[r] ~ "[" ~ m^{3} ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  ylab(expression(K[r] ~ "[" ~ m^{3} ~ m^{-1} ~ MPa^{-1} ~ s^{-1} ~ "]")) +
   
   # facet_wrap(~Variable, scales = "free") +
   # facet_grid(Variable~kAQP) +
@@ -716,6 +723,45 @@ grid.arrange(p_kr, p_Kr, nrow = 1)
 dev.off()
 ```
 
+Quantify the drop of kr and jump of Kr :
+
+```{r}
+age1 <- 15
+age2 <- 25
+b    <- c("En.CS", "En.CS-Ex.LC", "En.CS-Ex.Sub")
+
+for(b_i in b){
+  cat("\n-BARRIER : ", b_i, "\n")
+  kr_m1 <- mean(data2plot$kr[data2plot$age >= age1 & data2plot$age < age2 & data2plot$Barrier_Name %in% b_i])
+  kr_m2 <- mean(data2plot$kr[data2plot$age >= age2 & data2plot$Barrier_Name %in% b_i])
+  cat("kr decreases by ", (kr_m1-kr_m2)*100/kr_m1, " % \n")
+  
+  Kr_m1 <- mean(data2plot$Kr[data2plot$age >= age1 & data2plot$age < age2 & data2plot$Barrier_Name %in% b_i])
+  Kr_m2 <- mean(data2plot$Kr[data2plot$age >= age2 & data2plot$Barrier_Name %in% b_i])
+  cat("Kr decreases by ", (Kr_m1-Kr_m2)*100/Kr_m1, " % \n")
+}
+
+# Compute averages :
+df1 <- data2plot[c("age", "kr", "Kr", "Barrier_Name")] %>% 
+  gather(kr, Kr, key = "Variable", value = "Value") %>% 
+  mutate(Period = 
+           case_when(age >= age1 & age < age2 ~ "before",
+                     age > age2 ~ "after")) %>% 
+  na.omit() %>% 
+  group_by(Barrier_Name, Variable, Period) %>% 
+  summarise(mean = mean(Value)) %>% 
+  spread(key = Period, value = mean) %>% 
+  mutate(Diff = (before-after)*100/before)
+
+df2 <- df1 %>% 
+  group_by(Variable) %>% 
+  summarise(Diff_mean = mean(Diff),
+            Diff_sd   = sd(Diff))
+
+pander(df2)
+```
+
+
 ## - Axial conductance
 
 At first i tested a ln transformation, but generalised Box-Cox transformation is better, so let's keep it.
@@ -728,7 +774,7 @@ data2stat <- MECHA_results %>%
   mutate("kx_ln" = ln(kx))
 
 ggplot(data2stat) +
-  geom_point(aes(x = age, y = kx)) +
+  geom_point(aes(x = age, y = kx_ln)) +
   theme_few()
 
 # CHECK NORMALITY ON ln TRANSFORMED DATA
@@ -739,10 +785,10 @@ hist(data2stat$kx_ln)
 shapiro.test(data2stat$kx_ln)
 
 # NORMALIZE WITH BOX-COX
-bc              <- MASS::boxcox(lm(data2stat$kx ~ 1))
+bc                 <- MASS::boxcox(lm(data2stat$kx ~ 1))
 lambda_kx          <- bc$x[which(bc$y == max(bc$y))]
 cat("kx lambda : ", lambda_kx, "\n")
-data2stat$kx_tf <- BoxCox(data2stat$kx,  lambda_kx)
+data2stat$kx_tf    <- BoxCox(data2stat$kx,  lambda_kx)
 
 # RE-CHECK NORMALITY ON BOX-COX TRANSFORMED DATA
 par(mfrow = c(1, 2))
@@ -761,6 +807,12 @@ plot(lm_kx)
 pander(summary(lm_kx))
 # anova(kx_lm)
 
+lm_kx2 <- lm(data    = data2stat, 
+             formula = kx_ln ~ radius+age)
+par(mfrow = c(2,2))
+plot(lm_kx2)
+pander(summary(lm_kx2))
+
 saveRDS(object = lm_kx, file = "./Results/kx_model.rds")
 ```
 
@@ -771,6 +823,7 @@ $$
 with :
 
 ```{r}
+lm_kx <- readRDS("./Results/kx_model.rds")
 cat("alpha = ", lm_kx$coefficients["(Intercept)"], "\n")
 cat("beta  = ", lm_kx$coefficients["radius"], "\n")
 cat("gamma = ", lm_kx$coefficients["age"], "\n")
@@ -782,8 +835,11 @@ Test prediction
 lm_kx <- readRDS("./Results/kx_model.rds")
 
 data2stat$r_data  <- data2stat$radius
-data2stat$radius  <- kx_pred(data2stat, lm_kx = lm_kx)
-data2stat$kx_pred <- kx_pred(data2stat, lm_kx)
+data2stat$radius  <- kx_pred(data2stat, 
+                             lm_kx = lm_kx, 
+                             lambda = lambda_kx)
+data2stat$kx_pred <- kx_pred(data2stat, 
+                             lm_kx)
 
 ggplot(data2stat) +
   
@@ -813,13 +869,16 @@ ggplot(data2stat) +
 
 p_kx <- ggplot(data2stat) +
   
-  geom_line(aes(x = age, y = ln(kx_pred)), 
+  geom_line(aes(x = age, y = kx_pred), 
             color = "orange",
             linewidth =2)+
   
-  geom_point(aes(x = age, y = ln(kx))) +
+  geom_point(aes(x = age, y = kx)) +
   
-  ylab(expression(ln(k)[x] ~ "[" ~ m^{4} ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  # scale_y_continuous(trans='log2') +
+  scale_y_log10() +
+  
+  ylab(expression(k[x] ~ "[" ~ m^{4} ~ MPa^{-1} ~ s^{-1} ~ "]")) +
   
   theme_few()
 
@@ -908,7 +967,7 @@ Barrier_lm <- lm(data = data2stat,
 
 par(mfrow = c(2,2))
 plot(Barrier_lm)
-# summary(Barrier_lm)
+summary(Barrier_lm)
 anova(Barrier_lm)
 ```
 
@@ -916,8 +975,9 @@ anova(Barrier_lm)
 
 ```{r}
 EM <- emmeans(Barrier_lm, specs = pairwise ~ Barrier_Name)
+print(EM)
 
-Means <- as_tibble(EM$emmeans)
+Means     <- as_tibble(EM$emmeans)
 Contrasts <- as_tibble(EM$contrasts)
 
 Means$emmean_TF <- BoxCox_reverse(Means$emmean, lambda)
@@ -996,14 +1056,14 @@ p_Barriers <- ggplot(data = data2plot,
                      ) +
   
   # # ADD VIOLINS
-  geom_violin(aes(fill  = Barrier_Name),
+  geom_violin(aes(fill  = Barrier_Name, color = Barrier_Name),
               # fill  = "lightgrey",
-              color = "white",
+              # color = "white",
               alpha = 0.2) +
 
   # ADD BOXPLOTS
-  geom_boxplot(width = 0.5,
-               alpha = 1) +
+  # geom_boxplot(width = 0.5,
+  #              alpha = 1) +
   
   # ADD POINTS
   geom_jitter(aes(x = Exodermis, 
@@ -1016,15 +1076,15 @@ p_Barriers <- ggplot(data = data2plot,
   facet_wrap(~Endodermis, scales = "free") +
   
   # ADD SIGNIFICANTS
-  geom_signif(comparisons = list(c("none", "LC"),
-                                 c("none", "Sub"),
-                                 c("LC", "Sub")
-                                 ),
-              map_signif_level = F,
-              test = "wilcox.test",
-              # test.args = list(formula = "kr ~ Barrier_Name"),
-              y_position = c(15, 17, 19)
-              ) +
+  # geom_signif(comparisons = list(c("none", "LC"),
+  #                                c("none", "Sub"),
+  #                                c("LC", "Sub")
+  #                                ),
+  #             map_signif_level = F,
+  #             test = "wilcox.test",
+  #             # test.args = list(formula = "kr ~ Barrier_Name"),
+  #             y_position = c(15, 17, 19)
+  #             ) +
   
   # CUSTOM LABELS
   xlab("Exodermis") +
@@ -1046,6 +1106,7 @@ p_Barriers <- ggplot(data = data2plot,
 
 # =========================================================================== #
 p_Barriers
+get_legend(p_Barriers)
 
 # ggsave(filename = "plots/MECHA/MECHA_Barriers_comparison.svg", 
 #        plot = p_Barriers, 

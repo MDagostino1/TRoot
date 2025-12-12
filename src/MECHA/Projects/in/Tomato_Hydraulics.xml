@@ -11,7 +11,7 @@
   </kw_barrier_range>
   <km value="3e-05"/>
   <kAQPrange>
-    <kAQP value="0.001" epi_factor="1" exo_factor="1" cortex_factor="1" endo_factor="1" stele_factor="1"/>
+    <kAQP value="0.00015" epi_factor="1" exo_factor="1" cortex_factor="1" endo_factor="1" stele_factor="1"/>
   </kAQPrange>
   <ratio_cortex value="1"/>
   <Kplrange>
