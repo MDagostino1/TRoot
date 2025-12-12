@@ -19,7 +19,8 @@ rm(list = ls())
 # ============================================================================ #
 # DEFINE PATHS
 CRBM.path    <- "./src/CRB-MARSHAL/"
-path.results <- "C:/Users/mdagostino/OneDrive - UCL/T-ROOT/ANALYSIS/RESULTS/CRB-MARSHAL/"
+# path.results <- "C:/Users/mdagostino/OneDrive - UCL/T-ROOT/ANALYSIS/RESULTS/CRB-MARSHAL/"  # Local path where CRB-MARSHAL data are stored
+path.results <- "./Results/CRB-MARSHAL/"
 path.plots   <- "./plots/CRB-MARSHAL/"
 # ============================================================================ #
 libs <- c("pander", 
@@ -88,47 +89,47 @@ Each RSA is associated with a RSA_id and we create a table `RSA_id`. \
 We loop through each RSA in *.txt* format, we format it and than we store everything in one big table called *RSA.all.csv*
  
 ```{r}
-RSA.path     <- "./src/CRB-MARSHAL/inputs/RSA/"
-RSA.path.raw <- paste0(RSA.path, "raw/")
-RSA_list     <- list.files(RSA.path.raw, pattern = ".txt")
-RSA.all      <- tibble()
-RSA.IDs      <- tibble()
-
-# ============================================================================ #
-for(RSA_i in RSA_list){
-  
-  # Load and process temp RSA
-  RSA_id_i        <- unlist(strsplit(RSA_i, split = ".txt"))[1]
-  RSA_temp        <- read.table(paste0(RSA.path.raw, RSA_i), header = T)
-  RSA_temp        <- reconnect.nodes(RSA_temp)
-  RSA_temp$RSA_id <- RSA_id_i
-  
-  write.csv(x = RSA_temp, file = paste0(RSA.path, RSA_id_i, ".csv"),
-            row.names = F)
-
-  # Update RSA.IDs table
-  RSA_id_i_df     <- tibble(
-    planttype = unlist(strsplit(RSA_id_i, split = "_"))[1],
-    age       = unlist(strsplit(RSA_id_i, split = "_"))[2],
-    rep       = unlist(strsplit(RSA_id_i, split = "_"))[3],
-    RSA_id    = RSA_id_i)
-  
-  RSA.IDs         <- rbind(RSA.IDs, RSA_id_i_df)
-
-  # Add RSA to global RSA.all table
-  RSA.all         <- rbind(RSA.all, RSA_temp)
-  
-}
-# ============================================================================ #
-
-# Write files
-write.csv(x = RSA.all,
-          file = paste0(CRBM.path, "inputs/RSA_all.csv"),
-          row.names = F)
-
-write.csv(x = RSA.IDs,
-          file = paste0(CRBM.path, "inputs/RSA_id.csv"),
-          row.names = F)
+# RSA.path     <- "./src/CRB-MARSHAL/inputs/RSA/"
+# RSA.path.raw <- paste0(RSA.path, "raw/")
+# RSA_list     <- list.files(RSA.path.raw, pattern = ".txt")
+# RSA.all      <- tibble()
+# RSA.IDs      <- tibble()
+# 
+# # ============================================================================ #
+# for(RSA_i in RSA_list){
+#   
+#   # Load and process temp RSA
+#   RSA_id_i        <- unlist(strsplit(RSA_i, split = ".txt"))[1]
+#   RSA_temp        <- read.table(paste0(RSA.path.raw, RSA_i), header = T)
+#   RSA_temp        <- reconnect.nodes(RSA_temp)
+#   RSA_temp$RSA_id <- RSA_id_i
+#   
+#   write.csv(x = RSA_temp, file = paste0(RSA.path, RSA_id_i, ".csv"),
+#             row.names = F)
+# 
+#   # Update RSA.IDs table
+#   RSA_id_i_df     <- tibble(
+#     planttype = unlist(strsplit(RSA_id_i, split = "_"))[1],
+#     age       = unlist(strsplit(RSA_id_i, split = "_"))[2],
+#     rep       = unlist(strsplit(RSA_id_i, split = "_"))[3],
+#     RSA_id    = RSA_id_i)
+#   
+#   RSA.IDs         <- rbind(RSA.IDs, RSA_id_i_df)
+# 
+#   # Add RSA to global RSA.all table
+#   RSA.all         <- rbind(RSA.all, RSA_temp)
+#   
+# }
+# # ============================================================================ #
+# 
+# # Write files
+# write.csv(x = RSA.all,
+#           file = paste0(CRBM.path, "inputs/RSA_all.csv"),
+#           row.names = F)
+# 
+# write.csv(x = RSA.IDs,
+#           file = paste0(CRBM.path, "inputs/RSA_id.csv"),
+#           row.names = F)
 ```
 
 ## Plot pre-processed RSA
@@ -350,6 +351,8 @@ Conds.tot <- merge(Conds.tot, roottypes)
 So we want to loop MARSHAL for each S_ID of Conds.tot.
 
 For that we run the MPIPE.R file. 
+
+Note : results of this code are too heavy to be stored on GITHUB. By default running this chunk generates 712Mb of data in *"./Results/CRB-MARSHAL/"*.
 
 ```{r, include = F}
 source("./src/CRB-MARSHAL/CRBM_functions.R")
