@@ -33,8 +33,6 @@ libs <- c("pander", "readxl", "EnvStats",
 for(pk in libs) {
   library(pk, character.only = T)   
 }
-
-simu_path <- "Results/12-01-2023/" # Last simulations
 ```
 
 # Load Results from MECHA

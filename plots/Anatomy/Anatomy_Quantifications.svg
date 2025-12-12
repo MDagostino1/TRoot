@@ -937,7 +937,7 @@
 </defs>
 <g clip-path='url(#cpMjA2LjYzfDMyOC40MnwzNjguOTJ8Mzg1Ljkw)'>
 <rect x='206.63' y='368.92' width='121.80' height='16.98' style='stroke-width: 1.16; stroke: none; fill: #FFFFFF;' />
-<text x='267.53' y='380.27' text-anchor='middle' style='font-size: 8.00px;fill: #1A1A1A; font-family: "Arial";' textLength='90.70px' lengthAdjust='spacingAndGlyphs'>xylem cell_diameter [mm]</text>
+<text x='267.53' y='380.27' text-anchor='middle' style='font-size: 8.00px;fill: #1A1A1A; font-family: "Arial";' textLength='88.65px' lengthAdjust='spacingAndGlyphs'>xylem cell_diameter [µm]</text>
 </g>
 <g clip-path='url(#cpMC4wMHw3MjAuMDB8MC4wMHw1MDQuMDA=)'>
 </g>
@@ -948,7 +948,7 @@
 </defs>
 <g clip-path='url(#cpMzY5LjEyfDQ5MC45MnwzNjguOTJ8Mzg1Ljkw)'>
 <rect x='369.12' y='368.92' width='121.80' height='16.98' style='stroke-width: 1.16; stroke: none; fill: #FFFFFF;' />
-<text x='430.02' y='380.27' text-anchor='middle' style='font-size: 8.00px;fill: #1A1A1A; font-family: "Arial";' textLength='76.91px' lengthAdjust='spacingAndGlyphs'>xylem max_size [mm]</text>
+<text x='430.02' y='380.27' text-anchor='middle' style='font-size: 8.00px;fill: #1A1A1A; font-family: "Arial";' textLength='74.86px' lengthAdjust='spacingAndGlyphs'>xylem max_size [µm]</text>
 </g>
 <g clip-path='url(#cpMC4wMHw3MjAuMDB8MC4wMHw1MDQuMDA=)'>
 </g>

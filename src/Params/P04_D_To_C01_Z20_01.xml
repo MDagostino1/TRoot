@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <granar>
-<aerenchyma n_files="10" proportion="0"/>
-<cortex cell_diameter="0.0275757142857143" n_layers="2" order="4"/>
-<endodermis cell_diameter="0.0174982727272727" n_layers="1" order="3"/>
-<epidermis cell_diameter="0.01448875" n_layers="1" order="6"/>
-<exodermis cell_diameter="0.0384731538461539" n_layers="1" order="5"/>
-<pericycle cell_diameter="0.013347" n_layers="1" order="2"/>
-<phloem cell_diameter="0.007968" n_layers="0" order="1.5" proportion="0"/>
-<planttype param="2"/>
-<randomness param="2"/>
 <secondarygrowth param="0"/>
-<stele cell_diameter="0.00798921786692472" layer_diameter="0.1464115" n_layers="10" order="1" SD="0.00134152766406868"/>
-<xylem cell_diameter="0.0220420525943034" max_size="0.0331297965152746" n_cells="6" n_files="2" order="1.5"/>
+<randomness param="2"/>
+<planttype param="2"/>
+<aerenchyma proportion="0" n_files="10"/>
+<xylem n_files="2" n_cells="6" max_size="0.0331297965152746" cell_diameter="0.0220420525943034" order="1.5"/>
+<stele cell_diameter="0.00798921786692472" SD="0.00134152766406868" order="1" n_layers="10" layer_diameter="0.1464115"/>
+<phloem cell_diameter="0.007968" order="1.5" n_layers="0" proportion="0"/>
+<cortex cell_diameter="0.0275757142857143" order="4" n_layers="2"/>
+<endodermis cell_diameter="0.0174982727272727" n_layers="1" order="3"/>
+<exodermis cell_diameter="0.0384731538461539" n_layers="1" order="5"/>
+<epidermis cell_diameter="0.01448875" n_layers="1" order="6"/>
+<pericycle cell_diameter="0.013347" order="2" n_layers="1"/>
 </granar>

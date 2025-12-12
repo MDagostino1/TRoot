@@ -1,5 +1,5 @@
 ---
-title: "MAIN"
+title: "TROOT_GRANAR-MECHA"
 author: "Marco D'Agostino"
 format: html
 editor: source
@@ -9,32 +9,7 @@ editor_options:
 
 # INTRODUCTION
 
-This notebook contains the main codes of the project T-ROOT
-
-First we load the packages. NB : you may need to install some of them manually.
-
--   *GRANAR* libraries : I advise to get them directly from GITHUB
-
--   Specific functions for this notebook : load all functions in *src/FUNCTIONS/T-Root/*.
-
-Other folders :
-
--   *Data* : contains all data used in these scripts
-
--   *src/MECHA/* : contains all codes to run MECHA
-
--   *src/Params/* : contains all quantified experimental cross sections in the form of GRANAR input parameters
-
--   *src/CRB-MARSHAL/* : contains all codes and data to run CRootBox and MARSHAL
-
-Here we load an convert quantification data (in the form of *xlsx* files in *Data/Quantifications* folder) into GRANAR parameters (params). The params will be stored both into single *xml* files (in the folder *Params*) directly usible into GRANAR, and into the big table Anatomy2. The file *Data_Preparation.R* automatically load and treat data from *Data/Quantifications*.
-
--   *Plants* contains IDs, ages and lengths of each roots
--   *Segments* contains informations about segments of each root
--   *CrossSections* contains IDs and informations about each cross section
--   *anatomy1* contains all quantifiation data
--   *anatomy2* contains all values of all GRANAR params for each cross section
--   *Parameters* contains information about the measured and GRANAR params
+This notebook contains the code workflow to load quantified anatomy data, run GRANAR and run MECHA. \
 
 ```{r, include=F}
 options(rstudio.help.showDataPreview = FALSE)
@@ -107,21 +82,44 @@ date           <- Sys.Date()
 Parameters$units[Parameters$param_id == "xylem_max_size" | Parameters$param_id == "xylem_cell_diameter"] <- "mm"
 ```
 
+# [don't run] Process Anatomical Data
+
+We quantified 40+ root cross sections of tomato from microscope pictures.  \
+These quantifications are in *Data/Quantifications/* folder, in the form of .XSLX files. \
+We run the script *Data_preparation.R* in *./src¨* to convert these XLSX file into single tables. \
+NB : Metadata files are required : \
+-   *Plants* contains IDs, ages and lengths of each roots \
+-   *Segments* contains informations about segments of each root \
+-   *CrossSections* contains IDs and informations about each cross section \
+The script in *Data_preparation.R* creates 
+
+
+Here we load an convert quantification data (in the form of *xlsx* files in *Data/Quantifications* folder) into GRANAR parameters (params). The params will be stored both into single *xml* files (in the folder *Params*) directly usible into GRANAR, and into the big table Anatomy2. The file *Data_Preparation.R* automatically load and treat data from *Data/Quantifications*.
+
+-   *anatomy1* contains all quantifiation data
+-   *anatomy2* contains all values of all GRANAR params for each cross section
+-   *Parameters* contains information about the measured and GRANAR params
+
 ```{r}
-## All anatomical data in standard table ; Create Anatomy_Full.csv
+# source("./src/Data_preparation.R")
+```
 
-# Anatomy_Full <- anatomy2 %>% 
-#   spread(key = param_id, value = value) %>% 
-#   left_join(CrossSections, by = "CS_id") %>% 
-#   mutate(radius = 
-#            cortex_cell_diameter * cortex_n_layers +
-#            endodermis_cell_diameter * endodermis_n_layers +
-#            epidermis_cell_diameter * epidermis_n_layers +
-#            exodermis_cell_diameter * exodermis_n_layers +
-#            stele_layer_diameter/2
-#            )
 
-# write.csv(Anatomy_Full, "Data/Anatomy/Anatomy_Full.csv", row.names = F)
+```{r}
+# All anatomical data in standard table ; Create Anatomy_Full.csv
+
+Anatomy_Full <- anatomy2 %>%
+  spread(key = param_id, value = value) %>%
+  left_join(CrossSections, by = "CS_id") %>%
+  mutate(radius =
+           cortex_cell_diameter * cortex_n_layers +
+           endodermis_cell_diameter * endodermis_n_layers +
+           epidermis_cell_diameter * epidermis_n_layers +
+           exodermis_cell_diameter * exodermis_n_layers +
+           stele_layer_diameter/2
+           )
+
+write.csv(Anatomy_Full, "Data/Anatomy/Anatomy_Full.csv", row.names = F)
 ```
 
 # 0) Analysis of quantifications
@@ -165,7 +163,7 @@ summary(anatomy2)
 data2plot <- anatomy2 %>% 
   left_join(Parameters[c("name", "type", "param_id", "units")], by = "param_id") %>% 
   left_join(CrossSections[c("CS_id", "age", "plant_id")], by = "CS_id") %>% 
-  mutate(Title = paste0(name, " ", type," [", units, "]"))
+  mutate(Title = paste0(name, " ", type, " [", units, "]"))
 
 cols <- c(
   "cortex_cell_diameter",
