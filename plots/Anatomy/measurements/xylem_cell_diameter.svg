@@ -98,6 +98,6 @@
 <text x='166.14' y='157.90' text-anchor='middle' style='font-size: 9.60px;fill: #4D4D4D; font-family: "Arial";' textLength='10.67px' lengthAdjust='spacingAndGlyphs'>30</text>
 <text x='109.08' y='171.50' text-anchor='middle' style='font-size: 12.00px; font-family: "Arial";' textLength='20.02px' lengthAdjust='spacingAndGlyphs'>age</text>
 <text transform='translate(14.57,82.97) rotate(-90)' text-anchor='middle' style='font-size: 12.00px; font-family: "Arial";' textLength='28.69px' lengthAdjust='spacingAndGlyphs'>value</text>
-<text x='44.13' y='12.42' style='font-size: 9.00px; font-family: "Arial";' textLength='102.00px' lengthAdjust='spacingAndGlyphs'>xylem cell_diameter [mm]</text>
+<text x='44.13' y='12.42' style='font-size: 9.00px; font-family: "Arial";' textLength='99.69px' lengthAdjust='spacingAndGlyphs'>xylem cell_diameter [µm]</text>
 </g>
 </svg>
