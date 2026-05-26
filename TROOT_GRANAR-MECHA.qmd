@@ -342,6 +342,24 @@ radius_plot
 dev.off()
 ```
 
+## Hydrophobic barriers
+
+```{r}
+HB_data <- read_xlsx("./Data/Barriers_Timings.xlsx") %>% 
+  mutate(Exo = factor(Exo, levels = c("none", "Suberin (patchy)", "Suberin (complete)", "Lignin Cap")))
+
+p <- ggplot(HB_data) +
+  geom_point(aes(x = Staining, y = age, color = Exo, shape = Exo), size = 3) +
+  coord_flip() +
+  theme_bw() +
+  theme(legend.position = "right")
+p
+
+svg(filename = paste0("./plots/BarriersTiming.svg"), width = 4, height = 2)
+p
+dev.off()
+```
+
 ## Correlations
 
 ```{r}
