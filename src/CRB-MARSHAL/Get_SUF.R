@@ -1,4 +1,3 @@
-
 getSUF <- function(table_data, 
                    table_cond, 
                    table_soil, 
