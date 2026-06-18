@@ -2067,7 +2067,7 @@ for h in range(Nhydraulics):
             elif Barrier==9: #Lignin Cap
                 kw_endo_endo=kw_barrier[0,0]
                 kw_exo_exo=kw_barrier[0,0] #(cm^2/hPa/d) hydraulic conductivity of the suberised walls between exodermis cells
-                kw_exo_epi=kw_barrier[0,1]
+                kw_exo_epi=kw_barrier[0,0] # [0,1] -> [0,0] change to lignin(CS) conductivity ?
                 kw_exo_cortex=kw
                 kw_cortex_cortex=kw
                 kw_endo_peri=kw #(cm^2/hPa/d) hydraulic conductivity of the walls between endodermis and pericycle cells

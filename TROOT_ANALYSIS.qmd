@@ -33,6 +33,29 @@ libs <- c("pander", "readxl", "EnvStats",
 for(pk in libs) {
   library(pk, character.only = T)   
 }
+
+################################################################################
+# Set median kAQP to filter when doing stats
+med_kAQP <- 4e-4
+# med_kAQP <- 5.5e-4 # Permeable lignin
+
+# Set conversion factors from cm HPa-1 d-1 to m MPa-1 s-1
+kr.conv <- 1.1574e-3
+kx.conv <- 1.1574e-9
+
+# Load data
+MECHA_results_1  <- read.csv("./Results/MECHA_results_1.csv") # Default case
+MECHA_results_2  <- read.csv("./Results/MECHA_results_2.csv") %>% 
+  mutate(lignin_perm = case_when(
+    kw_lignin == 1e-16 ~ "imperm.",
+    kw_lignin == 4.3e-7 ~ "perm."
+  )) # Permeable Lignin case
+
+MECHA_results <- MECHA_results_1 # Dataframe that will be analysed
+
+Anatomy_Full   <- read.csv("Data/Anatomy/Anatomy_Full.csv")
+anatomy2       <- read.csv("Data/Anatomy/anatomy2.csv")
+Parameters     <- read_xlsx("Data/Parameters.xlsx")
 ```
 
 # Load Results from MECHA
@@ -50,41 +73,6 @@ for(pk in libs) {
   - *anatomy2* contains same info as Anatomy_Full but in only 3 columns : CS_id, param_id and value.
   
   - *Parameters* contains param_id, and meta data about parameters.
-
-```{r}
-# Set conversion factors from cm HPa-1 d-1 to m MPa-1 s-1
-kr.conv <- 1.1574e-3
-kx.conv <- 1.1574e-9
-
-# Load data
-MECHA_results  <- read.csv("./Results/MECHA_results.csv")
-Anatomy_Full   <- read.csv("Data/Anatomy/Anatomy_Full.csv")
-anatomy2       <- read.csv("Data/Anatomy/anatomy2.csv")
-Parameters     <- read_xlsx("Data/Parameters.xlsx")
-
-# Convert kr to m s-1 MPa-1 and kx to m4 s-1 MPa-1
-MECHA_results <- MECHA_results %>% 
-  rename(kx = Kx) %>% 
-  mutate(perimeter = perimeter*10, # from cm to mm
-         kr = kr*kr.conv,
-         kx = kx*kx.conv,
-         Kr = kr*perimeter,
-         kpl = kpl*(1e-6 * 1e4 * (60*60*24)^-1)
-         # kAQP = kAQP*kr.conv
-         )
-
-# Change barrier names
-MECHA_results$Barrier_Name <- NaN
-MECHA_results$Barrier_Name[MECHA_results$Barrier == "b1"] <- "En.CS"
-MECHA_results$Barrier_Name[MECHA_results$Barrier == "b2"] <- "En.Sub*"
-MECHA_results$Barrier_Name[MECHA_results$Barrier == "b3"] <- "En.Sub"
-MECHA_results$Barrier_Name[MECHA_results$Barrier == "b4"] <- "En.Sub-Ex.CS"
-MECHA_results$Barrier_Name[MECHA_results$Barrier == "b5"] <- "En.CS-Ex.CS"
-MECHA_results$Barrier_Name[MECHA_results$Barrier == "b6"] <- "En.CS-Ex.Sub"
-MECHA_results$Barrier_Name[MECHA_results$Barrier == "b7"] <- "Ex.CS"
-MECHA_results$Barrier_Name[MECHA_results$Barrier == "b8"] <- "En.Sub-Ex.Sub"
-MECHA_results$Barrier_Name[MECHA_results$Barrier == "b9"] <- "En.CS-Ex.LC"
-```
 
 # DESCRIPTIVE AND PLOTS OF QUANTIFIED DATA
 
@@ -121,7 +109,7 @@ plist <- Parameters %>%
 plist <- plist$param_id
 
 data2plot <- MECHA_results[c("CS_id", "kr", "kAQP", "Barrier_Name")] %>% 
-  filter(kAQP == 4e-4) %>% 
+  filter(kAQP == med_kAQP) %>% 
   select(-kAQP) %>% 
   filter(Barrier_Name %in% c("En.CS", "En.CS-Ex.LC", "En.CS-Ex.Sub")) %>%
   left_join(Anatomy_Full[c("CS_id", plist, "radius", "age")], by = "CS_id") %>% 
@@ -159,7 +147,8 @@ color_scale <- c("En.CS"        = "black",
                  "En.CS-Ex.Sub" = "#4E3CA5")
 
 data2plot <- MECHA_results %>% 
-  filter(kAQP == 4e-4) %>%
+  # filter(kAQP == 4e-4) %>%
+  filter(kAQP == med_kAQP) %>% 
   filter(Barrier_Name %in% c("En.CS", "En.CS-Ex.LC", "En.CS-Ex.Sub")) %>% 
   # mutate(kr = kr*1e8,
   #        Kr = Kr*1e9) %>% 
@@ -212,7 +201,7 @@ dev.off()
 ```{r}
 # Select data for only one Barrier (they all have the same values anyway)
 data2plot <- MECHA_results %>% 
-  filter(Barrier == "b1" & kAQP == 1e-4) %>% 
+  filter(Barrier == "b1" & kAQP == med_kAQP) %>% 
   select(c("CS_id", "kx")) %>% 
   left_join(Anatomy_Full[c("CS_id", "age")], by = "CS_id") %>% 
   mutate(kx_ln = ln(kx))
@@ -471,11 +460,17 @@ th <- 3 # Outlier treshold (x)
 
 # Define data
 data2stat <- MECHA_results %>% 
-  select(c("Barrier_Name", "kr", "kAQP", "CS_id")) %>% 
+  select(c("Barrier_Name", 
+           "kr", 
+           "kAQP", 
+           # "lignin_perm", 
+           "CS_id")
+         ) %>% 
   left_join(Anatomy_Full[c("CS_id", "age", "radius")], by = "CS_id") %>% 
   mutate(Barrier_Name = as.factor(Barrier_Name)) %>% 
   filter(Barrier_Name %in% barriers) %>% 
-  mutate(kr = kr)
+  mutate(kr = kr
+         )
 
 # # Remove outliers
 # data2stat <- data2stat %>% 
@@ -517,12 +512,14 @@ shapiro.test(data2stat$kr_tf)
 ```{r}
 lm_kr <- lm(data = data2stat, 
              formula = kr_tf ~ 
-               age +
-               radius +
-               Barrier_Name +
-               kAQP +
-               kAQP:Barrier_Name
-               )
+              age +
+              radius +
+              Barrier_Name +
+              # lignin_perm +
+              kAQP +
+              # kAQP:lignin_perm +
+              kAQP:Barrier_Name
+              )
 
 par(mfrow = c(2, 2))
 plot(lm_kr)
@@ -536,6 +533,8 @@ anova(lm_kr)
 # Export model 
 saveRDS(object = lm_kr, file = "./Results/kr_model.rds")
 ```
+
+### Extract coefficitents to build the regression
 
 $k_r^* = \beta_0 + \beta_1* $
 
@@ -606,7 +605,8 @@ color_scale <- c("En.CS"        = "black",
                  "En.CS-Ex.Sub" = "#4E3CA5")
 
 data2plot <- MECHA_results %>% 
-  filter(kAQP == 4e-4) %>%
+  # filter(kAQP == 4e-4) %>%
+  filter(kAQP == med_kAQP) %>% 
   filter(Barrier_Name %in% c("En.CS", "En.CS-Ex.LC", "En.CS-Ex.Sub")) %>% 
   # mutate(kr = kr*1e8,
   #        Kr = Kr*1e9) %>% 
@@ -766,7 +766,7 @@ At first i tested a ln transformation, but generalised Box-Cox transformation is
 
 ```{r}
 data2stat <- MECHA_results %>%
-  filter(kAQP == 1e-4 & Barrier_Name == "En.CS-Ex.Sub") %>% 
+  filter(kAQP == med_kAQP & Barrier_Name == "En.CS-Ex.Sub") %>% 
   left_join(Anatomy_Full[c("CS_id", "age", "radius")], by = "CS_id") %>% 
   select("kx", "age", "radius") %>% 
   mutate("kx_ln" = ln(kx))
@@ -900,7 +900,7 @@ th <- 3 # Outlier treshold (x)
 
 # Define data
 data2stat <- MECHA_results %>% 
-  filter(kAQP == 4e-4) %>% 
+  filter(kAQP == med_kAQP) %>% 
   select(c("Barrier_Name", "kr")) %>% 
   mutate(Barrier_Name = as.factor(Barrier_Name)) %>% 
   filter(Barrier_Name %in% barriers)
@@ -929,11 +929,7 @@ ks.test(data2stat$kr, 'pnorm', mean(data2stat$kr), sd(data2stat$kr))
 hist(data2stat$kr, breaks = 20)
 qqnorm(data2stat$kr)
 qqline(data2stat$kr)
-```
 
-We see that data is not normal so we apply a Cox-Box transfomation (Box & Cox 1964).
-
-```{r}
 #APPLY COX-BOX TRANSFORMATION
 bc     <- MASS::boxcox(lm(data2stat$kr ~ 1))
 lambda <- bc$x[which(bc$y == max(bc$y))]
@@ -992,8 +988,13 @@ mean_b4 <- BoxCox_reverse(Means$emmean[Means$Barrier_Name == "En.Sub"], lambda)
 mean_b5 <- BoxCox_reverse(Means$emmean[Means$Barrier_Name == "En.Sub-Ex.CS"], lambda)
 mean_b6 <- BoxCox_reverse(Means$emmean[Means$Barrier_Name == "En.Sub-Ex.Sub"], lambda)
 
+# print(paste0("Difference En.CS / En.CS-Ex.LC [%]  : ", round((mean_b1-mean_b2)*100/mean_b1, digits = 2)))
+# print(paste0("Difference En.CS / En.Sub [%]       : ", round((mean_b1-mean_b4)*100/mean_b1, digits = 2)))
+
 print(paste0("Difference En.CS / En.CS-Ex.LC [%]  : ", round((mean_b1-mean_b2)*100/mean_b1, digits = 2)))
 print(paste0("Difference En.CS / En.Sub [%]       : ", round((mean_b1-mean_b4)*100/mean_b1, digits = 2)))
+
+
 ```
 
 
@@ -1110,7 +1111,8 @@ get_legend(p_Barriers)
 #        plot = p_Barriers, 
 #        device = "svg", width = 5, height = 5)
 
-svg(filename = "plots/MECHA/MECHA_Barriers_comparison.svg", width = 4, height = 4)
+# svg(filename = "plots/MECHA/MECHA_Barriers_comparison.svg", width = 4, height = 4)
+svg(filename = "plots/MECHA/MECHA_Barriers_comparison.svg", width = 2, height = 4)
 p_Barriers
 dev.off()
 ```

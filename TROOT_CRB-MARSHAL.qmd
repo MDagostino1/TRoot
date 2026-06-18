@@ -19,8 +19,8 @@ rm(list = ls())
 # ============================================================================ #
 # DEFINE PATHS
 CRBM.path    <- "./src/CRB-MARSHAL/"
-# path.results <- "C:/Users/mdagostino/OneDrive - UCL/T-ROOT/ANALYSIS/RESULTS/CRB-MARSHAL/"  # Local path where CRB-MARSHAL data are stored
-path.results <- "./Results/CRB-MARSHAL/"
+path.results <- "C:/Users/mdagostino/OneDrive - UCL/T-ROOT/ANALYSIS/RESULTS/CRB-MARSHAL/"  # Local path where CRB-MARSHAL data are stored
+# path.results <- "./Results/CRB-MARSHAL/"
 path.plots   <- "./plots/CRB-MARSHAL/"
 # ============================================================================ #
 libs <- c("pander", 
@@ -708,10 +708,10 @@ SUF_plot <- ggplot(data = SUF_df) +
   geom_point(aes(x = zr
                  ,y = SUF_sum_mean
                  ,color = Scenario_ID
-                 # ,shape = Scenario_ID
+                 ,shape = Scenario_ID
                  )
              # ,position = position_dodge(0.5)
-             ,size = 1
+             ,size = 2
              ) +
 
   geom_errorbar(aes(x = zr
@@ -737,6 +737,10 @@ SUF_plot <- ggplot(data = SUF_df) +
   scale_color_manual(values = S_colors) +
   # scale_fill_manual(values = S_colors) +
   # scale_fill_viridis(discrete = T) +
+  scale_shape_manual(values = c("WT" = 15, 
+                               "kAQP" = 16, 
+                               "Sub" = 17, 
+                               "SubSG" = 18)) +
 
   ylab("Standart Uptake Fractions [-]") +
   xlab("depth [cm]") +
@@ -747,8 +751,9 @@ SUF_plot <- ggplot(data = SUF_df) +
   coord_flip() +
   # ggtitle(paste0("Sum of SUF per scenario")) +
   theme_few() +
-  theme(axis.text.x  = element_text(size = 8, angle = 90, hjust = 1, vjust = 0.5)) +
-  theme(legend.position = "none")
+  theme(axis.text.x  = element_text(size = 8, angle = 90, hjust = 1, vjust = 0.5)
+        # ,legend.position = "none"
+  )
   
 SUF_plot
 
@@ -756,8 +761,8 @@ SUF_plot
 #        plot = SUF_plot, 
 #        device = "svg", width = 5, height = 5)
 
-svg(filename = paste0(path.plots, "SUF_sum_full.svg"), 
-    width = 4, height = 4)
+svg(filename = paste0(path.plots, "SUF_sum_full.svg"),
+    width = 5, height = 4)
 SUF_plot
 dev.off()
 ```
@@ -897,7 +902,7 @@ plot_SUF <- function(data2plot){
                      y = z1, yend = z2,
                      color = SUF, size = radius)) +
     
-    scale_size_continuous(range = c(0.5, 1), 
+    scale_size_continuous(range = c(0.5, 2), 
                           limits = c(min(data2plot$radius), 
                                      max(data2plot$radius))) +
     
@@ -919,6 +924,60 @@ plot_SUF <- function(data2plot){
 }
 ```
 
+```{r}
+data2plot <- RSHA_full %>% 
+  filter(age == 60 & RSA_id == unique(RSA.IDs$RSA_id[1])) %>% 
+  filter(Scenario_ID %in% c("WT", "SubSG")) %>% 
+  mutate(SUF_norm = case_when(
+    Scenario_ID %in% c("WT", "kAQP", "Sub") ~ 3*SUF,
+    Scenario_ID == "SubSG" ~ SUF
+  ))
+  
+rmin <- min(data2plot$radius)
+rmax <- 1
+
+p <- ggplot() +
+    
+    # geom_segment(data = data2plot_main,
+    #              aes(x = x1, xend = x2,
+    #                  y = z1, yend = z2,
+    #                  size = radius),
+    #              color = "blue") +  
+    
+    geom_segment(data = data2plot,
+                 aes(x = x1, xend = x2,
+                     y = z1, yend = z2,
+                     color = SUF_norm, size = radius)) +
+    
+    scale_size_continuous(range = c(rmin, rmax), 
+                          limits = c(min(data2plot$radius), 
+                                     max(data2plot$radius))) +
+    
+    scale_color_viridis(option = "magma",
+                        breaks = c(min(data2plot$SUF_norm),
+                                   max(data2plot$SUF_norm)
+                                   ),
+                        labels = c("low", "high"),
+                        direction = 1
+                        # , limits = c(min(data2plot$SUF), max(data2plot$SUF))
+                        ) +
+    
+    facet_wrap(~ Scenario_ID, nrow = 1) +
+    coord_fixed() +
+    theme_classic()
+    # theme_void()
+
+plot(p)
+
+ggsave(filename = paste0("RSHA_suf_example_clean", ".png")
+       , plot = p
+       ,dpi = 1000
+       ,device = "png"
+       ,path = path.plots
+       ,width = 4, height = 4)
+```
+
+
 Plot for WT and SubSG
 
 ```{r}
@@ -930,10 +989,10 @@ for(S_id in unique(RSHA_full$Scenario_ID)){
     filter(age == age_i & RSA_id == unique(RSA.IDs$RSA_id[1]) & Scenario_ID == S_id)
   p <- plot_SUF(data2plot)
   plot(p)
-  ggsave(filename = paste0("RSHA_suf_example_", age_i, "_", S_id, ".png"), plot = p
-       ,device = "png"
-       ,path = path.plots
-       ,width = 4, height = 4)
+  # ggsave(filename = paste0("RSHA_suf_example_", age_i, "_", S_id, ".png"), plot = p
+  #      ,device = "png"
+  #      ,path = path.plots
+  #      ,width = 4, height = 4)
   
 }
 ```

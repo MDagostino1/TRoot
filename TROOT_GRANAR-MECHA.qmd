@@ -9,7 +9,7 @@ editor_options:
 
 # INTRODUCTION
 
-This notebook contains the code workflow to load quantified anatomy data, run GRANAR and run MECHA. \
+This notebook contains the code workflow to load quantified anatomy data, run GRANAR and run MECHA.\
 
 ```{r, include=F}
 options(rstudio.help.showDataPreview = FALSE)
@@ -80,30 +80,32 @@ date           <- Sys.Date()
 
 # Correct units in Parameters
 Parameters$units[Parameters$param_id == "xylem_max_size" | Parameters$param_id == "xylem_cell_diameter"] <- "mm"
+
+# Set conversion factors from cm HPa-1 d-1 to m MPa-1 s-1
+kr.conv <- 1.1574e-3
+kx.conv <- 1.1574e-9
 ```
 
-# [don't run] Process Anatomical Data
+# \[don't run\] Process Anatomical Data
 
-We quantified 40+ root cross sections of tomato from microscope pictures.  \
-These quantifications are in *Data/Quantifications/* folder, in the form of .XSLX files. \
-We run the script *Data_preparation.R* in *./src¨* to convert these XLSX file into single tables. \
-NB : Metadata files are required : \
--   *Plants* contains IDs, ages and lengths of each roots \
--   *Segments* contains informations about segments of each root \
--   *CrossSections* contains IDs and informations about each cross section \
-The script in *Data_preparation.R* creates 
-
+We quantified 40+ root cross sections of tomato from microscope pictures.\
+These quantifications are in *Data/Quantifications/* folder, in the form of .XSLX files.\
+We run the script *Data_preparation.R* in *./src¨* to convert these XLSX file into single tables.\
+NB : Metadata files are required :\
+- *Plants* contains IDs, ages and lengths of each roots\
+- *Segments* contains informations about segments of each root\
+- *CrossSections* contains IDs and informations about each cross section\
+The script in *Data_preparation.R* creates
 
 Here we load an convert quantification data (in the form of *xlsx* files in *Data/Quantifications* folder) into GRANAR parameters (params). The params will be stored both into single *xml* files (in the folder *Params*) directly usible into GRANAR, and into the big table Anatomy2. The file *Data_Preparation.R* automatically load and treat data from *Data/Quantifications*.
 
--   *anatomy1* contains all quantifiation data
--   *anatomy2* contains all values of all GRANAR params for each cross section
--   *Parameters* contains information about the measured and GRANAR params
+- *anatomy1* contains all quantifiation data
+- *anatomy2* contains all values of all GRANAR params for each cross section
+- *Parameters* contains information about the measured and GRANAR params
 
 ```{r}
 # source("./src/Data_preparation.R")
 ```
-
 
 ```{r}
 # All anatomical data in standard table ; Create Anatomy_Full.csv
@@ -126,9 +128,9 @@ write.csv(Anatomy_Full, "Data/Anatomy/Anatomy_Full.csv", row.names = F)
 
 This part load and analyse the cross section quantifications.
 
-First let's have a look at metadata. 
+First let's have a look at metadata.
 
-So we had 
+So we had
 
 ## Root lengths
 
@@ -202,7 +204,7 @@ ggsave(filename = "plots/Anatomy/Anatomy_Quantifications.svg",
        device = "svg")
 ```
 
-Plot all individual quantified traits in *plots/anatomical_measurements/* 
+Plot all individual quantified traits in *plots/anatomical_measurements/*
 
 ```{r}
 # param_id_i <- cols[5]
@@ -231,8 +233,7 @@ for(i in seq(1, length(cols))){
 
 ## Secondary Growth
 
-Secondary Growth was monitored as binary (0 = primary growth, 1 = secondary growth).
-Note that the *intermediate* phase is classified as secondary growth.
+Secondary Growth was monitored as binary (0 = primary growth, 1 = secondary growth). Note that the *intermediate* phase is classified as secondary growth.
 
 ```{r}
 SG_data <- anatomy2 %>% 
@@ -260,7 +261,7 @@ ggsave(filename = "plots/Anatomy/SG_probability.svg",
        device = "svg")
 ```
 
-## Radius 
+## Radius
 
 Here we see that radius can be approximated as constant till 25 days, at 0.199 mm. Then, after 25 days, it can be approximated using : $r = exp(-7.59 + 0.23x)$
 
@@ -313,7 +314,6 @@ pred2_df <- data.frame(age      = seq(treshold, 30),
 radius_pred <- rbind(pred1_df, pred2_df)
 ```
 
-
 ```{r}
 radius_plot <- ggplot() +
   
@@ -360,6 +360,15 @@ p
 dev.off()
 ```
 
+In Canto-Pastor 2024, suberin appears at :
+  * patchy : 35+-5    % of root length -> 2.45+-0.35 d
+  * full   : 63+-11.5 % of root length -> 4.41+-0.80 d
+  
+In Manzano 2025 :
+  * lignin start at 0.4 cm from the root tip
+  * fully recover epidermal frontier at 2 cm
+  * full recover of epi frontier + CS at 8 cm
+
 ## Correlations
 
 ```{r}
@@ -401,7 +410,6 @@ ggplot(Barriers_Timing) +
   geom_point(aes(x = age, y = barrier, color = tissue)) +
   theme_few()
 ```
-
 
 ## Parameter regressions
 
@@ -456,16 +464,14 @@ xml <- "src/Params/B04_B_To_C01_Z20_01.xml"
 param1 <- read_param_xml(xml)
 
 # Modify some parameters
-# param1$value[param1$name == "secondarygrowth" & param1$type == "param"] <- 1
-# param1$value[param1$name == "phloem" & param1$type == "n_layers"]       <- 0
-param1$value[param1$name == "param" & param1$type == "randomness"]        <- 0
+# param1$value[param1$name == "secondarygrowth" & param1$type == "param"]   <- 1
+# param1$value[param1$name == "phloem" & param1$type == "n_layers"]         <- 0
+param1$value[param1$name == "param" & param1$type == "randomness"]          <- 0
 # param1$value[param1$name == "cortex" & param1$type == "n_layers"]         <- 1
 # param1$value[param1$name == "cortex" & param1$type == "cell_diameter"]    <- 0.005
 # param1$value[param1$name == "epidermis" & param1$type == "cell_diameter"] <- 0.005
 # param1$value[param1$name == "exodermis" & param1$type == "cell_diameter"] <- 0.005
 ```
-
-
 
 ## Play with GRANAR
 
@@ -531,32 +537,32 @@ To run MECHA, we first load the root of interest by changing *current_root*. Nex
 
 By default, MECHA can simulate different scenarios : \*
 
--   **B0 : No apoplastic barriers**
+- **B0 : No apoplastic barriers**
 
--   **B1 : Endodermal Casparian strip (radial walls)**
+- **B1 : Endodermal Casparian strip (radial walls)**
 
--   **B2 : Endodermal suberization except at passage cells**
+- **B2 : Endodermal suberization except at passage cells**
 
--   **B3 : Endodermis full suberization**
+- **B3 : Endodermis full suberization**
 
--   **B4 : Endodermis full suberization and exodermal Casparian strip (radial walls)**
+- **B4 : Endodermis full suberization and exodermal Casparian strip (radial walls)**
 
--   **B5 : Endo- and exodermal Casparian strips (radial walls)**
+- **B5 : Endo- and exodermal Casparian strips (radial walls)**
 
--   **B6 : Exodermis full suberization and endodermal Casparian strip (radial walls)**
+- **B6 : Exodermis full suberization and endodermal Casparian strip (radial walls)**
 
--   **B7 : Exodermal Casparian strip (radial walls)**
+- **B7 : Exodermal Casparian strip (radial walls)**
 
--   **B8 : Endo and exodermal suberization**
+- **B8 : Endo and exodermal suberization**
 
--   **B9: Lignin Cap and endodermal CS**
+- **B9: Lignin Cap and endodermal CS**
 
 Here we choose to compute scenarios 0, 1, 5 and 6. You can change the simulated scenarios in *MECHA/Projects/granar/in/Maize_Geometry.xml* in line 19.
 
 ```{r}
 # Load a GRANAR anatomy file
 anatomy_path <- "Data/Virtual Anatomies/"
-anatomy_file <- "B04_B_To_C01_Z20_01.xml"
+anatomy_file <- "P11_D_To_C01_Z20_01.xml"
 
 # Quick look at current_root
 test <- get_root_section(paste0(anatomy_path, anatomy_file))
@@ -577,7 +583,7 @@ ggplot(test) +
 source("./src/MECHA/MECHA_functions.R")
 
 # Upload current anatomy to MECHA folder
-MECHA.upload_anatomy(filename = "B04_B_To_C01_Z20_01.xml",
+MECHA.upload_anatomy(filename = "P11_D_To_C01_Z20_01.xml",
                      filepath = "./Data/Virtual Anatomies/",
                      path_MECHA = "./src/MECHA/")
 
@@ -602,6 +608,8 @@ MECHA_inputs_list <- read_MECHA_inputs(read_path,
 MECHA_inputs_list$General$properties$Output$path        <- "out/"
 MECHA_inputs_list$Hydraulics$param$kAQPrange$kAQP$value <- 1.5e-4
 
+MECHA_inputs_list$Hydraulics$param$kw_barrier_range$kw_barrier$Casp <- 1e-10
+
 # WRITE XML's
 write_MECHA_inputs(input_list = MECHA_inputs_list, 
                    path = paste0(path_MECHA, "Projects/in/"), 
@@ -616,12 +624,25 @@ Launch MECHA
 
 ```{r}
 library(reticulate)
-use_condaenv("GRANAR-MECHA") # choose python environment 
+use_condaenv("GRANAR-MECHA") # choose python environment
 sys <- import("sys", convert=T)
 
 # ============================================================================ #
+# Clean output file
+files <- list.files("./src/MECHA/Projects/out/")
+for(f in files){
+  unlink(paste0("./src/MECHA/Projects/out/", f))
+}
+
+# Run MECHA
 py_run_file("src/MECHA/MECHAv4_TRoot.py")
 Conds <- MECHA_get_results(output_path = "./src/MECHA/Projects/out/")
+
+ggplot(Conds %>% 
+         filter(Barrier %in% c("b1", "b9", "b6")) %>% 
+         mutate(Barrier = factor(Barrier, levels = c("b1", "b9", "b6")))) +
+  geom_bar(aes(x = Barrier, y = kr), stat = "identity") +
+  theme_bw()
 
 ```
 
@@ -630,43 +651,60 @@ Visualization (in devlopment)
 ```{r, eval=FALSE}
 rp <- "./src/MECHA/Projects/out/"
 
-Flux1 <- ApoSymp(paste0(rp,"Macro_prop_1,1.txt")) # En.CS
+# Flux1 <- ApoSymp(paste0(rp,"Macro_prop_1,1.txt")) # En.CS
 Flux9 <- ApoSymp(paste0(rp,"Macro_prop_9,9.txt")) # En.CS-Ex.LC
 Flux6 <- ApoSymp(paste0(rp,"Macro_prop_6,6.txt")) # En.CS-Ex.Sub
 
-plot_water_flux(Flux1, apobar = 3)
+# plot_water_flux(Flux1, apobar = 3)
 plot_water_flux(Flux9, apobar = 3)
-plot_water_flux(Flux6, apobar = 3)
+# plot_water_flux(Flux6, apobar = 3)
 ```
 
 ## Run MECHA for all quantified anatomies
 
+NB : For the main analysis, MECHA was run for 10 values of kAQP (ranging from 1 to 10 x E-4 cm HPa-1 d-1) and for all apoplastic barriers types.
+
+The results of this main analysis are stored in */Results/MECHA_results_1.csv*.
+
+Here we re-run an analysis only for b1, b6 and b9, with varying kAQP and lignin permeability.
+
+The results of this second analysis will be stored in */Results/MECHA_results_2.csv*.
+
+/!\ The definition of apoplastic barriers simulation is done manually in *MECHA/Projects/in/Tomato_Geometry.xml*
+
 We need to run MECHA for :
 
-* Each GRANAR anatomy
+  - Each GRANAR anatomy
+  
+  - 3 types of apoplastic barriers deposition (b1, b6 and b9 -> to change manually in Tomato_Geometry.xml!!)
 
-* 10 values of kAQP (ranging from 1 to 10 e-4 cm HPa-1 d-1)
+  - 10 values of kAQP (ranging from 1 to 10 e-4 cm HPa-1 d-1)
 
-* 10 values of PDM?
+  - 2 values of kw_lignin : 1e-16 (impermeable) and 4.3e-7 (1 nanometer pores) cm2 HPa-1 d-1
 
-Define parametric space
+### Define parametric space
 
 ```{r, eval= F}
 # List files of GRANAR anatomies
 Anatomy_list <- list.files(path = "./Data/Virtual Anatomies/", pattern = ".xml")
 
 # Set hydraulic parameters
-kAQP_list    <- seq(1:10)*1e-4  # Elhert et al. (2009) : 4.3e-4 [cm/HPa/d]
-kpl_list     <- 5.3e-12         # Bret-Harte 1994      : 5.3e-12 [cm^3/hPa/d/plasmodesmata]
+kAQP_list    <- c(1e-4, 4e-4, 8e-4)  # Elhert et al. (2009) : 4.3e-4 [cm/HPa/d]
+kpl_list     <- c(5.3e-12)           # Bret-Harte 1994      : 5.3e-12 [cm^3/hPa/d/plasmodesmata]
+kw_lignin    <- c(1e-16, 4.3e-7)
 
-hydro_params  <- expand.grid(kAQP = kAQP_list, kpl  = kpl_list)
+hydro_params  <- expand.grid(kAQP = kAQP_list, kpl  = kpl_list, kw_lignin = kw_lignin)
 
 hydro_params <- hydro_params %>% 
-  mutate(Simu_ID = paste0(kAQP, "_", kpl))
+  mutate(Simu_ID = paste0(kAQP, "_", kpl, "_", kw_lignin))
 ```
+
+### Loop MECHA
 
 ```{r, include = F}
 library(reticulate)
+# use_condaenv("GRANAR-MECHA") # choose python environment
+# sys <- import("sys", convert=T)
 source("./src/MECHA/MECHA_functions.R")
 
 # Set up
@@ -706,6 +744,7 @@ for(anatomy in Anatomy_list){
     Simu_ID <- hydro_params$Simu_ID[i]
     kAQP    <- hydro_params$kAQP[i]
     kpl     <- hydro_params$kpl[i]
+    kw_lignin <- hydro_params$kw_lignin[i]
     
     # Check if the Result_ID has already been simulated
     Result_ID <- paste0(CS_id, "_", Simu_ID)
@@ -732,6 +771,7 @@ for(anatomy in Anatomy_list){
     MECHA_inputs_list$General$properties$Output$path        <- "out/"
     MECHA_inputs_list$Hydraulics$param$kAQPrange$kAQP$value <- kAQP
     MECHA_inputs_list$Hydraulics$param$Kplrange$Kpl$value   <- kpl
+    MECHA_inputs_list$Hydraulics$param$kw_barrier_range$kw_barrier$Casp <- kw_lignin
     
     # WRITE XML's
     write_MECHA_inputs(
@@ -779,7 +819,7 @@ for(anatomy in Anatomy_list){
 }
 ```
 
-Collect and process all results
+### Collect and process all results
 
 ```{r}
 list_results  <- list.files("./Results/MECHA_results/")
@@ -790,27 +830,197 @@ for(i in list_results){
   MECHA_results <- rbind(MECHA_results, results_temp)
 }
 
-write.csv(x = MECHA_results, file = "./Results/MECHA_results.csv", row.names = F)
+
+MECHA_results <- left_join(MECHA_results, hydro_params) %>% 
+  
+  # Here we remove scenarios that are not in hydro_params
+  # na.omit() %>% 
+  
+  rename(kx = Kx) %>% 
+  
+  # Convert kr to m s-1 MPa-1 and kx to m4 s-1 MPa-1
+  mutate(perimeter = perimeter*10, # from cm to mm
+         kr = kr*kr.conv,
+         kx = kx*kx.conv,
+         Kr = kr*perimeter,
+         kpl = kpl*(1e-6 * 1e4 * (60*60*24)^-1)
+         # kAQP = kAQP*kr.conv
+         ) %>% 
+
+  # Change barrier names  
+  mutate(Barrier_Name = case_when(
+    Barrier == "b1" ~ "En.CS",
+    Barrier == "b2" ~ "En.Sub*",
+    Barrier == "b3" ~ "En.Sub",
+    Barrier == "b4" ~ "En.Sub-Ex.CS",
+    Barrier == "b5" ~ "En.CS-Ex.CS",
+    Barrier == "b6" ~ "En.CS-Ex.Sub",
+    Barrier == "b7" ~ "Ex.CS",
+    Barrier == "b8" ~ "En.Sub-Ex.Sub",
+    Barrier == "b9" ~ "En.CS-Ex.LC"
+  )) 
+  
+
+write.csv(x = MECHA_results, file = "./Results/MECHA_results_2.csv", row.names = F)
 ```
+
+## Analyse Results
 
 Simple preview
 
 ```{r}
-MECHA_results <- read.csv("./Results/MECHA_results.csv")
+color_scale <- c("En.CS" = "black", 
+                 "En.CS-Ex.LC" = "#C71AB7", 
+                 "En.CS-Ex.Sub" = "#4E3CA5")
+
+MECHA_results <- read.csv("./Results/MECHA_results_2.csv") %>% 
+  mutate(Barrier_Name = factor(Barrier_Name, levels = c("En.CS", "En.CS-Ex.LC", "En.CS-Ex.Sub"))) %>% 
+  mutate(kw_lignin = as.factor(kw_lignin))  
 
 data2plot <- MECHA_results %>% 
-  left_join(Anatomy_Full, by = "CS_id") %>% 
-  # filter(kAQP == 4e-4) %>% 
-  filter(Barrier %in% c("b1", "b9", "b6"))
+  left_join(Anatomy_Full, by = "CS_id")
 
-ggplot(data2plot, 
+p1 <- ggplot(data2plot, 
        aes(x = age, 
-           y = kr, 
-           color = Barrier)) +
+           y = kr*1e7, 
+           color = kw_lignin)) +
   geom_point() +
   geom_smooth() +
-  facet_wrap(~kAQP) +
-  theme_few()
+  facet_grid(kAQP~Barrier_Name) +
+  theme_bw()
+
+p1
+ggsave(filename = "./plots/MECHA/MECHA_lignin_comparison_1.png",plot = p1
+       ,device = "png", width = 5, height = 4)
+
 ```
 
+```{r}
+data2stat <- MECHA_results %>% 
+  select(c("CS_id", "kr", "kw_lignin", "kAQP", "Barrier_Name")) %>% 
+  mutate(ln_p = case_when(kw_lignin == 1e-16 ~ "imper.",
+                          kw_lignin == 4.3e-7 ~ "per.")
+         ) %>% 
+  select(-c(kw_lignin)) %>% 
+  mutate(kAQP = as.factor(kAQP*1e4))
+
+p <- ggplot(data2stat) +
+  geom_violin(aes(x = ln_p, y = kr, fill = Barrier_Name, color = Barrier_Name), 
+              alpha = 0.2, width = 0.7) +
+  geom_boxplot(aes(x = ln_p, y = kr, fill = Barrier_Name), 
+               alpha = 0.2, width = 0.7) +
+  # geom_jitter(aes(x = ln_p, y = kr, color = Barrier_Name, shape = ln_p), width = 0.1) +
+  facet_wrap(~kAQP, nrow = 1) +
+  scale_color_manual(values = color_scale) +
+  scale_fill_manual(values = color_scale) +
+  theme_clean()  +
+  theme(axis.text.x = element_text(angle = 90))
+p
+
+ggsave(filename = "./plots/MECHA/MECHA_lignin_comparison_2.png",plot = p
+       ,device = "png", width = 7, height = 3)
+```
+
+Stats 
+
+```{r}
+data2stat2 <- data2stat %>% filter(kAQP == 4) 
+kw_lignin_lm <- lm(data2stat2
+                  ,formula = kr ~ Barrier_Name * ln_p)
+
+par(mfrow = c(2, 2))
+plot(kw_lignin_lm)
+```
+
+
+```{r}
+summary(kw_lignin_lm)
+cat("###################################### \n")
+anova(kw_lignin_lm)
+cat("###################################### \n")
+EM <- emmeans(kw_lignin_lm, ~ Barrier_Name | ln_p)
+print(EM)
+
+Means <- as_tibble(EM)
+mean1 <- Means$emmean[Means$Barrier_Name == "En.CS" & Means$ln_p == "per."]
+mean2 <- Means$emmean[Means$Barrier_Name == "En.CS-Ex.LC" & Means$ln_p == "per."]
+mean3 <- Means$emmean[Means$Barrier_Name == "En.CS-Ex.Sub" & Means$ln_p == "per."]
+
+cat("Difference between En.CS and En.CS-Ex.LC :", round((mean2-mean1)*100/mean1, digits = 2), "% \n")
+cat("Difference between En.CS-Ex.LC and En.CS-Ex.Sub :", round((mean3-mean2)*100/mean2, digits = 2), "% \n")
+cat("Difference between En.CS and En.CS-Ex.Sub :", round((mean3-mean1)*100/mean1, digits = 2), "% \n")
+
+contrast(EM, method = "pairwise")
+```
+
+Violin Plot
+
+```{r}
+data2plot <- MECHA_results %>% 
+  filter(kAQP == 4e-4 & kw_lignin == 4.3e-7) %>% 
+  
+  mutate(Endodermis = recode(Barrier_Name,
+                             "En.CS"         = "Endodermal CS",
+                             "En.CS-Ex.LC"   = "Endodermal CS",
+                             "En.CS-Ex.Sub"  = "Endodermal CS",
+                             "En.Sub"        = "Endodermal Sub",
+                             "En.Sub-Ex.CS"  = "Endodermal Sub",
+                             "En.Sub-Ex.Sub" = "Endodermal Sub")
+         ) %>% 
+  mutate(Exodermis = recode(Barrier_Name,
+                             "En.CS"         = "none",
+                             "En.CS-Ex.LC"   = "LC",
+                             "En.CS-Ex.Sub"  = "Sub",
+                             "En.Sub"        = "none",
+                             "En.Sub-Ex.CS"  = "LC",
+                             "En.Sub-Ex.Sub" = "Sub")
+         ) %>% 
+  mutate(kr = kr*1e8)
+  
+
+p_Barriers <- ggplot(data = data2plot, 
+                     aes(x = Exodermis, 
+                         y = kr)
+                     ) +
+  
+  # # ADD VIOLINS
+  geom_violin(aes(fill  = Barrier_Name, color = Barrier_Name),
+              # fill  = "lightgrey",
+              # color = "white",
+              alpha = 0.2) +
+  
+  # ADD POINTS
+  geom_jitter(aes(x = Exodermis, 
+                  y = kr,
+                  color = Barrier_Name)
+              ,width = 0.1
+              ,size = 1
+              ) +
+  
+  facet_wrap(~Endodermis, scales = "free") +
+  
+  # CUSTOM LABELS
+  xlab("Exodermis") +
+  ylab(expression(k[r] ~ "[" ~ 10^{-08} ~ m ~ MPa^{-1} ~ s^{-1} ~ "]")) +
+  ylim(1, 20) +
+  
+  # OTHER PARAMS
+  # scale_fill_manual(values=c("white","white","white", "grey", "grey", "grey")) +
+  # scale_color_viridis() +
+  scale_color_manual(values = color_scale) +
+  scale_fill_manual(values = color_scale) +
+  
+  theme_few() +
+  theme(legend.position = "none"
+        ,axis.line = element_line()
+        ,panel.border = element_blank()
+        ) +
+  theme(axis.text.x = element_text(angle = 90))
+
+p_Barriers
+
+svg(filename = "plots/MECHA/MECHA_Barriers_comparison.svg", width = 2, height = 4)
+p_Barriers
+dev.off()
+```
 

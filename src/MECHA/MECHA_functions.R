@@ -418,8 +418,12 @@ MECHA_get_results <- function(output_path)
     Kx         <- as.double(strsplit(macro_prop[7,], " ")[[1]][5])
     perimeter  <- as.double(strsplit(macro_prop[6,], " ")[[1]][3])
     
-    barrier    <- unlist(strsplit(list_files[i], split = ","))[2]
-    barrier    <- unlist(strsplit(barrier, split = ".txt"))[1]
+    # barrier    <- unlist(strsplit(list_files[i], split = ","))[2]
+    # barrier    <- unlist(strsplit(barrier, split = ".txt"))[1]
+    # barrier    <- paste0("b", barrier)
+    
+    barrier    <- unlist(strsplit(list_files[i], split = ","))[1]
+    barrier    <- unlist(strsplit(barrier, split = "_"))[3]
     barrier    <- paste0("b", barrier)
     
     Conds_temp <- tibble(Barrier   = barrier,
