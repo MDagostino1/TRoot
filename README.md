@@ -1,5 +1,7 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18324981.svg)](https://doi.org/10.5281/zenodo.18324981)
 # [TROOT] Secondary Growth and Exodermal Barriers Shape Local Root Hydraulics: Modeling Insights in Tomato
+Published in _in silico Plants_ [here](https://doi.org/10.1093/insilicoplants/diag022).
+
 Marco D’Agostino, Rémy Schoppach, Adrien Heymans, Valentin Couvreur, Guillaume Lobet
 
 The analysis is decomposed in 3 notebooks :
